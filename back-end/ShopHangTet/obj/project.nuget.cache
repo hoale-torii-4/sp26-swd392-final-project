@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "dgSpecHash": "hozwOaUDVvc=",
+  "success": true,
+  "projectFilePath": "D:\\duc\\HK7\\SWD392\\sp26-swd392-final-project\\back-end\\ShopHangTet\\ShopHangTet.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Asus\\.nuget\\packages\\microsoft.aspnetcore.openapi\\9.0.4\\microsoft.aspnetcore.openapi.9.0.4.nupkg.sha512",
+    "C:\\Users\\Asus\\.nuget\\packages\\microsoft.openapi\\1.6.17\\microsoft.openapi.1.6.17.nupkg.sha512",
+    "C:\\Users\\Asus\\.nuget\\packages\\microsoft.visualstudio.azure.containers.tools.targets\\1.21.0\\microsoft.visualstudio.azure.containers.tools.targets.1.21.0.nupkg.sha512"
+  ],
+  "logs": []
+}
