@@ -1,0 +1,31 @@
+services:
+  # Database
+  db:
+    image: mongo:7.0
+    container_name: shop_hang_tet_db
+    command: ["mongod","--replSet","rs0","--bind_ip_all"]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  # Backend (Tùy chọn nếu muốn chạy BE trong Docker)
+  backend:
+    build: ./back-end/ShopHangTet
+    ports:
+      - "5000:8080"
+    environment:
+      - ConnectionStrings__MongoConnection=mongodb://db:27017/?replicaSet=rs0
+    depends_on:
+      - db
+
+  # Frontend (Tùy chọn)
+  frontend:
+    build: ./front-end
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:

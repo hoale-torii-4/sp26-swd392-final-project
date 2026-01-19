@@ -137,3 +137,33 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+# ==========================================
+# ASP.NET Core / C# (Backend)
+# ==========================================
+bin/
+obj/
+out/
+.vs/
+.vscode/
+*.user
+*.userosscache
+*.sln.docstates
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Publish output
+publish/
+/app/publish/
+appsettings.Development.json
+
+# ==========================================
+# Windows / OS Specific
+# ==========================================
+Thumbs.db
+desktop.ini
+.DS_Store
