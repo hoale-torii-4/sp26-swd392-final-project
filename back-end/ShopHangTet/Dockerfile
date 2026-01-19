@@ -11,6 +11,11 @@ EXPOSE 8081
 # This stage is used to build the service project
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG BUILD_CONFIGURATION=Release
+
+# CÀI ĐẶT NODE.JS (Để build Vue.js và TS)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
 WORKDIR /src
 COPY ["ShopHangTet.csproj", "."]
 RUN dotnet restore "./ShopHangTet.csproj"
