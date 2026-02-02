@@ -149,6 +149,11 @@ out/
 *.userosscache
 *.sln.docstates
 
+# appsettings secrets
+appsettings.Development.json
+appsettings.Production.json
+.env
+
 # User-specific files
 *.rsuser
 *.suo
@@ -159,7 +164,6 @@ out/
 # Publish output
 publish/
 /app/publish/
-appsettings.Development.json
 
 # ==========================================
 # Windows / OS Specific
