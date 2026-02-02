@@ -8,16 +8,33 @@ services:
       - "27017:27017"
     volumes:
       - mongo_data:/data/db
+    healthcheck:
+      test: echo "try { rs.status() } catch (err) { rs.initiate({_id:'rs0',members:[{_id:0,host:'db:27017'}]}) }" | mongosh --quiet
+      interval: 5s
+      timeout: 30s
+      retries: 10
+      start_period: 40s
 
-  # Backend (Tùy chọn nếu muốn chạy BE trong Docker)
+  # Backend
   backend:
     build: ./back-end/ShopHangTet
     ports:
       - "5000:8080"
     environment:
       - ConnectionStrings__MongoConnection=mongodb://db:27017/?replicaSet=rs0
+      - ASPNETCORE_ENVIRONMENT=Development
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    restart: on-failure
+
+  # Frontend (Tùy chọn)
+  # frontend:
+  #   build: ./front-end
+  #   ports:
+  #     - "5173:5173"
+  #   depends_on:
+  #     - backend
 
 volumes:
   mongo_data:
