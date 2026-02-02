@@ -19,13 +19,5 @@ services:
     depends_on:
       - db
 
-  # Frontend (Tùy chọn)
-  frontend:
-    build: ./front-end
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
-
 volumes:
   mongo_data:
