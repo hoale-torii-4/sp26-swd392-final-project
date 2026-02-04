@@ -15,7 +15,7 @@ services:
       retries: 10
       start_period: 40s
 
-  # Backend
+  # Backend API
   backend:
     build: ./back-end/ShopHangTet
     ports:
@@ -27,14 +27,6 @@ services:
       db:
         condition: service_healthy
     restart: on-failure
-
-  # Frontend (Tùy chọn)
-  # frontend:
-  #   build: ./front-end
-  #   ports:
-  #     - "5173:5173"
-  #   depends_on:
-  #     - backend
 
 volumes:
   mongo_data:
