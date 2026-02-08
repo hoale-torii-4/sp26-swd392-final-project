@@ -5,7 +5,6 @@ using Microsoft.OpenApi.Models;
 using Scalar.AspNetCore;
 using MongoDB.Driver;
 using ShopHangTet.Data;
-using ShopHangTet.Interfaces;
 using ShopHangTet.Repositories;
 using ShopHangTet.Services;
 using System.Text;

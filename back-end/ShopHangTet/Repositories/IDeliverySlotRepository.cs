@@ -1,6 +1,6 @@
 using ShopHangTet.Models;
 
-namespace ShopHangTet.Interfaces;
+namespace ShopHangTet.Repositories;
 
 public interface IDeliverySlotRepository
 {
