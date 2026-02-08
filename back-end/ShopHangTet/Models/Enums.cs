@@ -20,6 +20,15 @@ public enum OrderItemType
     MIX_MATCH
 }
 
+/// Item Category Enum for Mix & Match validation theo SWD
+public enum ItemCategory
+{
+    DRINK,
+    FOOD, 
+    NUT,
+    ALCOHOL
+}
+
 public enum UserRole
 {
     MEMBER,

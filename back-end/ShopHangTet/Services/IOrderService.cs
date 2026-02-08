@@ -6,7 +6,19 @@ namespace ShopHangTet.Services
     /// Interface cho OrderService - quản lý đơn hàng B2C và B2B
     public interface IOrderService
     {
-        // === Order Placement (B2C/B2B separated) ===
+        // === SWD Compliant Methods - Tách riêng B2C và B2B ===
+        Task<OrderModel> PlaceB2COrderAsync(CreateOrderB2CDto dto);
+        Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto);
+        
+        // === Order Validation ===
+        Task<OrderValidationResult> ValidateB2COrderAsync(CreateOrderB2CDto dto);
+        Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto);
+        
+        // === SWD Mix & Match Validation ===
+        Task<MixMatchValidationResult> ValidateMixMatchRulesAsync(string customBoxId);
+        
+        // === Legacy methods - DEPRECATED ===
+        [Obsolete("Use PlaceB2COrderAsync or PlaceB2BOrderAsync instead")]
         Task<OrderModel> PlaceB2COrderAsync(CreateOrderDto dto);
         Task<OrderModel> PlaceB2BOrderAsync(CreateOrderDto dto);
         
@@ -21,7 +33,8 @@ namespace ShopHangTet.Services
         Task<OrderModel> UpdateStatusAsync(string orderId, OrderStatus status, string updatedBy, string? notes = null);
     }
 
-    /// DTO tạo đơn hàng (dùng trong OrderService)
+    /// Legacy DTO - DEPRECATED, use MasterDTOs instead
+    [Obsolete("Use CreateOrderB2CDto or CreateOrderB2BDto from MasterDTOs")]
     public class CreateOrderDto
     {
         public string? UserId { get; set; }

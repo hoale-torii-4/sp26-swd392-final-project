@@ -614,25 +614,449 @@ namespace ShopHangTet.Services
             var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
             if (item == null) return;
 
-            var previousStock = item.StockQuantity;
-            var newStock = previousStock - quantity;
+            // Deduct stock
+            item.StockQuantity -= quantity;
 
-            item.StockQuantity = newStock;
-
+            // SWD: Chỉ log DEDUCT khi Order chuyển sang PREPARING
             _context.InventoryLogs.Add(new InventoryLog
             {
-                ProductId = itemId,
-                ProductType = "ITEM",
-                ChangeType = "ORDER",
-                Quantity = -quantity,
-                PreviousStock = previousStock,
-                NewStock = newStock,
                 OrderId = orderId,
-                UpdatedBy = updatedBy,
-                Notes = "Deducted when order moved to PREPARING",
+                ItemId = itemId,
+                Quantity = -quantity, // Âm cho DEDUCT theo SWD
+                Action = "DEDUCT",
                 CreatedAt = DateTime.UtcNow
             });
         }
+
+        #region SWD Compliant Methods
+
+        /// Đặt hàng B2C (Guest hoặc Member) - 1 địa chỉ duy nhất theo SWD
+        public async Task<OrderModel> PlaceB2COrderAsync(CreateOrderB2CDto dto)
+        {
+            var validation = await ValidateB2COrderAsync(dto);
+            if (!validation.IsValid)
+            {
+                throw new InvalidOperationException(string.Join("; ", validation.Errors));
+            }
+
+            _logger.LogInformation($"Creating B2C order for {dto.CustomerEmail}");
+
+            if (!await TryReserveSlotAsync(dto.DeliverySlotId))
+            {
+                throw new InvalidOperationException("Delivery slot is not available");
+            }
+
+            try
+            {
+                var orderItems = await BuildOrderItemsFromB2CAsync(dto.Items);
+                var totalQuantity = orderItems.Sum(x => x.Quantity);
+
+                var order = new OrderModel
+                {
+                    Id = ObjectId.GenerateNewId(),
+                    OrderCode = GenerateOrderCode(),
+                    OrderType = OrderType.B2C, // BẮT BUỘC theo SWD
+                    UserId = string.IsNullOrEmpty(dto.UserId) ? null : ObjectId.Parse(dto.UserId),
+                    CustomerName = dto.CustomerName,
+                    CustomerEmail = dto.CustomerEmail,
+                    CustomerPhone = dto.CustomerPhone,
+                    Items = orderItems,
+                    // B2C: Single DeliveryAddress
+                    DeliveryAddress = MapDeliveryAddressFromDto(dto.DeliveryAddress, totalQuantity),
+                    DeliveryDate = dto.DeliveryDate,
+                    DeliverySlotId = string.IsNullOrEmpty(dto.DeliverySlotId) ? null : ObjectId.Parse(dto.DeliverySlotId),
+                    GreetingMessage = dto.GreetingMessage,
+                    GreetingCardUrl = dto.GreetingCardUrl,
+                    SubTotal = orderItems.Sum(x => x.TotalPrice),
+                    ShippingFee = CalculateShippingFee(1),
+                    Status = OrderStatus.PAYMENT_CONFIRMING,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                order.TotalAmount = order.SubTotal + order.ShippingFee;
+                order.StatusHistory.Add(new OrderStatusHistory
+                {
+                    Status = OrderStatus.PAYMENT_CONFIRMING,
+                    Timestamp = DateTime.UtcNow,
+                    UpdatedBy = "System",
+                    Notes = "Đơn hàng được tạo - Đang xác nhận thanh toán"
+                });
+
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"B2C Order created: {order.OrderCode}");
+                return order;
+            }
+            catch
+            {
+                await RollbackSlotAsync(dto.DeliverySlotId);
+                throw;
+            }
+        }
+
+        /// Đặt hàng B2B (Member only) - OrderDelivery + OrderDeliveryItem theo SWD
+        public async Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto)
+        {
+            var validation = await ValidateB2BOrderAsync(dto);
+            if (!validation.IsValid)
+            {
+                throw new InvalidOperationException(string.Join("; ", validation.Errors));
+            }
+
+            _logger.LogInformation($"Creating B2B order for user {dto.UserId}");
+
+            if (!await TryReserveSlotAsync(dto.DeliverySlotId))
+            {
+                throw new InvalidOperationException("Delivery slot is not available");
+            }
+
+            try
+            {
+                var orderItems = await BuildOrderItemsFromB2BAsync(dto.Items);
+                
+                // B2B: KHÔNG gán DeliveryAddress vào Order
+                var addressIds = dto.DeliveryAllocations.Select(x => x.AddressId).ToList();
+                var addresses = await _context.Addresses
+                    .Where(x => addressIds.Contains(x.Id) && x.UserId == dto.UserId)
+                    .ToListAsync();
+
+                if (addresses.Count != addressIds.Count)
+                {
+                    throw new InvalidOperationException("Một hoặc nhiều địa chỉ không hợp lệ");
+                }
+
+                var order = new OrderModel
+                {
+                    Id = ObjectId.GenerateNewId(),
+                    OrderCode = GenerateOrderCode(),
+                    OrderType = OrderType.B2B, // BẮT BUỘC theo SWD
+                    UserId = ObjectId.Parse(dto.UserId),
+                    CustomerName = dto.CustomerName,
+                    CustomerEmail = dto.CustomerEmail,
+                    CustomerPhone = dto.CustomerPhone,
+                    Items = orderItems,
+                    // B2B KHÔNG có DeliveryAddress - dùng OrderDelivery table
+                    DeliveryAddress = null,
+                    DeliveryDate = dto.DeliveryDate,
+                    DeliverySlotId = string.IsNullOrEmpty(dto.DeliverySlotId) ? null : ObjectId.Parse(dto.DeliverySlotId),
+                    GreetingMessage = dto.GreetingMessage,
+                    GreetingCardUrl = dto.GreetingCardUrl,
+                    SubTotal = orderItems.Sum(x => x.TotalPrice),
+                    ShippingFee = CalculateB2BShippingFee(addresses.Count),
+                    Status = OrderStatus.PAYMENT_CONFIRMING,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                order.TotalAmount = order.SubTotal + order.ShippingFee;
+                order.StatusHistory.Add(new OrderStatusHistory
+                {
+                    Status = OrderStatus.PAYMENT_CONFIRMING,
+                    Timestamp = DateTime.UtcNow,
+                    UpdatedBy = "System",
+                    Notes = "Đơn hàng B2B được tạo - Đang xác nhận thanh toán"
+                });
+
+                _context.Orders.Add(order);
+                await _context.SaveChangesAsync();
+
+                // B2B: Tạo OrderDelivery và OrderDeliveryItem theo SWD
+                foreach (var allocation in dto.DeliveryAllocations)
+                {
+                    var orderDelivery = new OrderDelivery
+                    {
+                        OrderId = order.Id.ToString(),
+                        AddressId = allocation.AddressId,
+                        Status = "PENDING",
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    _context.OrderDeliveries.Add(orderDelivery);
+                    await _context.SaveChangesAsync(); // Để có OrderDelivery.Id
+
+                    // Tạo OrderDeliveryItem cho từng allocation
+                    foreach (var itemAllocation in allocation.ItemAllocations)
+                    {
+                        var orderDeliveryItem = new OrderDeliveryItem
+                        {
+                            OrderDeliveryId = orderDelivery.Id,
+                            OrderItemId = itemAllocation.OrderItemId,
+                            Quantity = itemAllocation.Quantity,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        _context.OrderDeliveryItems.Add(orderDeliveryItem);
+                    }
+                }
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"B2B Order created: {order.OrderCode}");
+                return order;
+            }
+            catch
+            {
+                await RollbackSlotAsync(dto.DeliverySlotId);
+                throw;
+            }
+        }
+
+        /// SWD Mix & Match Rules Validation - BẮT BUỘC
+        public async Task<MixMatchValidationResult> ValidateMixMatchRulesAsync(string customBoxId)
+        {
+            var result = new MixMatchValidationResult { IsValid = true };
+
+            var customBox = await _context.CustomBoxes.FindAsync(ObjectId.Parse(customBoxId));
+            if (customBox == null)
+            {
+                result.IsValid = false;
+                result.Errors.Add("CustomBox không tồn tại");
+                return result;
+            }
+
+            var customBoxItems = await _context.CustomBoxItems
+                .Where(cbi => cbi.CustomBoxId == customBox.Id)
+                .Include(cbi => cbi.Item)
+                .ToListAsync();
+
+            if (!customBoxItems.Any())
+            {
+                result.IsValid = false;
+                result.Errors.Add("Hộp quà phải có ít nhất 1 sản phẩm");
+                return result;
+            }
+
+            // Đếm theo category theo SWD rules
+            result.DrinkCount = customBoxItems.Count(cbi => cbi.Item.Category == ItemCategory.DRINK);
+            result.FoodCount = customBoxItems.Count(cbi => cbi.Item.Category == ItemCategory.FOOD);
+            result.NutCount = customBoxItems.Count(cbi => cbi.Item.Category == ItemCategory.NUT);
+            result.AlcoholCount = customBoxItems.Count(cbi => cbi.Item.Category == ItemCategory.ALCOHOL);
+
+            // SWD Rules: ≥1 DRINK, 2-4 FOOD, ≤1 ALCOHOL
+            if (result.DrinkCount < 1)
+            {
+                result.Errors.Add("Mix & Match phải có ít nhất 1 đồ uống");
+                result.IsValid = false;
+            }
+
+            if (result.FoodCount < 2)
+            {
+                result.Errors.Add("Mix & Match phải có ít nhất 2 món ăn");
+                result.IsValid = false;
+            }
+            else if (result.FoodCount > 4)
+            {
+                result.Errors.Add("Mix & Match không được có quá 4 món ăn");
+                result.IsValid = false;
+            }
+
+            if (result.AlcoholCount > 1)
+            {
+                result.Errors.Add("Mix & Match không được có quá 1 rượu");
+                result.IsValid = false;
+            }
+
+            return result;
+        }
+
+        // SWD Validation methods
+        public async Task<OrderValidationResult> ValidateB2COrderAsync(CreateOrderB2CDto dto)
+        {
+            var result = new OrderValidationResult { IsValid = true };
+
+            // Validate basic fields
+            if (string.IsNullOrEmpty(dto.CustomerName))
+                result.Errors.Add("Customer name is required");
+
+            if (!IsValidEmail(dto.CustomerEmail))
+                result.Errors.Add("Valid email is required");
+
+            if (dto.Items.Count == 0)
+                result.Errors.Add("At least one item is required");
+
+            // Validate Mix & Match items
+            foreach (var item in dto.Items.Where(x => x.Type == OrderItemType.MIX_MATCH))
+            {
+                if (!string.IsNullOrEmpty(item.CustomBoxId))
+                {
+                    var validation = await ValidateMixMatchRulesAsync(item.CustomBoxId);
+                    if (!validation.IsValid)
+                    {
+                        result.Errors.AddRange(validation.Errors);
+                    }
+                }
+            }
+
+            result.IsValid = result.Errors.Count == 0;
+            return result;
+        }
+
+        public async Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto)
+        {
+            var result = new OrderValidationResult { IsValid = true };
+
+            if (string.IsNullOrEmpty(dto.UserId))
+                result.Errors.Add("B2B requires login - UserId is required");
+
+            if (dto.DeliveryAllocations.Count == 0)
+                result.Errors.Add("At least one delivery address is required for B2B");
+
+            // Validate Mix & Match items
+            foreach (var item in dto.Items.Where(x => x.Type == OrderItemType.MIX_MATCH))
+            {
+                if (!string.IsNullOrEmpty(item.CustomBoxId))
+                {
+                    var validation = await ValidateMixMatchRulesAsync(item.CustomBoxId);
+                    if (!validation.IsValid)
+                    {
+                        result.Errors.AddRange(validation.Errors);
+                    }
+                }
+            }
+
+            result.IsValid = result.Errors.Count == 0;
+            return result;
+        }
+
+        // Helper methods for new DTOs
+        private async Task<List<OrderItem>> BuildOrderItemsFromB2CAsync(List<OrderItemDto> items)
+        {
+            var result = new List<OrderItem>();
+
+            foreach (var dto in items)
+            {
+                if (dto.Type == OrderItemType.READY_MADE)
+                {
+                    // Handle GiftBox
+                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == dto.GiftBoxId);
+                    if (giftBox == null)
+                        throw new InvalidOperationException("GiftBox not found");
+
+                    result.Add(new OrderItem
+                    {
+                        Type = OrderItemType.READY_MADE,
+                        GiftBoxId = ObjectId.Parse(dto.GiftBoxId ?? ""),
+                        Quantity = dto.Quantity,
+                        UnitPrice = giftBox.Price,
+                        TotalPrice = giftBox.Price * dto.Quantity,
+                        Snapshot = await BuildGiftBoxSnapshotAsync(giftBox)
+                    });
+                }
+                else if (dto.Type == OrderItemType.MIX_MATCH)
+                {
+                    // Handle CustomBox với validation
+                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == dto.CustomBoxId);
+                    if (customBox == null)
+                        throw new InvalidOperationException("CustomBox not found");
+
+                    // SWD: Validate Mix & Match rules
+                    var validation = await ValidateMixMatchRulesAsync(dto.CustomBoxId ?? "");
+                    if (!validation.IsValid)
+                    {
+                        throw new InvalidOperationException($"Mix & Match validation failed: {string.Join(", ", validation.Errors)}");
+                    }
+
+                    result.Add(new OrderItem
+                    {
+                        Type = OrderItemType.MIX_MATCH,
+                        CustomBoxId = ObjectId.Parse(dto.CustomBoxId ?? ""),
+                        Quantity = dto.Quantity,
+                        UnitPrice = customBox.TotalPrice,
+                        TotalPrice = customBox.TotalPrice * dto.Quantity,
+                        Snapshot = await BuildCustomBoxSnapshotAsync(customBox)
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        private async Task<List<OrderItem>> BuildOrderItemsFromB2BAsync(List<OrderItemDto> items)
+        {
+            return await BuildOrderItemsFromB2CAsync(items); // Same logic
+        }
+
+        private DeliveryAddress MapDeliveryAddressFromDto(DeliveryAddressDto dto, int quantity)
+        {
+            return new DeliveryAddress
+            {
+                RecipientName = dto.RecipientName,
+                RecipientPhone = dto.RecipientPhone,
+                AddressLine = dto.AddressLine,
+                Ward = dto.Ward,
+                District = dto.District,
+                City = dto.City,
+                Notes = dto.Notes ?? "",
+                Quantity = quantity,
+                GreetingMessage = dto.GreetingMessage ?? "",
+                HideInvoice = dto.HideInvoice
+            };
+        }
+
+        private async Task<OrderItemSnapshot> BuildGiftBoxSnapshotAsync(GiftBox giftBox)
+        {
+            var snapshot = new OrderItemSnapshot
+            {
+                Name = giftBox.Name,
+                Description = giftBox.Description,
+                Items = new List<OrderItemSnapshotItem>()
+            };
+
+            foreach (var item in giftBox.Items)
+            {
+                var itemDetail = await _context.Items.FirstOrDefaultAsync(x => x.Id == item.ItemId);
+                if (itemDetail != null)
+                {
+                    snapshot.Items.Add(new OrderItemSnapshotItem
+                    {
+                        ItemId = item.ItemId,
+                        Name = itemDetail.Name,
+                        Quantity = item.Quantity,
+                        UnitPrice = itemDetail.Price
+                    });
+                }
+            }
+
+            return snapshot;
+        }
+
+        private async Task<OrderItemSnapshot> BuildCustomBoxSnapshotAsync(CustomBox customBox)
+        {
+            var snapshot = new OrderItemSnapshot
+            {
+                Name = "Custom Mix & Match Box",
+                Description = "Hộp quà tự tạo",
+                Items = new List<OrderItemSnapshotItem>()
+            };
+
+            foreach (var item in customBox.Items)
+            {
+                var itemDetail = await _context.Items.FirstOrDefaultAsync(x => x.Id == item.ItemId);
+                if (itemDetail != null)
+                {
+                    snapshot.Items.Add(new OrderItemSnapshotItem
+                    {
+                        ItemId = item.ItemId,
+                        Name = itemDetail.Name,
+                        Quantity = item.Quantity,
+                        UnitPrice = itemDetail.Price
+                    });
+                }
+            }
+
+            return snapshot;
+        }
+
+        private decimal CalculateShippingFee(int addressCount)
+        {
+            return 30000; // B2C flat rate
+        }
+
+        private decimal CalculateB2BShippingFee(int addressCount)
+        {
+            return addressCount * 25000; // B2B per address
+        }
+
+        #endregion
 
         #endregion
     }

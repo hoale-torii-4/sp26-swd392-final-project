@@ -25,6 +25,7 @@ namespace ShopHangTet.Data
     public DbSet<Cart> Carts { get; set; }
     public DbSet<CartItem> CartItems { get; set; }
     public DbSet<CustomBox> CustomBoxes { get; set; }
+    public DbSet<CustomBoxItem> CustomBoxItems { get; set; }
 
     // Orders
     public DbSet<OrderModel> Orders { get; set; }
@@ -56,6 +57,7 @@ namespace ShopHangTet.Data
         modelBuilder.Entity<Cart>();
         modelBuilder.Entity<CartItem>();
         modelBuilder.Entity<CustomBox>();
+        modelBuilder.Entity<CustomBoxItem>();
 
         modelBuilder.Entity<OrderModel>();
         modelBuilder.Entity<OrderItem>();

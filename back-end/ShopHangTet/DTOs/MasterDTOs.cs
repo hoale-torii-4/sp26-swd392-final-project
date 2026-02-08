@@ -350,6 +350,20 @@ namespace ShopHangTet.DTOs
         public string? Note { get; set; }
     }
 
+    /// Mix & Match Validation Result theo SWD
+    public class MixMatchValidationResult
+    {
+        public bool IsValid { get; set; }
+        public List<string> Errors { get; set; } = new();
+        public int DrinkCount { get; set; }
+        public int FoodCount { get; set; }
+        public int NutCount { get; set; }
+        public int AlcoholCount { get; set; }
+        
+        /// SWD Rules: ≥1 DRINK, 2-4 FOOD, ≤1 ALCOHOL
+        public bool MeetsSwdRules => DrinkCount >= 1 && FoodCount >= 2 && FoodCount <= 4 && AlcoholCount <= 1;
+    }
+
     // ========== ORDER RESPONSE DTOs ==========
     public class OrderDto
     {

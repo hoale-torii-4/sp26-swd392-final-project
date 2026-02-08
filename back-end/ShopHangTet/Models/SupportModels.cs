@@ -244,4 +244,73 @@ namespace ShopHangTet.Models
         [BsonElement("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
+
+    /// <summary>
+    /// Inventory Log Model - Theo SWD (CHỈ trigger khi Order -> PREPARING)
+    /// </summary>
+    public class InventoryLog
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+        [BsonElement("orderId")]
+        public string OrderId { get; set; } = string.Empty; // FK to Order theo SWD
+
+        [BsonElement("itemId")]
+        public string ItemId { get; set; } = string.Empty; // FK to Item theo SWD
+
+        [BsonElement("quantity")]
+        public int Quantity { get; set; } // Số lượng (âm cho DEDUCT)
+
+        [BsonElement("action")]
+        public string Action { get; set; } = "DEDUCT"; // CHỈ DEDUCT theo SWD
+
+        [BsonElement("createdAt")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Order Delivery Model - B2B Multi-address theo SWD
+    /// </summary>
+    public class OrderDelivery
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+        [BsonElement("orderId")]
+        public string OrderId { get; set; } = string.Empty; // FK to Order
+
+        [BsonElement("addressId")]
+        public string AddressId { get; set; } = string.Empty; // FK to Address
+
+        [BsonElement("status")]
+        public string Status { get; set; } = "PENDING";
+
+        [BsonElement("createdAt")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Order Delivery Item Model - Phân bổ OrderItem theo địa chỉ (B2B)
+    /// </summary>
+    public class OrderDeliveryItem
+    {
+        [BsonId]
+        [BsonRepresentation(BsonType.ObjectId)]
+        public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+
+        [BsonElement("orderDeliveryId")]
+        public string OrderDeliveryId { get; set; } = string.Empty; // FK to OrderDelivery
+
+        [BsonElement("orderItemId")]
+        public string OrderItemId { get; set; } = string.Empty; // FK to OrderItem
+
+        [BsonElement("quantity")]
+        public int Quantity { get; set; }
+
+        [BsonElement("createdAt")]
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    }
 }
