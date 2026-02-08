@@ -12,6 +12,9 @@ public class OrderModel
     // Order Code for tracking
     public string OrderCode { get; set; } = string.Empty;
     
+    // Order type: B2C or B2B
+    public OrderType OrderType { get; set; } = OrderType.B2C;
+    
     // Thông tin khách hàng
     public ObjectId? UserId { get; set; } // Null nếu Guest checkout
     public string CustomerName { get; set; } = string.Empty;
@@ -21,8 +24,8 @@ public class OrderModel
     // Danh sách sản phẩm (READY_MADE hoặc MIX_MATCH)
     public List<OrderItem> Items { get; set; } = new();
     
-    // B2C only - B2B use OrderDelivery table
-    public List<DeliveryAddress> DeliveryAddresses { get; set; } = new();
+    // CHỈ dùng cho B2C
+    public DeliveryAddress? DeliveryAddress { get; set; }
     
     // Scheduled delivery
     public DateTime DeliveryDate { get; set; }

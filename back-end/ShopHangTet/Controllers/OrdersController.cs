@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.Services;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace ShopHangTet.Controllers;
 
@@ -144,6 +145,29 @@ public class OrdersController : ControllerBase
         catch (Exception ex)
         {
             return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    /// Cập nhật trạng thái đơn hàng (Chỉ STAFF)
+    [Authorize(Roles = "STAFF")]
+    [HttpPut("{orderId}/status")]
+    public async Task<IActionResult> UpdateOrderStatus(string orderId, [FromBody] UpdateOrderStatusDto request)
+    {
+        try
+        {
+            // Lấy role từ JWT (giả sử có claim)
+            var userRole = User.FindFirst("role")?.Value ?? "MEMBER";
+            if (userRole != "STAFF")
+            {
+                return Forbid("Only STAFF can update order status");
+            }
+
+            var order = await _orderService.UpdateStatusAsync(orderId, request.Status, User.Identity?.Name ?? "System", request.Note);
+            return Ok(new { success = true, order });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { success = false, message = ex.Message });
         }
     }
 }

@@ -47,24 +47,24 @@ namespace ShopHangTet.Services
                 var totalQuantity = orderItems.Sum(x => x.Quantity);
 
                 var deliveryAddress = MapDeliveryAddress(dto.DeliveryAddresses.Single(), totalQuantity);
-                var deliveryAddresses = new List<DeliveryAddress> { deliveryAddress };
 
                 var order = new OrderModel
                 {
                     Id = ObjectId.GenerateNewId(),
                     OrderCode = GenerateOrderCode(),
+                    OrderType = OrderType.B2C,
                     UserId = string.IsNullOrEmpty(dto.UserId) ? null : ObjectId.Parse(dto.UserId),
                     CustomerName = dto.CustomerName,
                     CustomerEmail = dto.CustomerEmail,
                     CustomerPhone = dto.CustomerPhone,
                     Items = orderItems,
-                    DeliveryAddresses = deliveryAddresses,
+                    DeliveryAddress = deliveryAddress,
                     DeliveryDate = dto.DeliveryDate,
                     DeliverySlotId = string.IsNullOrEmpty(dto.DeliverySlotId) ? null : ObjectId.Parse(dto.DeliverySlotId),
                     GreetingMessage = dto.GreetingMessage,
                     GreetingCardUrl = dto.GreetingCardUrl,
                     SubTotal = orderItems.Sum(x => x.TotalPrice),
-                    ShippingFee = CalculateShippingFee(deliveryAddresses),
+                    ShippingFee = CalculateShippingFee(new List<DeliveryAddress> { deliveryAddress }),
                     Status = Models.OrderStatus.PAYMENT_CONFIRMING,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
@@ -125,12 +125,12 @@ namespace ShopHangTet.Services
                 {
                     Id = ObjectId.GenerateNewId(),
                     OrderCode = GenerateOrderCode(),
+                    OrderType = OrderType.B2B,
                     UserId = ObjectId.Parse(dto.UserId!),
                     CustomerName = dto.CustomerName,
                     CustomerEmail = dto.CustomerEmail,
                     CustomerPhone = dto.CustomerPhone,
                     Items = orderItems,
-                    DeliveryAddresses = deliveryAddresses,
                     DeliveryDate = dto.DeliveryDate,
                     DeliverySlotId = string.IsNullOrEmpty(dto.DeliverySlotId) ? null : ObjectId.Parse(dto.DeliverySlotId),
                     GreetingMessage = dto.GreetingMessage,
