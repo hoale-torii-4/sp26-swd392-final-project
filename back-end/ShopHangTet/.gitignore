@@ -148,7 +148,7 @@ out/
 *.user
 *.userosscache
 *.sln.docstates
-
+ShopHangTet.Tests/
 # appsettings secrets
 appsettings.Development.json
 appsettings.Production.json
