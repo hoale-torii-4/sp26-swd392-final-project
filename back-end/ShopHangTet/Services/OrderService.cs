@@ -1,4 +1,4 @@
-using ShopHangTet.Interfaces;
+using ShopHangTet.Repositories;
 using ShopHangTet.Models;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;

@@ -25,7 +25,7 @@ public class UserModel
     public string FullName { get; set; } = string.Empty;
     
     [BsonElement("phone")]
-    public string Phone { get; set; } = string.Empty;
+    public string? Phone { get; set; } = string.Empty;
     
     [BsonElement("role")]
     public UserRole Role { get; set; } = UserRole.MEMBER;

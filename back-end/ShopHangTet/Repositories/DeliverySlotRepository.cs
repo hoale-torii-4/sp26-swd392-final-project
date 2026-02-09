@@ -1,7 +1,6 @@
 using MongoDB.Bson;
 using MongoDB.Driver;
 using ShopHangTet.Models;
-using ShopHangTet.Interfaces;
 
 namespace ShopHangTet.Repositories;
 
