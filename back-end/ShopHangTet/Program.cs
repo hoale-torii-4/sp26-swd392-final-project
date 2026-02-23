@@ -101,6 +101,7 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 // builder.Services.AddScoped<IOrderService, OrderService>();
 // builder.Services.AddScoped<IReviewService, ReviewService>();
 // builder.Services.AddScoped<IChatService, ChatService>();
+// builder.Services.AddScoped<IAiService, AiService>();
 
 var app = builder.Build();
 
