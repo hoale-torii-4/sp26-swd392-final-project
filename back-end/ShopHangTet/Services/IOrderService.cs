@@ -22,6 +22,12 @@ namespace ShopHangTet.Services
 
         // === Status & Inventory ===
         Task<OrderModel> UpdateStatusAsync(string orderId, OrderStatus status, string updatedBy, string? notes = null);
+
+        // === SePay Payment ===
+        /// Xác nhận thanh toán từ SePay webhook - cập nhật trạng thái và trừ kho
+        Task<bool> ConfirmPaymentAsync(string orderCode, decimal amountPaid);
+        /// Lấy đơn hàng theo mã đơn (cho frontend polling)
+        Task<OrderModel?> GetOrderByCodeAsync(string orderCode);
     }
 
     public class OrderValidationResult

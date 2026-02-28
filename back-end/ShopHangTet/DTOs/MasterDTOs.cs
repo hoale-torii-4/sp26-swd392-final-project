@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using ShopHangTet.Models;
@@ -583,5 +584,57 @@ namespace ShopHangTet.DTOs
         public decimal Discount { get; set; }
         public decimal DeliveryFee { get; set; }
         public decimal Total { get; set; }
+    }
+
+    // ========== SEPAY WEBHOOK DTOs ==========
+    public class SePayWebhookDto
+    {
+        [JsonPropertyName("id")]
+        public int Id { get; set; }
+
+        [JsonPropertyName("gateway")]
+        public string Gateway { get; set; } = string.Empty;
+
+        [JsonPropertyName("transactionDate")]
+        public string TransactionDate { get; set; } = string.Empty;
+
+        [JsonPropertyName("accountNumber")]
+        public string AccountNumber { get; set; } = string.Empty;
+
+        [JsonPropertyName("code")]
+        public string? Code { get; set; }
+
+        /// Nội dung chuyển khoản — chứa mã đơn hàng (VD: "SHT2602261234")
+        [JsonPropertyName("content")]
+        public string? Content { get; set; }
+
+        /// Số tiền khách chuyển (VND)
+        [JsonPropertyName("transferAmount")]
+        public decimal TransferAmount { get; set; }
+
+        [JsonPropertyName("accumulated")]
+        public decimal Accumulated { get; set; }
+
+        [JsonPropertyName("subAccount")]
+        public string? SubAccount { get; set; }
+
+        [JsonPropertyName("referenceCode")]
+        public string? ReferenceCode { get; set; }
+
+        /// "in" = tiền vào, "out" = tiền ra
+        [JsonPropertyName("transferType")]
+        public string TransferType { get; set; } = string.Empty;
+
+        [JsonPropertyName("description")]
+        public string? Description { get; set; }
+    }
+
+    /// Response DTO cho kiểm tra trạng thái thanh toán
+    public class PaymentStatusResponseDto
+    {
+        public string OrderCode { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public bool IsPaid { get; set; }
     }
 }

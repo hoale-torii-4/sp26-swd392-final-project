@@ -90,6 +90,60 @@ namespace ShopHangTet.Services
             return order;
         }
 
+        /// Xác nhận thanh toán từ SePay webhook
+        public async Task<bool> ConfirmPaymentAsync(string orderCode, decimal amountPaid)
+        {
+            var order = await _context.Orders
+                .FirstOrDefaultAsync(o => o.OrderCode == orderCode);
+
+            // Kiểm tra đơn tồn tại, đang chờ thanh toán, và đúng số tiền
+            if (order == null)
+            {
+                _logger.LogWarning("ConfirmPayment: Order {OrderCode} not found", orderCode);
+                return false;
+            }
+
+            if (order.Status != OrderStatus.PAYMENT_CONFIRMING)
+            {
+                _logger.LogWarning("ConfirmPayment: Order {OrderCode} is not in PAYMENT_CONFIRMING status (current: {Status})",
+                    orderCode, order.Status);
+                return false;
+            }
+
+            if (amountPaid < order.TotalAmount)
+            {
+                _logger.LogWarning("ConfirmPayment: Insufficient amount for {OrderCode}. Expected: {Expected}, Received: {Received}",
+                    orderCode, order.TotalAmount, amountPaid);
+                return false;
+            }
+
+            // 1. Trừ kho (Inventory deduction)
+            await ApplyInventoryOnPreparingAsync(order, "SePay-Webhook");
+
+            // 2. Cập nhật trạng thái sang PREPARING
+            order.Status = OrderStatus.PREPARING;
+            order.StatusHistory.Add(new OrderStatusHistory
+            {
+                Status = OrderStatus.PREPARING,
+                Timestamp = DateTime.UtcNow,
+                UpdatedBy = "SePay-Webhook",
+                Notes = $"Thanh toán xác nhận tự động qua SePay. Số tiền: {amountPaid:N0} VND"
+            });
+            order.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("ConfirmPayment: Order {OrderCode} confirmed. Amount: {Amount}", orderCode, amountPaid);
+            return true;
+        }
+
+        /// Lấy đơn hàng theo mã đơn (cho frontend polling check-status)
+        public async Task<OrderModel?> GetOrderByCodeAsync(string orderCode)
+        {
+            return await _context.Orders
+                .FirstOrDefaultAsync(o => o.OrderCode == orderCode);
+        }
+
         private string GenerateOrderCode()
         {
             var timestamp = DateTime.UtcNow.ToString("yyMMdd");
