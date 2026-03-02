@@ -70,6 +70,11 @@ namespace ShopHangTet.DTOs
         public string? Phone { get; set; }
     }
 
+    public class GoogleLoginDto
+    {
+        [Required]
+        public string IdToken { get; set; } = string.Empty;
+    }
     public class LoginDto
     {
         [Required]
@@ -116,6 +121,36 @@ namespace ShopHangTet.DTOs
 
         [Required]
         public string Otp { get; set; } = string.Empty;
+    }
+    public class ForgotPasswordDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+    }
+
+    public class ResetPasswordDto
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Otp { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(6)]
+        public string NewPassword { get; set; } = string.Empty;
+    }
+
+    public class ChangePasswordDto
+    {
+        [Required]
+        public string OldPassword { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(6)]
+        public string NewPassword { get; set; } = string.Empty;
     }
 
     // ========== COLLECTION DTOs ==========

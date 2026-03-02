@@ -10,9 +10,9 @@
   "Smtp": {
     "Host": "smtp.gmail.com",
     "Port": 587,
-    "Username": "nguyenhoangdungcubin@gmail.com",
-    "Password": "tidj vroj sgub usbd",
-    "From": "Shop Hàng Tết <nguyenhoangdungcubin@gmail.com>"
+    "Username": "Mail_mấy_ní",
+    "Password": "Pass_Ứng_dụng_mail",
+    "From": "Shop Hàng Tết <Mail_mấy_ní>"
   },
   "Logging": {
     "LogLevel": {
