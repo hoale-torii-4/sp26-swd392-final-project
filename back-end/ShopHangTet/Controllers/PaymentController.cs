@@ -134,9 +134,13 @@ public class PaymentController : ControllerBase
             var response = new PaymentStatusResponseDto
             {
                 OrderCode = order.OrderCode,
-                Status = order.Status.ToString(),
+                Status = order.Status == OrderStatus.PAYMENT_EXPIRED_INTERNAL
+                    ? OrderStatus.PAYMENT_CONFIRMING.ToString()
+                    : order.Status.ToString(),
                 TotalAmount = order.TotalAmount,
-                IsPaid = order.Status != OrderStatus.PAYMENT_CONFIRMING
+                IsPaid = order.Status == OrderStatus.PREPARING
+                    || order.Status == OrderStatus.SHIPPING
+                    || order.Status == OrderStatus.COMPLETED
             };
 
             return Ok(ApiResponse<PaymentStatusResponseDto>.SuccessResult(response));
@@ -173,6 +177,12 @@ public class PaymentController : ControllerBase
 
     private string? GetConfigValue(string key, string envKey)
     {
-        return _configuration[key] ?? Environment.GetEnvironmentVariable(envKey);
+        var envValue = Environment.GetEnvironmentVariable(envKey);
+        if (!string.IsNullOrWhiteSpace(envValue))
+        {
+            return envValue;
+        }
+
+        return _configuration[key];
     }
 }

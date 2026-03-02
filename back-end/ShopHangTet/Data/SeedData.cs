@@ -20,6 +20,7 @@ public static class SeedData
             await context.SaveChangesAsync();
 
             await SeedGiftBoxesAsync(context);
+            await SeedTestDatasetAsync(context);
             await SeedDeliverySlotsAsync(context);
 
             await context.SaveChangesAsync();
@@ -443,5 +444,52 @@ public static class SeedData
             await context.DeliverySlots.AddRangeAsync(slots);
             Console.WriteLine($"----> Seeded {slots.Count} DeliverySlots");
         }
+    }
+
+    private static async Task SeedTestDatasetAsync(ShopHangTetDbContext context)
+    {
+        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        if (!string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        const string testGiftBoxName = "[TEST10K] QR Sandbox Box";
+
+        var existed = await context.GiftBoxes.AnyAsync(x => x.Name == testGiftBoxName);
+        if (existed)
+        {
+            return;
+        }
+
+        var collectionId = await context.Collections.Select(x => x.Id).FirstOrDefaultAsync();
+        var cheapestItem = await context.Items.OrderBy(x => x.Price).FirstOrDefaultAsync();
+
+        if (string.IsNullOrWhiteSpace(collectionId) || cheapestItem == null)
+        {
+            return;
+        }
+
+        var testGiftBox = new GiftBox
+        {
+            Name = testGiftBoxName,
+            Description = "Gift box test cho QR amount 10.000 VND",
+            Price = 10000,
+            CollectionId = collectionId,
+            Tags = new List<string>(),
+            Images = new List<string> { "seed-box.jpg" },
+            Items = new List<GiftBoxItem>
+            {
+                new GiftBoxItem
+                {
+                    ItemId = cheapestItem.Id,
+                    Quantity = 1
+                }
+            },
+            IsActive = true
+        };
+
+        await context.GiftBoxes.AddAsync(testGiftBox);
+        Console.WriteLine("----> Seeded test dataset: [TEST10K] QR Sandbox Box (10.000 VND)");
     }
 }

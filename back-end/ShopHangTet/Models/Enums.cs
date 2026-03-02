@@ -3,6 +3,7 @@ namespace ShopHangTet.Models;
 public enum OrderStatus
 {
     PAYMENT_CONFIRMING,
+    PAYMENT_EXPIRED_INTERNAL,
     PREPARING,
     SHIPPING,
     COMPLETED

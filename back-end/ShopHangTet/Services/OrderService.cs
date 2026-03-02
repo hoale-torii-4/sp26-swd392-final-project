@@ -42,7 +42,9 @@ namespace ShopHangTet.Services
             return new OrderTrackingResult
             {
                 OrderCode = order.OrderCode,
-                Status = order.Status.ToString(),
+                Status = order.Status == OrderStatus.PAYMENT_EXPIRED_INTERNAL
+                    ? OrderStatus.PAYMENT_CONFIRMING.ToString()
+                    : order.Status.ToString(),
                 CreatedAt = order.CreatedAt,
                 DeliveryDate = order.DeliveryDate,
                 TotalAmount = order.TotalAmount,
@@ -317,6 +319,9 @@ namespace ShopHangTet.Services
             {
                 var orderItems = await BuildOrderItemsFromB2CAsync(dto.Items);
                 var totalQuantity = orderItems.Sum(x => x.Quantity);
+                var shippingFee = ShouldApplyTestShippingOverride(orderItems)
+                    ? 0
+                    : CalculateShippingFee(1);
 
                 var order = new OrderModel
                 {
@@ -335,7 +340,7 @@ namespace ShopHangTet.Services
                     GreetingMessage = dto.GreetingMessage,
                     GreetingCardUrl = dto.GreetingCardUrl,
                     SubTotal = orderItems.Sum(x => x.TotalPrice),
-                    ShippingFee = CalculateShippingFee(1),
+                    ShippingFee = shippingFee,
                     Status = OrderStatus.PAYMENT_CONFIRMING,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow
@@ -712,6 +717,20 @@ namespace ShopHangTet.Services
             }
 
             return snapshotItems;
+        }
+
+        private static bool ShouldApplyTestShippingOverride(List<OrderItem> orderItems)
+        {
+            var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+            if (!string.Equals(environment, "Development", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return orderItems.Any(x =>
+                x.Type == OrderItemType.READY_MADE
+                && !string.IsNullOrWhiteSpace(x.ProductName)
+                && x.ProductName.Contains("[TEST10K]", StringComparison.OrdinalIgnoreCase));
         }
 
         private decimal CalculateShippingFee(int addressCount)
