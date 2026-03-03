@@ -93,6 +93,7 @@ builder.Services.AddScoped<IDeliverySlotRepository, DeliverySlotRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 // builder.Services.AddScoped<OrderService>();
 
+<<<<<<< Updated upstream
 // TODO PHASE 2: Implement và uncomment các services sau
 // builder.Services.AddScoped<IUserService, UserService>();
 // builder.Services.AddScoped<IProductService, ProductService>();
@@ -102,6 +103,18 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 // builder.Services.AddScoped<IReviewService, ReviewService>();
 // builder.Services.AddScoped<IChatService, ChatService>();
 // builder.Services.AddScoped<IAiService, AiService>();
+=======
+// Đăng ký AI Service
+var openRouterApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY");
+
+if (string.IsNullOrWhiteSpace(openRouterApiKey))
+{
+    throw new Exception("OPENROUTER_API_KEY not found. .env is not loading.");
+}
+
+builder.Services.AddSingleton<AiService>(sp =>
+    new AiService(openRouterApiKey.Trim()));
+>>>>>>> Stashed changes
 
 var app = builder.Build();
 
