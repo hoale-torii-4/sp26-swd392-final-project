@@ -107,6 +107,17 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddHostedService<OrderExpirationBackgroundService>();
 // builder.Services.AddScoped<OrderService>();
 
+// Đăng ký AI Service
+var openRouterApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY");
+
+if (string.IsNullOrWhiteSpace(openRouterApiKey))
+{
+    throw new Exception("OPENROUTER_API_KEY not found. .env is not loading.");
+}
+
+builder.Services.AddSingleton<AiService>(sp =>
+    new AiService(openRouterApiKey));
+
 var app = builder.Build();
 
 //Cấu hình Pipeline cho môi trường Development
