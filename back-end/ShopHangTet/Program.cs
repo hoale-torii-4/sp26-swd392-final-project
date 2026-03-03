@@ -110,8 +110,6 @@ builder.Services.AddHostedService<OrderExpirationBackgroundService>();
 var app = builder.Build();
 
 //Cấu hình Pipeline cho môi trường Development
-if (app.Environment.IsDevelopment())
-{
     app.MapOpenApi(); // Tạo file openapi.json
 
     // Truy cập tại: http://localhost:PORT/scalar/v1
@@ -131,7 +129,7 @@ if (app.Environment.IsDevelopment())
             Console.WriteLine($"📋 Scalar API Documentation: {url}/scalar/v1");
         }
     });
-}
+
 
 //Kích hoạt Middleware
 app.UseCors("AllowVueApp");
