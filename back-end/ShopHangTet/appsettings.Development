@@ -3,20 +3,16 @@
     "MongoConnection": "mongodb+srv://ShopHangTet:lA3VfARVteSiSEKU@swd.qqz9p5b.mongodb.net/?appName=SWD"
   },
   "Jwt": {
-    "SecretKey": "ShopHangTet_KhoaBiMatSieuDai_Cho_Phat_Trien_123456789!@#",,
+    "SecretKey": "ShopHangTet_KhoaBiMatSieuDai_Cho_Phat_Trien_123456789!@#",
     "Issuer": "ShopHangTet",
     "Audience": "ShopHangTet.Client"
   },
   "Smtp": {
     "Host": "smtp.gmail.com",
     "Port": 587,
-    "Username": "Email_mấy_ní",
-    "Password": "app_mật_khẩu_mấy_ní",
-    "From": "Shop Hàng Tết <Email_mấy_ní>"
-  },
-  "SePay": {
-    "BaseApiUrl": "https://pgapi.sepay.vn",
-    "CheckoutUrl": "https://pay.sepay.vn"
+    "Username": "Mail_mấy_ní",
+    "Password": "Pass_Ứng_dụng_mail",
+    "From": "Shop Hàng Tết <Mail_mấy_ní>"
   },
   "Logging": {
     "LogLevel": {
@@ -24,9 +20,6 @@
       "Microsoft.AspNetCore": "Warning",
       "Microsoft.EntityFrameworkCore": "Information"
     }
-  },
-  "Seed": {
-    "Enabled": true
   },
   "AllowedHosts": "*"
 }
