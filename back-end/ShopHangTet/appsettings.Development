@@ -7,12 +7,10 @@
     "Issuer": "ShopHangTet",
     "Audience": "ShopHangTet.Client"
   },
-  "Smtp": {
-    "Host": "smtp.gmail.com",
-    "Port": 587,
-    "Username": "Mail_mấy_ní",
-    "Password": "Pass_Ứng_dụng_mail",
-    "From": "Shop Hàng Tết <Mail_mấy_ní>"
+  "Brevo": {
+    "ApiKey": "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",
+    "SenderEmail": "legendtv.animation.smart@gmail.com",
+    "SenderName": "Shop Hàng Tết"
   },
   "Logging": {
     "LogLevel": {
