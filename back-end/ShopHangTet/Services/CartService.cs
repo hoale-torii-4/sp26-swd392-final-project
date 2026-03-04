@@ -7,9 +7,9 @@ namespace ShopHangTet.Services
 {
     public class CartService : ICartService
     {
-        private readonly DbContext _context;
+        private readonly ShopHangTetDbContext _context;
 
-        public CartService(DbContext context)
+        public CartService(ShopHangTetDbContext context)
         {
             _context = context;
         }
