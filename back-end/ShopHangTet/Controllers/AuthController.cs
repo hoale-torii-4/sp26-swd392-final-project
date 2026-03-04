@@ -38,6 +38,8 @@ namespace ShopHangTet.Controllers
                 return BadRequest(ApiResponse<object>.ErrorResult("Email này đã được sử dụng."));
             }
 
+            string otpCode = new Random().Next(100000, 999999).ToString();
+
             var newUser = new UserModel
             {
                 Email = request.Email,
@@ -48,14 +50,56 @@ namespace ShopHangTet.Controllers
                 Status = UserStatus.ACTIVE,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                IsEmailVerified = false
+                IsEmailVerified = false,
+                OtpCode = otpCode,
+                OtpExpiry = DateTime.UtcNow.AddMinutes(5)
             };
 
             _context.Users.Add(newUser);
             await _context.SaveChangesAsync();
 
+            bool isSent = await _emailService.SendOtpAsync(newUser.Email, otpCode);
+
+            if (!isSent)
+            {
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Tạo tài khoản thành công nhưng hệ thống gửi mail đang lỗi."));
+            }
+
             _ = _emailService.SendWelcomeEmailAsync(newUser.Email, newUser.FullName);
-            return Ok(ApiResponse<object>.SuccessResult(new { UserId = newUser.Id }, "Đăng ký thành công!"));
+            return Ok(ApiResponse<object>.SuccessResult(new { UserId = newUser.Id }, "Đăng ký thành công! Vui lòng kiểm tra email để nhận mã OTP."));
+        }
+        // ===========================
+        // 1.5. VERIFY EMAIL
+        // ===========================
+        [HttpPost("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromBody] OtpVerifyDto request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (user == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Không tìm thấy người dùng với email này."));
+            }
+
+            if (user.IsEmailVerified)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Tài khoản này đã được xác thực trước đó."));
+            }
+
+            if (user.OtpCode != request.Otp || user.OtpExpiry < DateTime.UtcNow)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Mã OTP không hợp lệ hoặc đã hết hạn."));
+            }
+
+            user.IsEmailVerified = true;
+            user.OtpCode = null;   
+            user.OtpExpiry = null; 
+            user.Status = UserStatus.ACTIVE;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Xác thực email thành công! Bạn đã có thể đăng nhập."));
         }
 
         // ===========================
@@ -66,9 +110,20 @@ namespace ShopHangTet.Controllers
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return Unauthorized(ApiResponse<object>.ErrorResult("Email hoặc mật khẩu không đúng."));
+            }
+
+            // Check Verify Email
+            if (!user.IsEmailVerified)
+            {
+                return BadRequest(new
+                {
+                    Success = false,
+                    Message = "Tài khoản chưa được xác thực. Vui lòng kiểm tra email để lấy mã OTP xác nhận!",
+                    Data = new { email = user.Email, isEmailVerified = false } // Trả về data để Front-end biết nhảy trang
+                });
             }
 
             if (user.Status != UserStatus.ACTIVE)
@@ -79,7 +134,7 @@ namespace ShopHangTet.Controllers
             // Create token
             var token = _jwtService.GenerateToken(user);
 
-            // Encapsulate response in LoginResponseDto format
+            // Encapsulate response in LoginResponseDto format (Profile)
             var loginResponse = CreateLoginResponse(user, token);
 
             return Ok(ApiResponse<LoginResponseDto>.SuccessResult(loginResponse, "Đăng nhập thành công!"));
