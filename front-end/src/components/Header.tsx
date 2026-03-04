@@ -4,7 +4,7 @@ import { authService } from "../services/authService";
 
 const navLinks = [
     { label: "TRANG CHỦ", to: "/home" },
-    { label: "GIỎ QUÀ TẾT", to: "/products" },
+    { label: "GIỎ QUÀ TẾT", to: "/gift-boxes" },
     { label: "TỰ TẠO GIỎ QUÀ", to: "/custom" },
     { label: "VỀ CHÚNG TÔI", to: "/about" },
     { label: "HƯỚNG DẪN MUA", to: "/guide" },
