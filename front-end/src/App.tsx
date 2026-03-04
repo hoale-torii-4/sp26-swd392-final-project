@@ -9,6 +9,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import GuidePage from './pages/GuidePage'
 import AboutPage from './pages/AboutPage'
 import AccountPage from './pages/AccountPage'
+import GiftBoxesPage from './pages/GiftBoxesPage'
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
         <Route path="/guide" element={<GuidePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/gift-boxes" element={<GiftBoxesPage />} />
       </Routes>
     </BrowserRouter>
   )
