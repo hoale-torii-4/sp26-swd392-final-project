@@ -9,23 +9,32 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import GuidePage from './pages/GuidePage'
 import AboutPage from './pages/AboutPage'
 import AccountPage from './pages/AccountPage'
+import GiftBoxesPage from './pages/GiftBoxesPage'
+import CartPage from './pages/CartPage'
+import { GoogleOAuthProvider } from '@react-oauth/google'
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/forgot-password/success" element={<ForgotPasswordSuccessPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/guide" element={<GuidePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/account" element={<AccountPage />} />
-      </Routes>
-    </BrowserRouter>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/forgot-password/success" element={<ForgotPasswordSuccessPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/guide" element={<GuidePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/gift-boxes" element={<GiftBoxesPage />} />
+          <Route path="/cart" element={<CartPage />} />
+        </Routes>
+      </BrowserRouter>
+    </GoogleOAuthProvider>
   )
 }
 

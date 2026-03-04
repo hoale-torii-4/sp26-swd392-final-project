@@ -92,4 +92,24 @@ export const authService = {
         );
         return response.data;
     },
+
+    /**
+     * POST /api/Auth/google-login
+     * Sends the Google OAuth ID token to the backend.
+     * On success, stores token + user data in localStorage.
+     */
+    googleLogin: async (idToken: string): Promise<LoginResponse> => {
+        const response = await apiClient.post<LoginResponse>(
+            `${AUTH_ENDPOINT}/google-login`,
+            { idToken },
+        );
+        const result = response.data;
+
+        if (result.Success && result.Data) {
+            localStorage.setItem(TOKEN_KEY, result.Data.Token);
+            localStorage.setItem(USER_KEY, JSON.stringify(result.Data.User));
+        }
+
+        return result;
+    },
 };
