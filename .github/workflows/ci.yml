@@ -1,0 +1,49 @@
+name: ShopHangTet CI Pipeline
+
+# Robot sẽ tự động chạy khi có người Push code hoặc tạo Pull Request vào nhánh main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # KIỂM TRA BACK-END (.NET)
+  build-backend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Tải code về máy ảo
+      uses: actions/checkout@v3
+
+    - name: Cài đặt môi trường .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Tải các thư viện (Restore)
+      working-directory: ./back-end/ShopHangTet
+      run: dotnet restore
+
+    - name: Kiểm tra lỗi cú pháp (Build)
+      working-directory: ./back-end/ShopHangTet
+      run: dotnet build --no-restore
+
+  # KIỂM TRA FRONT-END (React Vite)
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Tải code về máy ảo
+      uses: actions/checkout@v3
+
+    - name: Cài đặt môi trường Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Cài đặt các gói thư viện npm
+      working-directory: ./front-end
+      run: npm install
+
+    - name: Kiểm tra lỗi và đóng gói (Build)
+      working-directory: ./front-end
+      run: npm run build
