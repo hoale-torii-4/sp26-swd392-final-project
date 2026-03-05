@@ -16,6 +16,15 @@ namespace ShopHangTet.Models
         [BsonElement("description")]
         public string Description { get; set; } = string.Empty;
 
+        [BsonElement("coverImage")]
+        public string? CoverImage { get; set; } // Ảnh đại diện collection
+
+        [BsonElement("pricingMultiplier")]
+        public decimal PricingMultiplier { get; set; } = 1.35m; // Hệ số nhân giá (default: thường)
+
+        [BsonElement("packagingFee")]
+        public decimal PackagingFee { get; set; } = 150000m; // Phí đóng gói (default: thường)
+
         [BsonElement("isActive")]
         public bool IsActive { get; set; } = true;
 
@@ -88,6 +97,9 @@ namespace ShopHangTet.Models
 
         [BsonElement("quantity")]
         public int Quantity { get; set; }
+
+        [BsonElement("itemPriceSnapshot")]
+        public decimal ItemPriceSnapshot { get; set; }
     }
 
     /// Item Model - Thành phần Mix & Match
@@ -106,11 +118,20 @@ namespace ShopHangTet.Models
         [BsonElement("price")]
         public decimal Price { get; set; }
 
+        [BsonElement("images")]
+        public List<string> Images { get; set; } = new();
+
         [BsonElement("isAlcohol")]
         public bool IsAlcohol { get; set; } = false;
 
         [BsonElement("stockQuantity")]
         public int StockQuantity { get; set; }
+
+        [BsonElement("reservedQuantity")]
+        public int ReservedQuantity { get; set; } = 0;
+
+        /// Available = StockQuantity - ReservedQuantity
+        public int AvailableQuantity => StockQuantity - ReservedQuantity;
 
         [BsonElement("isActive")]
         public bool IsActive { get; set; } = true;

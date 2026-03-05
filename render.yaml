@@ -1,0 +1,43 @@
+services:
+  # ==========================================
+  # 1. BACK-END API (shophangtet-api)
+  # ==========================================
+  - type: web
+    name: shophangtet-api
+    env: dotnet
+    rootDir: back-end/ShopHangTet
+    buildCommand: dotnet publish -c Release -o out
+    startCommand: dotnet out/ShopHangTet.dll
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      # A zai lưu ý tự điền env lên render nhá
+      - key: Brevo__ApiKey
+        sync: false
+      - key: Brevo__SenderEmail
+        sync: false
+      - key: Brevo__SenderName
+        sync: false
+      - key: ConnectionStrings__MongoConnection
+        sync: false
+      - key: GoogleAuth__ClientId
+        sync: false
+      - key: Jwt__SecretKey
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+
+  # ==========================================
+  # 2. FRONT-END WEB (shophangtet-web)
+  # ==========================================
+  - type: static
+    name: shophangtet-web
+    env: node
+    rootDir: front-end                
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist           
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
