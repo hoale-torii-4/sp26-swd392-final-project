@@ -69,7 +69,7 @@ namespace ShopHangTet.Controllers
             return Ok(ApiResponse<object>.SuccessResult(new { UserId = newUser.Id }, "Đăng ký thành công! Vui lòng kiểm tra email để nhận mã OTP."));
         }
         // ===========================
-        // 1.5. VERIFY EMAIL
+        // 1.5. VERIFY EMAIL (account created and saved to db immediately, if user cannot receive otp, go to API 1.7)
         // ===========================
         [HttpPost("verify-email")]
         public async Task<IActionResult> VerifyEmail([FromBody] OtpVerifyDto request)
@@ -101,7 +101,50 @@ namespace ShopHangTet.Controllers
 
             return Ok(ApiResponse<object>.SuccessResult(null, "Xác thực email thành công! Bạn đã có thể đăng nhập."));
         }
+        // ===========================
+        // 1.7. RESEND REGISTER OTP (When there is a user's email exist in db didn't receive the otp and need to resend during registration)
+        // ONLY FOR UNVERIFIED EMAIL (isEmailVerified = false)
+        // ===========================
+        [HttpPost("resend-register-otp")]
+        public async Task<IActionResult> ResendRegisterOtp([FromBody] ResendOtpDto request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
+            if (user == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Không tìm thấy tài khoản nào đăng ký với email này."));
+            }
+
+            if (user.IsEmailVerified)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Tài khoản này đã được xác thực thành công. Vui lòng đăng nhập thẳng vào hệ thống!"));
+            }
+
+            if (user.OtpExpiry.HasValue && user.OtpExpiry.Value > DateTime.UtcNow.AddMinutes(4))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP mới."));
+            }
+
+            // 1. Generate new OTP code with 6 random digits
+            string otpCode = new Random().Next(100000, 999999).ToString();
+
+            // 2. Save OTP and expired after 5 minutes in database
+            user.OtpCode = otpCode;
+            user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // 3. Brevo email sending
+            bool isSent = await _emailService.SendOtpAsync(user.Email, otpCode);
+
+            if (!isSent)
+            {
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Tạo mã thành công nhưng hệ thống gửi mail đang gặp sự cố. Vui lòng thử lại sau."));
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Đã gửi lại mã xác nhận OTP. Vui lòng kiểm tra cả hòm thư Spam (Thư rác)."));
+        }
         // ===========================
         // 2. LOGIN
         // ===========================
@@ -227,7 +270,7 @@ namespace ShopHangTet.Controllers
             };
         }
         // ===========================
-        // 4. FORGOT PASSWORD (QUÊN MẬT KHẨU - GỬI OTP)
+        // 4. FORGOT PASSWORD (OTP)
         // ===========================
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto request)
@@ -237,6 +280,12 @@ namespace ShopHangTet.Controllers
             if (user == null)
             {
                 return Ok(ApiResponse<object>.SuccessResult(null, "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi."));
+            }
+
+            // If otpexpiry > 4 minutes, it means user just requested OTP and need to wait until 5 minutes to request again. This is to prevent spamming OTP request.
+            if (user.OtpExpiry.HasValue && user.OtpExpiry.Value > DateTime.UtcNow.AddMinutes(4))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP mới."));
             }
 
             // 6 random digits OTP generation
