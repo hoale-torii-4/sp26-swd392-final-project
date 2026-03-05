@@ -106,6 +106,7 @@ builder.Services.AddScoped<IDeliverySlotRepository, DeliverySlotRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddHostedService<OrderExpirationBackgroundService>();
 // builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<ICartService, CartService>();
 
 // Đăng ký AI Service
 var openRouterApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY");
