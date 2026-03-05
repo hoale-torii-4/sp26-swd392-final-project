@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.DTOs;
 using ShopHangTet.Services;
 using System.Security.Claims;
@@ -24,10 +24,10 @@ namespace ShopHangTet.Controllers
                       ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
 
             var sessionId = Request.Headers["X-Session-Id"].FirstOrDefault();
+
             return (userId, sessionId);
         }
 
-        // Kiểm tra xem khách có ID không
         private bool IsValidIdentity(string? userId, string? sessionId)
         {
             return !string.IsNullOrWhiteSpace(userId) || !string.IsNullOrWhiteSpace(sessionId);
@@ -39,9 +39,10 @@ namespace ShopHangTet.Controllers
             var (userId, sessionId) = GetUserOrSession();
 
             if (!IsValidIdentity(userId, sessionId))
-                return BadRequest(ApiResponse<CartDto>.ErrorResult("Từ chối phục vụ: Vui lòng cung cấp Token đăng nhập hoặc Header X-Session-Id"));
+                return BadRequest(ApiResponse<CartDto>.ErrorResult("Cần Token hoặc X-Session-Id"));
 
             var result = await _cartService.GetCartAsync(userId, sessionId);
+
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
@@ -51,33 +52,36 @@ namespace ShopHangTet.Controllers
             var (userId, sessionId) = GetUserOrSession();
 
             if (!IsValidIdentity(userId, sessionId))
-                return BadRequest(ApiResponse<CartDto>.ErrorResult("Từ chối phục vụ: Vui lòng cung cấp Token đăng nhập hoặc Header X-Session-Id"));
+                return BadRequest(ApiResponse<CartDto>.ErrorResult("Cần Token hoặc X-Session-Id"));
 
             var result = await _cartService.AddToCartAsync(userId, sessionId, dto);
+
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpPut("update/{itemId}")]
-        public async Task<IActionResult> UpdateCartItem([FromRoute] string itemId, [FromBody] UpdateCartItemDto dto)
+        public async Task<IActionResult> UpdateCartItem(string itemId, [FromBody] UpdateCartItemDto dto)
         {
             var (userId, sessionId) = GetUserOrSession();
 
             if (!IsValidIdentity(userId, sessionId))
-                return BadRequest(ApiResponse<CartDto>.ErrorResult("Từ chối phục vụ: Vui lòng cung cấp Token đăng nhập hoặc Header X-Session-Id"));
+                return BadRequest(ApiResponse<CartDto>.ErrorResult("Cần Token hoặc X-Session-Id"));
 
             var result = await _cartService.UpdateCartItemAsync(userId, sessionId, itemId, dto);
+
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpDelete("remove/{itemId}")]
-        public async Task<IActionResult> RemoveFromCart([FromRoute] string itemId)
+        public async Task<IActionResult> RemoveFromCart(string itemId)
         {
             var (userId, sessionId) = GetUserOrSession();
 
             if (!IsValidIdentity(userId, sessionId))
-                return BadRequest(ApiResponse<CartDto>.ErrorResult("Từ chối phục vụ: Vui lòng cung cấp Token đăng nhập hoặc Header X-Session-Id"));
+                return BadRequest(ApiResponse<CartDto>.ErrorResult("Cần Token hoặc X-Session-Id"));
 
             var result = await _cartService.RemoveFromCartItemAsync(userId, sessionId, itemId);
+
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
@@ -87,9 +91,10 @@ namespace ShopHangTet.Controllers
             var (userId, sessionId) = GetUserOrSession();
 
             if (!IsValidIdentity(userId, sessionId))
-                return BadRequest(ApiResponse<CartDto>.ErrorResult("Từ chối phục vụ: Vui lòng cung cấp Token đăng nhập hoặc Header X-Session-Id"));
+                return BadRequest(ApiResponse<CartDto>.ErrorResult("Cần Token hoặc X-Session-Id"));
 
             var result = await _cartService.ClearCartAsync(userId, sessionId);
+
             return result.Success ? Ok(result) : BadRequest(result);
         }
     }

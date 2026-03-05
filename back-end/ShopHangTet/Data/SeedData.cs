@@ -81,6 +81,9 @@ public static class SeedData
             {
                 Name = "Xuân Đoàn Viên",
                 Description = "Bộ sưu tập quà Tết truyền thống, ấm áp cho gia đình",
+                CoverImage = "https://ibb.co/xKcfgX53",
+                PricingMultiplier = 1.35m,
+                PackagingFee = 150000m,
                 DisplayOrder = 1,
                 IsActive = true
             },
@@ -88,6 +91,9 @@ public static class SeedData
             {
                 Name = "Cát Tường Phú Quý",
                 Description = "Bộ sưu tập quà Tết cao cấp, sang trọng",
+                CoverImage = "https://placehold.co/1200x800/png?text=Cat+Tuong+Phu+Quy",
+                PricingMultiplier = 1.50m,
+                PackagingFee = 300000m,
                 DisplayOrder = 2,
                 IsActive = true
             },
@@ -95,6 +101,9 @@ public static class SeedData
             {
                 Name = "Lộc Xuân Doanh Nghiệp",
                 Description = "Bộ sưu tập quà Tết dành cho doanh nghiệp",
+                CoverImage = "https://placehold.co/1200x800/png?text=Loc+Xuan+Doanh+Nghiep",
+                PricingMultiplier = 1.35m,
+                PackagingFee = 200000m,
                 DisplayOrder = 3,
                 IsActive = true
             },
@@ -102,6 +111,9 @@ public static class SeedData
             {
                 Name = "An Nhiên Tân Xuân",
                 Description = "Bộ sưu tập quà Tết sức khỏe, tinh tế",
+                CoverImage = "https://placehold.co/1200x800/png?text=An+Nhien+Tan+Xuan",
+                PricingMultiplier = 1.35m,
+                PackagingFee = 180000m,
                 DisplayOrder = 4,
                 IsActive = true
             },
@@ -109,6 +121,9 @@ public static class SeedData
             {
                 Name = "Xuân Gắn Kết",
                 Description = "Bộ sưu tập quà Tết nhẹ nhàng, thân tình",
+                CoverImage = "https://placehold.co/1200x800/png?text=Xuan+Gan+Ket",
+                PricingMultiplier = 1.35m,
+                PackagingFee = 180000m,
                 DisplayOrder = 5,
                 IsActive = true
             }
@@ -127,10 +142,99 @@ public static class SeedData
         {
             await context.Collections.AddRangeAsync(missingCollections);
         }
+
+        var existingCollections = await context.Collections.ToListAsync();
+        foreach (var seedCollection in collections)
+        {
+            var current = existingCollections.FirstOrDefault(x => x.Name.Equals(seedCollection.Name, StringComparison.OrdinalIgnoreCase));
+            if (current == null) continue;
+
+            current.CoverImage = seedCollection.CoverImage;
+            current.PricingMultiplier = seedCollection.PricingMultiplier;
+            current.PackagingFee = seedCollection.PackagingFee;
+            current.DisplayOrder = seedCollection.DisplayOrder;
+            current.IsActive = seedCollection.IsActive;
+            if (string.IsNullOrWhiteSpace(current.Description))
+            {
+                current.Description = seedCollection.Description;
+            }
+        }
     }
 
     private static async Task SeedItemsAsync(ShopHangTetDbContext context)
     {
+        static string BuildFallbackImageUrl(string itemName)
+        {
+            return $"https://placehold.co/1000x1000/png?text={Uri.EscapeDataString(itemName)}";
+        }
+
+        static List<string> GetItemImages(string itemName)
+        {
+            return itemName switch
+            {
+                // NUTS
+                "Hạt điều rang muối" => new List<string> { "https://tiemphonui.com/cdn/shop/files/1_11.png?v=1742183452" },
+                "Hạt macca" => new List<string> { "https://bizweb.dktcdn.net/thumb/1024x1024/100/458/914/products/6-271c920f-9514-491d-a1e4-92e4b4951eb2.jpg?v=1765197778150" },
+                "Hạt hạnh nhân" => new List<string> { "https://hatdieu.org/storage/images/arDzeLoAcVbd8z0AmlT7F2Dg1uJqBNKRrOO0A9Tj.jpeg" },
+                "Hạt óc chó" => new List<string> { "https://product.hstatic.net/1000141988/product/hat_oc_cho_chile_your_superfood_hu_300_g_b83288fb91754251be4a9f70b1ca8a2a_master.png" },
+                "Hạt dẻ cười" => new List<string> { "https://cdn1470.cdn4s4.io.vn/media/san-pham/cac-loai-hat-say/hat-de%CC%89-cu%CC%9Bo%CC%9Bi-my-hu.png" },
+                "Đậu phộng rang" => new List<string> { "https://catalog-assets-asia-southeast1.aeon-vn-prod.e.spresso.com/c3RvcmFnZS5nb29nbGVhcGlzLmNvbQ==/YWVvbnZpZXRuYW0tc3ByZXNzby1wdWJsaWM=/Rk9PRExJTkUgMjAyNA==/TUFS/MDQ2ODM4ODk=.jpg" },
+                "Hạt hướng dương" => new List<string> { "https://catalog-assets-asia-southeast1.aeon-vn-prod.e.spresso.com/c3RvcmFnZS5nb29nbGVhcGlzLmNvbQ==/YWVvbnZpZXRuYW0tc3ByZXNzby1wdWJsaWM=/Rk9PRExJTkUgMjAyNA==/TUFS/MDQ2ODM4ODk=.jpg" },
+                "Hạt bí xanh" => new List<string> { "https://catalog-assets-asia-southeast1.aeon-vn-prod.e.spresso.com/c3RvcmFnZS5nb29nbGVhcGlzLmNvbQ==/YWVvbnZpZXRuYW0tc3ByZXNzby1wdWJsaWM=/Rk9PRExJTkUgMjAyNA==/TUFS/MDQ2ODM4ODk=.jpg" },
+                "Hạt điều wasabi" => new List<string> { "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTsIYb970f9N22S5UCXjDe347Ggo0UcpKQPBg&s" },
+                "Hạt mix cao cấp" => new List<string> { "https://bizweb.dktcdn.net/100/447/068/products/64.png?v=1700034491443" },
+
+                // COOKIES & CANDY
+                "Butter cookies" => new List<string> { "https://product.hstatic.net/200000833669/product/ito-banhquybobuttercookieshop15cai_7c46364f51794e12a8e403a3ef91bc7c.png" },
+                "Bánh quy bơ Đan Mạch" => new List<string> { "https://drive.gianhangvn.com/image/danh-quy-danisa-454g-2-1375405j12208.jpg" },
+                "Socola Jinkeli" => new List<string> { "https://thucphamplaza.com/wp-content/uploads/products_img/ChatGPT-Image-Jan-12-2026-05_57_02-PM.png" },
+                "Socola Ferrero" => new List<string> { "https://bizweb.dktcdn.net/thumb/grande/100/469/765/products/z6148081896960-5906ebaedc5e8041298078b2e53dfada.jpg" },
+                "Kẹo tiramisu" => new List<string> { "https://product.hstatic.net/1000282430/product/290006263000_7662dbebb314499b85a52a1001325a1e.jpg" },
+                "Kẹo nougat" => new List<string> { "https://product.hstatic.net/1000282430/product/290019966000_52c3451492f14e4eaf6a97b65b446126_grande.png" },
+                "Bánh pía mini" => new List<string> { "https://www.dacsanhuongviet.vn/site/wp-content/uploads/2020/07/Pi%CC%81a-kim-sa-%C4%91a%CC%A3%CC%82u-xanh-la%CC%81-du%CC%9B%CC%81a-tru%CC%9B%CC%81ng-muo%CC%82%CC%81i-tan-cha%CC%89y-500gr.jpg" },
+                "Bánh quy yến mạch" => new List<string> { "https://cdn.tgdd.vn/Files/2022/12/25/1498683/gioi-thieu-banh-quy-yen-mach-oat-krunch-moi-gion-ngon-tot-cho-suc-khoe-202212252327172797.jpg" },
+                "Socola đen 70%" => new List<string> { "https://product.hstatic.net/200000361859/product/z4885692003680_46d7987c2cffbedd5ce7dec7a86bcf65_67ea65b6ee974006a7f7f50715b5cbe5_master.jpg" },
+                "Kẹo trái cây mềm" => new List<string> { "https://www.fujimarket.vn/images_upload/san-pham/4902888254888-keo-mem-3-vi-trai-cay-morinaga-hi-chew-assortment-86g.jpg" },
+                "Kẹo caramel" => new List<string> { "https://shop.annam-gourmet.com/pub/media/catalog/product/cache/ee0af4cad0f3673c5271df64bd520339/i/t/item_F123048_bebd.jpg" },
+                "Bánh hạnh nhân lát" => new List<string> { "https://bizweb.dktcdn.net/thumb/grande/100/004/714/products/hanh-nhan-lat-200g.png?v=1671165513047" },
+
+                // DRIED FRUITS
+                "Mứt xoài" => new List<string> { "https://hailongfood.com/image/cache/catalog/h%E1%BA%A1t%20s%E1%BA%A5y%20kh%C3%B4/%E1%BA%A2nh%20b%C3%ACa%20sp/16-700x700.jpg" },
+                "Mứt dừa" => new List<string> { "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR00jNeYly_7H6TC--BnSP07K35utB8e29DIQ&s" },
+                "Mứt gừng" => new List<string> { "https://down-vn.img.susercontent.com/file/vn-11134207-7ras8-m0pqewys1kh949" },
+                "Mứt dứa" => new List<string> { "https://product.hstatic.net/1000141988/product/mut_trai_dua_le_fruit_225_g__i0001241__84b6595bd9e842998c9560d8a5bd5aa4_master.jpg" },
+                "Nho khô" => new List<string> { "https://hatduatruongdat.com/upload/product/dsc02573-4334.jpg" },
+                "Táo đỏ" => new List<string> { "https://vn-test-11.slatic.net/p/5e686487d7a72f2a9a47cf8be855f192.png" },
+                "Mứt me" => new List<string> { "https://www.baxiufood.vn/wp-content/uploads/2025/01/mut-me-chua-ngot-01.jpg" },
+
+                // TEA
+                "Trà ô long" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+o+long" },
+                "Trà sen Tây Hồ" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+sen+Tay+Ho" },
+                "Trà lài" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+lai" },
+                "Trà thảo mộc" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+thao+moc" },
+                "Trà hoa quả" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+hoa+qua" },
+                "Trà gừng mật ong" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+gung+mat+ong" },
+                "Trà atiso" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+atiso" },
+                "Trà xanh Nhật" => new List<string> { "https://placehold.co/1000x1000/png?text=Tra+xanh+Nhat" },
+
+                // ALCOHOL
+                "Rượu vang đỏ (Chile/Pháp entry)" => new List<string> { "https://placehold.co/1000x1000/png?text=Ruou+vang+do" },
+                "Rượu Batise" => new List<string> { "https://placehold.co/1000x1000/png?text=Ruou+Batise" },
+                "Rượu Chivas 12" => new List<string> { "https://placehold.co/1000x1000/png?text=Ruou+Chivas+12" },
+                "Rượu Chivas 21" => new List<string> { "https://placehold.co/1000x1000/png?text=Ruou+Chivas+21" },
+                "Rượu vang trắng" => new List<string> { "https://placehold.co/1000x1000/png?text=Ruou+vang+trang" },
+                "Rượu sake" => new List<string> { "https://placehold.co/1000x1000/png?text=Ruou+sake" },
+
+                // SAVORY SPECIALTIES
+                "Khô gà lá chanh" => new List<string> { "https://placehold.co/1000x1000/png?text=Kho+ga+la+chanh" },
+                "Khô bò" => new List<string> { "https://placehold.co/1000x1000/png?text=Kho+bo" },
+                "Chà bông cá hồi" => new List<string> { "https://placehold.co/1000x1000/png?text=Cha+bong+ca+hoi" },
+                "Lạp xưởng tươi" => new List<string> { "https://placehold.co/1000x1000/png?text=Lap+xuong+tuoi" },
+
+                _ => new List<string> { BuildFallbackImageUrl(itemName) }
+            };
+        }
+
         var items = new List<Item>
         {
             // NHOM HAT - DINH DUONG (10)
@@ -196,9 +300,13 @@ public static class SeedData
             new Item { Name = "Lạp xưởng tươi", Category = ItemCategory.FOOD, Price = 160000, StockQuantity = 1000, IsActive = true }
         };
 
-        var existingNames = await context.Items
-            .Select(i => i.Name)
-            .ToListAsync();
+        foreach (var item in items)
+        {
+            item.Images = GetItemImages(item.Name);
+        }
+
+        var existingItems = await context.Items.ToListAsync();
+        var existingNames = existingItems.Select(i => i.Name).ToList();
 
         var existingSet = existingNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var missingItems = items
@@ -209,6 +317,23 @@ public static class SeedData
         {
             await context.Items.AddRangeAsync(missingItems);
             Console.WriteLine($"----> Seeded {missingItems.Count} Items");
+        }
+
+        var updatedImageCount = 0;
+        foreach (var existingItem in existingItems)
+        {
+            if (existingItem.Images != null && existingItem.Images.Count > 0)
+            {
+                continue;
+            }
+
+            existingItem.Images = GetItemImages(existingItem.Name);
+            updatedImageCount++;
+        }
+
+        if (updatedImageCount > 0)
+        {
+            Console.WriteLine($"----> Updated images for {updatedImageCount} existing Items");
         }
     }
 
@@ -221,6 +346,7 @@ public static class SeedData
         if (!collections.Any() || !items.Any()) return;
 
         var collectionMap = collections.ToDictionary(c => c.Name, c => c.Id);
+        var collectionDetailMap = collections.ToDictionary(c => c.Name, c => c);
         var tagMap = tags.ToDictionary(t => t.Name, t => t.Id);
         var itemMap = items.ToDictionary(i => i.Name, i => i.Id);
 
@@ -229,6 +355,13 @@ public static class SeedData
             if (!collectionMap.TryGetValue(collectionName, out var id))
                 throw new InvalidOperationException($"Collection not found: {collectionName}");
             return id;
+        }
+
+        Collection GetCollection(string collectionName)
+        {
+            if (!collectionDetailMap.TryGetValue(collectionName, out var collection))
+                throw new InvalidOperationException($"Collection not found: {collectionName}");
+            return collection;
         }
 
         string GetItemId(string itemName)
@@ -251,10 +384,47 @@ public static class SeedData
             return ids;
         }
 
+        decimal CalculateGiftBoxSeedPrice(string collectionName, string[] itemNames)
+        {
+            var collection = GetCollection(collectionName);
+            var totalCost = itemNames.Sum(itemName =>
+            {
+                if (!itemMap.TryGetValue(itemName, out var itemId))
+                    throw new InvalidOperationException($"Item not found: {itemName}");
+
+                var item = items.First(x => x.Id == itemId);
+                return item.Price;
+            });
+
+            var price = (totalCost * collection.PricingMultiplier) + collection.PackagingFee;
+            return Math.Round(price, 0);
+        }
+
+        static string GetGiftBoxFallbackImage(string title)
+        {
+            return $"https://placehold.co/1200x800/png?text={Uri.EscapeDataString(title)}";
+        }
+
+        static string GetGiftBoxImageUrl(string collectionName, string boxName)
+        {
+            var key = $"{collectionName}|{boxName}";
+            return key switch
+            {
+                "Xuân Đoàn Viên|Gia Ấm" => "https://ibb.co/xKcfgX53",
+                "Xuân Đoàn Viên|Trường Thọ" => "https://ibb.co/fYM2624p",
+                "Xuân Đoàn Viên|Sum Vầy" => "https://ibb.co/JRkjx7r8",
+                "Xuân Đoàn Viên|Tri Ân" => "https://ibb.co/QvLWJnbn",
+                "Xuân Đoàn Viên|Đoàn Tụ" => "https://ibb.co/fVH2mGrG",
+                "Xuân Đoàn Viên|Xuân Hòa" => "https://ibb.co/JW7708LB",
+                "Xuân Đoàn Viên|Ấm Tình" => "https://ibb.co/0RXCNK3k",
+                "Xuân Đoàn Viên|Phúc Lộc" => "https://ibb.co/YFqHRwrL",
+                _ => GetGiftBoxFallbackImage($"{collectionName}-{boxName}")
+            };
+        }
+
         GiftBox CreateGiftBox(
             string collectionName,
             string boxName,
-            decimal price,
             string recipientTag,
             string meaningTag,
             params string[] itemNames)
@@ -263,14 +433,15 @@ public static class SeedData
             {
                 Name = $"{collectionName} - {boxName}",
                 Description = $"Hộp quà {boxName} thuộc collection {collectionName}",
-                Price = price,
+                Price = CalculateGiftBoxSeedPrice(collectionName, itemNames),
                 CollectionId = GetCollectionId(collectionName),
                 Tags = GetTagIds(recipientTag, meaningTag),
-                Images = new List<string> { "seed-box.jpg" },
+                Images = new List<string> { GetGiftBoxImageUrl(collectionName, boxName) },
                 Items = itemNames.Select(itemName => new GiftBoxItem
                 {
                     ItemId = GetItemId(itemName),
-                    Quantity = 1
+                    Quantity = 1,
+                    ItemPriceSnapshot = items.First(x => x.Name == itemName).Price
                 }).ToList(),
                 IsActive = true
             };
@@ -279,93 +450,93 @@ public static class SeedData
         var giftBoxes = new List<GiftBox>
         {
             // 1) XUAN DOAN VIEN (8)
-            CreateGiftBox("Xuân Đoàn Viên", "Gia Ấm", 620000, "Gia đình", "Sum vầy",
+            CreateGiftBox("Xuân Đoàn Viên", "Gia Ấm", "Gia đình", "Sum vầy",
                 "Hạt điều rang muối", "Mứt dừa", "Butter cookies", "Trà lài"),
-            CreateGiftBox("Xuân Đoàn Viên", "Trường Thọ", 760000, "Người lớn tuổi", "Chúc sức khỏe",
+            CreateGiftBox("Xuân Đoàn Viên", "Trường Thọ", "Người lớn tuổi", "Chúc sức khỏe",
                 "Táo đỏ", "Mứt gừng", "Trà sen Tây Hồ", "Bánh pía mini"),
-            CreateGiftBox("Xuân Đoàn Viên", "Sum Vầy", 790000, "Bạn bè", "Mừng năm mới",
+            CreateGiftBox("Xuân Đoàn Viên", "Sum Vầy", "Bạn bè", "Mừng năm mới",
                 "Hạt macca", "Kẹo tiramisu", "Nho khô", "Trà ô long"),
-            CreateGiftBox("Xuân Đoàn Viên", "Tri Ân", 1050000, "Đối tác", "Tri ân",
+            CreateGiftBox("Xuân Đoàn Viên", "Tri Ân", "Đối tác", "Tri ân",
                 "Hạt hạnh nhân", "Socola Jinkeli", "Trà ô long", "Rượu Batise"),
-            CreateGiftBox("Xuân Đoàn Viên", "Đoàn Tụ", 900000, "Gia đình", "Mừng năm mới",
+            CreateGiftBox("Xuân Đoàn Viên", "Đoàn Tụ", "Gia đình", "Mừng năm mới",
                 "Hạt óc chó", "Mứt xoài", "Trà sen Tây Hồ", "Bánh quy bơ Đan Mạch"),
-            CreateGiftBox("Xuân Đoàn Viên", "Xuân Hòa", 560000, "Gia đình", "Sum vầy",
+            CreateGiftBox("Xuân Đoàn Viên", "Xuân Hòa", "Gia đình", "Sum vầy",
                 "Đậu phộng rang", "Mứt dứa", "Trà lài", "Butter cookies"),
-            CreateGiftBox("Xuân Đoàn Viên", "Ấm Tình", 900000, "Bạn bè", "Tri ân",
+            CreateGiftBox("Xuân Đoàn Viên", "Ấm Tình", "Bạn bè", "Tri ân",
                 "Hạt macca", "Socola Ferrero", "Trà ô long", "Nho khô"),
-            CreateGiftBox("Xuân Đoàn Viên", "Phúc Lộc", 960000, "Gia đình", "Chúc tài lộc",
+            CreateGiftBox("Xuân Đoàn Viên", "Phúc Lộc", "Gia đình", "Chúc tài lộc",
                 "Hạt điều rang muối", "Mứt gừng", "Trà thảo mộc", "Rượu vang đỏ (Chile/Pháp entry)"),
 
             // 2) CAT TUONG PHU QUY (9)
-            CreateGiftBox("Cát Tường Phú Quý", "Doanh Gia", 2150000, "Đối tác", "Chúc thành công",
+            CreateGiftBox("Cát Tường Phú Quý", "Doanh Gia", "Đối tác", "Chúc thành công",
                 "Rượu Chivas 12", "Hạt dẻ cười", "Socola Ferrero", "Trà ô long"),
-            CreateGiftBox("Cát Tường Phú Quý", "Thịnh Phát", 4500000, "Doanh nghiệp", "Chúc tài lộc",
+            CreateGiftBox("Cát Tường Phú Quý", "Thịnh Phát", "Doanh nghiệp", "Chúc tài lộc",
                 "Rượu Chivas 21", "Hạt macca", "Hạt óc chó", "Trà sen Tây Hồ"),
-            CreateGiftBox("Cát Tường Phú Quý", "Tri Ân", 1300000, "Nhân viên", "Tri ân",
+            CreateGiftBox("Cát Tường Phú Quý", "Tri Ân", "Nhân viên", "Tri ân",
                 "Rượu vang đỏ (Chile/Pháp entry)", "Bánh quy bơ Đan Mạch", "Mứt xoài", "Trà lài"),
-            CreateGiftBox("Cát Tường Phú Quý", "Cao Niên", 980000, "Người lớn tuổi", "Chúc sức khỏe",
+            CreateGiftBox("Cát Tường Phú Quý", "Cao Niên", "Người lớn tuổi", "Chúc sức khỏe",
                 "Táo đỏ", "Hạt óc chó", "Trà thảo mộc", "Mứt gừng"),
-            CreateGiftBox("Cát Tường Phú Quý", "Giao Hảo", 1380000, "Bạn bè", "Mừng năm mới",
+            CreateGiftBox("Cát Tường Phú Quý", "Giao Hảo", "Bạn bè", "Mừng năm mới",
                 "Rượu vang đỏ (Chile/Pháp entry)", "Khô bò", "Hạt điều rang muối", "Socola Jinkeli"),
-            CreateGiftBox("Cát Tường Phú Quý", "Vượng Phát", 2200000, "Đối tác", "Chúc tài lộc",
+            CreateGiftBox("Cát Tường Phú Quý", "Vượng Phát", "Đối tác", "Chúc tài lộc",
                 "Rượu Chivas 12", "Hạt óc chó", "Socola Ferrero", "Trà sen Tây Hồ"),
-            CreateGiftBox("Cát Tường Phú Quý", "Kim Ngọc", 1450000, "Người lớn tuổi", "Mừng năm mới",
+            CreateGiftBox("Cát Tường Phú Quý", "Kim Ngọc", "Người lớn tuổi", "Mừng năm mới",
                 "Rượu vang đỏ (Chile/Pháp entry)", "Táo đỏ", "Hạt macca", "Trà thảo mộc"),
-            CreateGiftBox("Cát Tường Phú Quý", "Thành Công", 2100000, "Doanh nghiệp", "Chúc thành công",
+            CreateGiftBox("Cát Tường Phú Quý", "Thành Công", "Doanh nghiệp", "Chúc thành công",
                 "Rượu Chivas 12", "Hạt dẻ cười", "Bánh quy bơ Đan Mạch", "Trà ô long"),
-            CreateGiftBox("Cát Tường Phú Quý", "Phúc Quý", 1300000, "Nhân viên", "Chúc tài lộc",
+            CreateGiftBox("Cát Tường Phú Quý", "Phúc Quý", "Nhân viên", "Chúc tài lộc",
                 "Rượu vang đỏ (Chile/Pháp entry)", "Socola Jinkeli", "Hạt điều rang muối", "Trà lài"),
 
             // 3) LOC XUAN DOANH NGHIEP (8)
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Tri Ân", 650000, "Nhân viên", "Tri ân",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Tri Ân", "Nhân viên", "Tri ân",
                 "Butter cookies", "Hạt điều rang muối", "Mứt dứa", "Trà lài"),
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Đồng Hành", 1180000, "Đối tác", "Chúc thành công",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Đồng Hành", "Đối tác", "Chúc thành công",
                 "Rượu vang đỏ (Chile/Pháp entry)", "Hạt macca", "Trà ô long", "Socola Jinkeli"),
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Khởi Lộc", 1900000, "Doanh nghiệp", "Chúc tài lộc",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Khởi Lộc", "Doanh nghiệp", "Chúc tài lộc",
                 "Rượu Chivas 12", "Hạt dẻ cười", "Trà sen Tây Hồ", "Bánh quy bơ Đan Mạch"),
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Gắn Kết", 720000, "Bạn bè", "Tri ân",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Gắn Kết", "Bạn bè", "Tri ân",
                 "Khô gà lá chanh", "Hạt điều rang muối", "Trà ô long", "Mứt xoài"),
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Đồng Tâm", 720000, "Nhân viên", "Mừng năm mới",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Đồng Tâm", "Nhân viên", "Mừng năm mới",
                 "Butter cookies", "Hạt macca", "Mứt dứa", "Trà lài"),
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Hợp Tác", 1400000, "Đối tác", "Chúc thành công",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Hợp Tác", "Đối tác", "Chúc thành công",
                 "Rượu vang đỏ (Chile/Pháp entry)", "Hạt hạnh nhân", "Trà sen Tây Hồ", "Socola Ferrero"),
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Khai Xuân", 1650000, "Doanh nghiệp", "Chúc tài lộc",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Khai Xuân", "Doanh nghiệp", "Chúc tài lộc",
                 "Rượu Chivas 12", "Hạt óc chó", "Trà ô long", "Bánh pía mini"),
-            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Bền Vững", 750000, "Bạn bè", "Mừng năm mới",
+            CreateGiftBox("Lộc Xuân Doanh Nghiệp", "Bền Vững", "Bạn bè", "Mừng năm mới",
                 "Khô gà lá chanh", "Hạt điều rang muối", "Trà hoa quả", "Mứt xoài"),
 
             // 4) AN NHIEN TAN XUAN (7)
-            CreateGiftBox("An Nhiên Tân Xuân", "Trường Thọ", 950000, "Người lớn tuổi", "Chúc sức khỏe",
+            CreateGiftBox("An Nhiên Tân Xuân", "Trường Thọ", "Người lớn tuổi", "Chúc sức khỏe",
                 "Táo đỏ", "Hạt óc chó", "Trà thảo mộc", "Chà bông cá hồi"),
-            CreateGiftBox("An Nhiên Tân Xuân", "An Khang", 750000, "Gia đình", "Chúc sức khỏe",
+            CreateGiftBox("An Nhiên Tân Xuân", "An Khang", "Gia đình", "Chúc sức khỏe",
                 "Hạt hạnh nhân", "Mứt dừa", "Trà sen Tây Hồ", "Mứt gừng"),
-            CreateGiftBox("An Nhiên Tân Xuân", "Thanh Nhã", 650000, "Bạn bè", "Mừng năm mới",
+            CreateGiftBox("An Nhiên Tân Xuân", "Thanh Nhã", "Bạn bè", "Mừng năm mới",
                 "Trà hoa quả", "Hạt điều rang muối", "Nho khô", "Bánh pía mini"),
-            CreateGiftBox("An Nhiên Tân Xuân", "Bình An", 750000, "Người lớn tuổi", "Chúc sức khỏe",
+            CreateGiftBox("An Nhiên Tân Xuân", "Bình An", "Người lớn tuổi", "Chúc sức khỏe",
                 "Táo đỏ", "Hạt óc chó", "Trà thảo mộc", "Mứt gừng"),
-            CreateGiftBox("An Nhiên Tân Xuân", "Thiện Tâm", 820000, "Gia đình", "Tri ân",
+            CreateGiftBox("An Nhiên Tân Xuân", "Thiện Tâm", "Gia đình", "Tri ân",
                 "Hạt hạnh nhân", "Mứt dừa", "Trà sen Tây Hồ", "Nho khô"),
-            CreateGiftBox("An Nhiên Tân Xuân", "Tâm Giao", 750000, "Bạn bè", "Tri ân",
+            CreateGiftBox("An Nhiên Tân Xuân", "Tâm Giao", "Bạn bè", "Tri ân",
                 "Trà hoa quả", "Hạt macca", "Bánh pía mini", "Mứt xoài"),
-            CreateGiftBox("An Nhiên Tân Xuân", "An Lành", 950000, "Người lớn tuổi", "Mừng năm mới",
+            CreateGiftBox("An Nhiên Tân Xuân", "An Lành", "Người lớn tuổi", "Mừng năm mới",
                 "Hạt dẻ cười", "Táo đỏ", "Trà thảo mộc", "Chà bông cá hồi"),
 
             // 5) XUAN GAN KET (8)
-            CreateGiftBox("Xuân Gắn Kết", "Chia Sẻ", 650000, "Bạn bè", "Tri ân",
+            CreateGiftBox("Xuân Gắn Kết", "Chia Sẻ", "Bạn bè", "Tri ân",
                 "Khô gà lá chanh", "Hạt điều rang muối", "Trà lài", "Mứt dứa"),
-            CreateGiftBox("Xuân Gắn Kết", "Sum Họp", 900000, "Gia đình", "Sum vầy",
+            CreateGiftBox("Xuân Gắn Kết", "Sum Họp", "Gia đình", "Sum vầy",
                 "Bánh quy bơ Đan Mạch", "Mứt xoài", "Trà ô long", "Hạt macca"),
-            CreateGiftBox("Xuân Gắn Kết", "Tri Ân", 1050000, "Nhân viên", "Tri ân",
+            CreateGiftBox("Xuân Gắn Kết", "Tri Ân", "Nhân viên", "Tri ân",
                 "Rượu vang đỏ (Chile/Pháp entry)", "Socola Jinkeli", "Trà lài", "Hạt hạnh nhân"),
-            CreateGiftBox("Xuân Gắn Kết", "Thân Giao", 1250000, "Đối tác", "Chúc thành công",
+            CreateGiftBox("Xuân Gắn Kết", "Thân Giao", "Đối tác", "Chúc thành công",
                 "Rượu Batise", "Hạt dẻ cười", "Trà ô long", "Khô bò"),
-            CreateGiftBox("Xuân Gắn Kết", "Tâm Ý", 650000, "Nhân viên", "Mừng năm mới",
+            CreateGiftBox("Xuân Gắn Kết", "Tâm Ý", "Nhân viên", "Mừng năm mới",
                 "Khô gà lá chanh", "Hạt điều rang muối", "Trà lài", "Mứt dứa"),
-            CreateGiftBox("Xuân Gắn Kết", "Thân Ái", 900000, "Gia đình", "Tri ân",
+            CreateGiftBox("Xuân Gắn Kết", "Thân Ái", "Gia đình", "Tri ân",
                 "Bánh quy bơ Đan Mạch", "Mứt xoài", "Trà ô long", "Hạt hạnh nhân"),
-            CreateGiftBox("Xuân Gắn Kết", "Hòa Thuận", 1300000, "Đối tác", "Chúc tài lộc",
+            CreateGiftBox("Xuân Gắn Kết", "Hòa Thuận", "Đối tác", "Chúc tài lộc",
                 "Rượu Batise", "Hạt dẻ cười", "Socola Ferrero", "Trà sen Tây Hồ"),
-            CreateGiftBox("Xuân Gắn Kết", "Gắn Bó", 900000, "Bạn bè", "Sum vầy",
+            CreateGiftBox("Xuân Gắn Kết", "Gắn Bó", "Bạn bè", "Sum vầy",
                 "Khô bò", "Hạt macca", "Trà lài", "Nho khô")
         };
 
@@ -382,6 +553,66 @@ public static class SeedData
         {
             await context.GiftBoxes.AddRangeAsync(missingGiftBoxes);
             Console.WriteLine($"----> Seeded {missingGiftBoxes.Count} GiftBoxes");
+        }
+
+        var existingGiftBoxes = await context.GiftBoxes.ToListAsync();
+        var updatedGiftBoxImages = 0;
+        var updatedGiftBoxPrices = 0;
+
+        foreach (var existingGiftBox in existingGiftBoxes)
+        {
+            var hasInvalidImage = existingGiftBox.Images == null
+                || existingGiftBox.Images.Count == 0
+                || existingGiftBox.Images.All(x => string.IsNullOrWhiteSpace(x) || x.Equals("seed-box.jpg", StringComparison.OrdinalIgnoreCase));
+
+            if (!hasInvalidImage)
+            {
+                // no-op, still check price sync below
+            }
+
+            var parts = existingGiftBox.Name.Split(" - ", 2, StringSplitOptions.TrimEntries);
+            if (hasInvalidImage)
+            {
+                var imageUrl = parts.Length == 2
+                    ? GetGiftBoxImageUrl(parts[0], parts[1])
+                    : GetGiftBoxFallbackImage(existingGiftBox.Name);
+
+                existingGiftBox.Images = new List<string> { imageUrl };
+                updatedGiftBoxImages++;
+            }
+
+            var collection = collections.FirstOrDefault(c => c.Id == existingGiftBox.CollectionId);
+            if (collection != null)
+            {
+                foreach (var giftBoxItem in existingGiftBox.Items)
+                {
+                    var sourceItem = items.FirstOrDefault(x => x.Id == giftBoxItem.ItemId);
+                    if (sourceItem != null)
+                    {
+                        giftBoxItem.ItemPriceSnapshot = sourceItem.Price;
+                    }
+                }
+
+                var totalCost = existingGiftBox.Items
+                    .Where(i => itemMap.ContainsValue(i.ItemId))
+                    .Sum(i => (i.ItemPriceSnapshot > 0 ? i.ItemPriceSnapshot : items.First(x => x.Id == i.ItemId).Price) * i.Quantity);
+
+                var recalculated = Math.Round((totalCost * collection.PricingMultiplier) + collection.PackagingFee, 0);
+                if (existingGiftBox.Price != recalculated)
+                {
+                    existingGiftBox.Price = recalculated;
+                    updatedGiftBoxPrices++;
+                }
+            }
+        }
+
+        if (updatedGiftBoxImages > 0)
+        {
+            Console.WriteLine($"----> Updated images for {updatedGiftBoxImages} existing GiftBoxes");
+        }
+        if (updatedGiftBoxPrices > 0)
+        {
+            Console.WriteLine($"----> Recalculated prices for {updatedGiftBoxPrices} existing GiftBoxes using collection pricing rules");
         }
     }
 
@@ -477,13 +708,14 @@ public static class SeedData
             Price = 10000,
             CollectionId = collectionId,
             Tags = new List<string>(),
-            Images = new List<string> { "seed-box.jpg" },
+            Images = new List<string> { "https://placehold.co/1200x800/png?text=TEST10K+QR+Sandbox+Box" },
             Items = new List<GiftBoxItem>
             {
                 new GiftBoxItem
                 {
                     ItemId = cheapestItem.Id,
-                    Quantity = 1
+                    Quantity = 1,
+                    ItemPriceSnapshot = cheapestItem.Price
                 }
             },
             IsActive = true

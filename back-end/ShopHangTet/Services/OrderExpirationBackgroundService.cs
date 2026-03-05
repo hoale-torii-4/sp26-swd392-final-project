@@ -48,6 +48,7 @@ public class OrderExpirationBackgroundService : BackgroundService
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ShopHangTetDbContext>();
+        var orderService = scope.ServiceProvider.GetRequiredService<IOrderService>();
 
         var cutoff = DateTime.UtcNow - ExpireAfter;
 
@@ -62,13 +63,23 @@ public class OrderExpirationBackgroundService : BackgroundService
 
         foreach (var order in expiredOrders)
         {
-            order.Status = OrderStatus.PAYMENT_EXPIRED_INTERNAL;
+            // Release reserved inventory trước khi expire
+            try
+            {
+                await orderService.ReleaseInventoryReservationAsync(order, "System-ExpirationService");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to release inventory for expired order {OrderCode}", order.OrderCode);
+            }
+
+            order.Status = OrderStatus.CANCELLED;
             order.StatusHistory.Add(new OrderStatusHistory
             {
-                Status = OrderStatus.PAYMENT_EXPIRED_INTERNAL,
+                Status = OrderStatus.CANCELLED,
                 Timestamp = DateTime.UtcNow,
                 UpdatedBy = "System-ExpirationService",
-                Notes = "Đơn hết hạn thanh toán sau 10 phút - internal"
+                Notes = "Đơn quá thời gian thanh toán 10 phút - tự động hủy và release reserve"
             });
             order.UpdatedAt = DateTime.UtcNow;
 
@@ -90,6 +101,6 @@ public class OrderExpirationBackgroundService : BackgroundService
 
         await context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Order expiration service marked {Count} order(s) as expired", expiredOrders.Count);
+        _logger.LogInformation("Order expiration service marked {Count} order(s) as expired and released inventory", expiredOrders.Count);
     }
 }
