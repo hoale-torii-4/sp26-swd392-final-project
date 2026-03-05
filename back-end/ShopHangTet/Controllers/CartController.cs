@@ -17,15 +17,19 @@ namespace ShopHangTet.Controllers
                 _cartService = cartService;
             }
 
-            // Lấy UserId nếu có Token, nếu không lấy SessionId từ Header
-            private (string? UserId, string? SessionId) GetUserOrSession()
-            {
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                var sessionId = Request.Headers["X-Session-Id"].FirstOrDefault();
-                return (userId, sessionId);
-            }
+        private (string? UserId, string? SessionId) GetUserOrSession()
+        {
+            // Quét mọi ngóc ngách của Token để tìm UserId
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                      ?? User.FindFirst("Id")?.Value
+                      ?? User.FindFirst("id")?.Value
+                      ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
 
-            [HttpGet]
+            var sessionId = Request.Headers["X-Session-Id"].FirstOrDefault();
+            return (userId, sessionId);
+        }
+
+        [HttpGet]
             public async Task<IActionResult> GetCart()
             {
                 var (userId, sessionId) = GetUserOrSession();

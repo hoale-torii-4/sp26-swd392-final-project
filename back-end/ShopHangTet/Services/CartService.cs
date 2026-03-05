@@ -3,20 +3,18 @@ using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 using System;
-// Nhớ using AppDbContext của bạn ở đây
 
 namespace ShopHangTet.Services
 {
     public class CartService : ICartService
     {
-        private readonly ShopHangTetDbContext _context; // Đổi thành tên thật của DbContext nhé
+        private readonly ShopHangTetDbContext _context; // Nhớ check lại tên AppDbContext
 
         public CartService(ShopHangTetDbContext context)
         {
             _context = context;
         }
 
-        // Đã gỡ lệnh .Include() gây lỗi và thay bằng việc tự Query thủ công
         private async Task<Cart> GetOrCreateCartAsync(string? userId, string? sessionId)
         {
             var cart = await _context.Set<Cart>()
@@ -28,15 +26,13 @@ namespace ShopHangTet.Services
             {
                 cart = new Cart { UserId = userId, SessionId = sessionId };
                 _context.Set<Cart>().Add(cart);
-                await _context.SaveChangesAsync(); // Cần lưu ngay để sinh ra Id cho Giỏ hàng mới
+                await _context.SaveChangesAsync(); // LƯU NGAY để sinh ra Id
                 cart.Items = new List<CartItem>();
             }
             else
             {
-                // Tự tay "móc" dữ liệu từ bảng CartItems sang cho giỏ hàng này
-                cart.Items = await _context.Set<CartItem>()
-                    .Where(i => i.CartId == cart.Id)
-                    .ToListAsync();
+                // Móc dữ liệu từ bảng CartItems lên
+                cart.Items = await _context.Set<CartItem>().Where(i => i.CartId == cart.Id).ToListAsync();
             }
 
             return cart;
@@ -110,7 +106,7 @@ namespace ShopHangTet.Services
             {
                 existingItem.Quantity += dto.Quantity;
                 existingItem.UnitPrice = unitPrice;
-                _context.Set<CartItem>().Update(existingItem); // Bắt buộc EF phải cập nhật
+                _context.Set<CartItem>().Update(existingItem);
             }
             else
             {
@@ -127,28 +123,26 @@ namespace ShopHangTet.Services
                     AddedAt = DateTime.UtcNow
                 };
                 cart.Items.Add(newItem);
-                _context.Set<CartItem>().Add(newItem); // Ép EF lưu thẳng vào bảng CartItems
+                _context.Set<CartItem>().Add(newItem); // Ép EF lưu vào bảng CartItems
             }
 
             cart.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(); // Lưu toàn bộ thay đổi
 
             return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart), "Đã thêm vào giỏ hàng");
         }
 
+        // --- CÁC HÀM CÒN LẠI GIỮ NGUYÊN NHƯ BẢN 2 BẢNG ---
         public async Task<ApiResponse<CartDto>> UpdateCartItemAsync(string? userId, string? sessionId, string cartItemId, UpdateCartItemDto dto)
         {
             var cart = await GetOrCreateCartAsync(userId, sessionId);
             var item = cart.Items.FirstOrDefault(i => i.Id == cartItemId);
-
             if (item == null) return ApiResponse<CartDto>.ErrorResult("Không tìm thấy sản phẩm trong giỏ");
 
             item.Quantity = dto.Quantity;
             _context.Set<CartItem>().Update(item);
-
             cart.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-
             return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart), "Đã cập nhật số lượng");
         }
 
@@ -156,14 +150,12 @@ namespace ShopHangTet.Services
         {
             var cart = await GetOrCreateCartAsync(userId, sessionId);
             var item = cart.Items.FirstOrDefault(i => i.Id == cartItemId);
-
             if (item != null)
             {
-                _context.Set<CartItem>().Remove(item); // Xóa khỏi bảng CartItems
+                _context.Set<CartItem>().Remove(item);
                 cart.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
             }
-
             return ApiResponse<bool>.SuccessResult(true, "Đã xóa sản phẩm khỏi giỏ");
         }
 
@@ -172,11 +164,10 @@ namespace ShopHangTet.Services
             var cart = await GetOrCreateCartAsync(userId, sessionId);
             if (cart.Items.Any())
             {
-                _context.Set<CartItem>().RemoveRange(cart.Items); // Dọn sạch rác trong bảng
+                _context.Set<CartItem>().RemoveRange(cart.Items);
                 cart.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
             }
-
             return ApiResponse<bool>.SuccessResult(true, "Đã làm sạch giỏ hàng");
         }
     }
