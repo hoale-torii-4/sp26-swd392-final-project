@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { authService } from "../services/authService";
 
 const navLinks = [
-    { label: "TRANG CHỦ", to: "/home" },
+    { label: "TRANG CHỦ", to: "/" },
     { label: "GIỎ QUÀ TẾT", to: "/gift-boxes" },
     { label: "TỰ TẠO GIỎ QUÀ", to: "/custom" },
     { label: "VỀ CHÚNG TÔI", to: "/about" },
@@ -48,7 +48,7 @@ export default function Header() {
         <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
             <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-4">
                 {/* Logo */}
-                <Link to="/home" className="flex items-center gap-3">
+                <Link to="/" className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-[#8B1A1A] rounded-full flex items-center justify-center">
                         <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2L13.09 8.26L20 9.27L15 14.14L16.18 21.02L12 17.77L7.82 21.02L9 14.14L4 9.27L10.91 8.26L12 2Z" />

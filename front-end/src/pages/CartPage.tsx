@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { cartService, type CartItem } from "../services/cartService";
+import { cartService, type CartItemDto, type CartDto } from "../services/cartService";
 
 /* ═══════════════════ HELPER ═══════════════════ */
 
@@ -10,30 +10,60 @@ function formatPrice(v: number) {
     return v.toLocaleString("vi-VN") + "₫";
 }
 
+function getTypeLabel(type: number): string {
+    return type === 0 ? "GIỎ QUÀ CÓ SẴN" : "TỰ CHỈNH RIÊNG";
+}
+
+function getTypeColor(type: number): string {
+    return type === 0 ? "bg-teal-700" : "bg-amber-600";
+}
+
 /* ═══════════════════ COMPONENT ═══════════════════ */
 
 export default function CartPage() {
-    const [items, setItems] = useState<CartItem[]>([]);
+    const [cart, setCart] = useState<CartDto | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    const reload = () => setItems(cartService.getItems());
-
-    useEffect(() => {
-        reload();
-    }, []);
-
-    const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-    const totalQty = items.reduce((s, i) => s + i.quantity, 0);
-
-    const handleQuantityChange = (id: string, delta: number) => {
-        const item = items.find((i) => i.id === id);
-        if (!item) return;
-        cartService.updateQuantity(id, item.quantity + delta);
-        reload();
+    const fetchCart = async () => {
+        try {
+            setError(null);
+            const data = await cartService.getCart();
+            setCart(data);
+        } catch (err: unknown) {
+            const axiosErr = err as { response?: { data?: { Message?: string } }; message?: string };
+            setError(axiosErr?.response?.data?.Message || axiosErr?.message || "Không thể tải giỏ hàng.");
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleRemove = (id: string) => {
-        cartService.removeItem(id);
-        reload();
+    useEffect(() => {
+        fetchCart();
+    }, []);
+
+    const items = cart?.Items ?? [];
+    const totalAmount = cart?.TotalAmount ?? 0;
+    const totalItems = cart?.TotalItems ?? 0;
+
+    const handleQuantityChange = async (itemId: string, currentQty: number, delta: number) => {
+        const newQty = currentQty + delta;
+        if (newQty < 1) return;
+        try {
+            const updated = await cartService.updateQuantity(itemId, newQty);
+            setCart(updated);
+        } catch {
+            // silently fail, could add toast
+        }
+    };
+
+    const handleRemove = async (itemId: string) => {
+        try {
+            await cartService.removeItem(itemId);
+            await fetchCart(); // reload after remove
+        } catch {
+            // silently fail
+        }
     };
 
     /* ═══════════════════ RENDER ═══════════════════ */
@@ -54,8 +84,36 @@ export default function CartPage() {
 
             {/* ════════ MAIN LAYOUT ════════ */}
             <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pb-14">
-                {items.length === 0 ? (
-                    /* Empty cart */
+                {/* Loading */}
+                {loading && (
+                    <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
+                        <svg className="w-10 h-10 mx-auto text-[#8B1A1A] animate-spin mb-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        <p className="text-gray-500 text-sm">Đang tải giỏ hàng...</p>
+                    </div>
+                )}
+
+                {/* Error */}
+                {!loading && error && (
+                    <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
+                        <svg className="w-16 h-16 mx-auto text-red-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                        </svg>
+                        <h2 className="text-lg font-bold text-gray-900 mb-2">Có lỗi xảy ra</h2>
+                        <p className="text-sm text-gray-500 mb-4">{error}</p>
+                        <button
+                            onClick={() => { setLoading(true); fetchCart(); }}
+                            className="px-5 py-2.5 bg-[#8B1A1A] text-white text-sm font-semibold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer"
+                        >
+                            Thử lại
+                        </button>
+                    </div>
+                )}
+
+                {/* Empty cart */}
+                {!loading && !error && items.length === 0 && (
                     <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
                         <svg className="w-20 h-20 mx-auto text-gray-300 mb-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
@@ -74,13 +132,16 @@ export default function CartPage() {
                             </svg>
                         </Link>
                     </div>
-                ) : (
+                )}
+
+                {/* Cart with items */}
+                {!loading && !error && items.length > 0 && (
                     <div className="flex flex-col lg:flex-row gap-8">
                         {/* ──────── CART ITEMS LIST ──────── */}
                         <div className="flex-1 min-w-0 space-y-4">
                             {items.map((item) => (
                                 <CartItemCard
-                                    key={item.id}
+                                    key={item.Id}
                                     item={item}
                                     onQuantityChange={handleQuantityChange}
                                     onRemove={handleRemove}
@@ -98,8 +159,8 @@ export default function CartPage() {
                                 {/* Breakdown rows */}
                                 <div className="space-y-3 text-sm">
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Giá trị quà tặng ({totalQty})</span>
-                                        <span className="text-gray-900 font-medium">{formatPrice(subtotal)}</span>
+                                        <span className="text-gray-500">Giá trị quà tặng ({totalItems})</span>
+                                        <span className="text-gray-900 font-medium">{formatPrice(totalAmount)}</span>
                                     </div>
                                     <div className="flex justify-between">
                                         <span className="text-gray-500">Phí đóng gói &amp; Trang trí</span>
@@ -107,7 +168,7 @@ export default function CartPage() {
                                     </div>
                                     <div className="flex justify-between border-t border-gray-100 pt-3">
                                         <span className="text-gray-500">Tạm tính</span>
-                                        <span className="text-gray-900 font-medium">{formatPrice(subtotal)}</span>
+                                        <span className="text-gray-900 font-medium">{formatPrice(totalAmount)}</span>
                                     </div>
                                 </div>
 
@@ -117,7 +178,7 @@ export default function CartPage() {
                                         Tổng giá trị đơn quà
                                     </p>
                                     <p className="text-2xl font-bold text-[#8B1A1A]">
-                                        {formatPrice(subtotal)}
+                                        {formatPrice(totalAmount)}
                                     </p>
                                 </div>
 
@@ -168,61 +229,40 @@ export default function CartPage() {
    ══════════════════════════════════════════════════ */
 
 interface CartItemCardProps {
-    item: CartItem;
-    onQuantityChange: (id: string, delta: number) => void;
+    item: CartItemDto;
+    onQuantityChange: (id: string, currentQty: number, delta: number) => void;
     onRemove: (id: string) => void;
 }
 
 function CartItemCard({ item, onQuantityChange, onRemove }: CartItemCardProps) {
-    const [showComponents, setShowComponents] = useState(false);
-
-    const tagColors: Record<string, string> = {
-        "GIỎ QUÀ CÓ SẴN": "bg-teal-700",
-        "BIẾU ĐỐI TÁC": "bg-[#8B1A1A]",
-        "TỰ CHỈNH RIÊNG": "bg-amber-600",
-    };
-
     return (
         <div className="bg-white rounded-2xl p-5 shadow-sm">
             <div className="flex gap-5">
-                {/* Product image */}
-                <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0">
-                    {item.image ? (
-                        <img
-                            src={item.image}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-300">
-                            <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                            </svg>
-                        </div>
-                    )}
+                {/* Product placeholder image */}
+                <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300">
+                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                    </svg>
                 </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h3 className="font-bold text-gray-900 text-base mb-1.5">{item.name}</h3>
-                            {/* Tags */}
+                            <h3 className="font-bold text-gray-900 text-base mb-1.5">
+                                {item.Name || "Sản phẩm"}
+                            </h3>
+                            {/* Type tag */}
                             <div className="flex flex-wrap gap-1.5 mb-2">
-                                {item.tags?.map((tag, i) => (
-                                    <span
-                                        key={i}
-                                        className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-white rounded ${tagColors[tag] || "bg-gray-500"}`}
-                                    >
-                                        {tag}
-                                    </span>
-                                ))}
+                                <span className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-white rounded ${getTypeColor(item.Type)}`}>
+                                    {getTypeLabel(item.Type)}
+                                </span>
                             </div>
                         </div>
 
                         {/* Delete button */}
                         <button
-                            onClick={() => onRemove(item.id)}
+                            onClick={() => onRemove(item.Id)}
                             className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                             title="Xóa sản phẩm"
                         >
@@ -232,38 +272,18 @@ function CartItemCard({ item, onQuantityChange, onRemove }: CartItemCardProps) {
                         </button>
                     </div>
 
-                    {/* Description (for custom boxes) */}
-                    {item.description && (
-                        <p className="text-xs text-gray-500 mb-1">{item.description}</p>
-                    )}
-
-                    {/* Expandable components list */}
-                    {item.components && item.components.length > 0 && (
-                        <button
-                            onClick={() => setShowComponents(!showComponents)}
-                            className="flex items-center gap-1 text-xs text-[#8B1A1A] font-medium mb-2 hover:underline cursor-pointer"
-                        >
-                            <svg className={`w-3 h-3 transition-transform ${showComponents ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                            {showComponents ? "ẨN THÀNH PHẦN" : "XEM THÀNH PHẦN"}
-                        </button>
-                    )}
-                    {showComponents && item.components && (
-                        <ul className="text-xs text-gray-500 list-disc list-inside mb-2 space-y-0.5">
-                            {item.components.map((c, i) => (
-                                <li key={i}>{c}</li>
-                            ))}
-                        </ul>
-                    )}
+                    {/* Unit price */}
+                    <p className="text-xs text-gray-500 mb-2">
+                        Đơn giá: {formatPrice(item.UnitPrice)}
+                    </p>
 
                     {/* Bottom row: quantity + price */}
                     <div className="flex items-center justify-between mt-2">
                         {/* Quantity selector */}
                         <div className="flex items-center border border-gray-200 rounded-lg">
                             <button
-                                onClick={() => onQuantityChange(item.id, -1)}
-                                disabled={item.quantity <= 1}
+                                onClick={() => onQuantityChange(item.Id, item.Quantity, -1)}
+                                disabled={item.Quantity <= 1}
                                 className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -271,10 +291,10 @@ function CartItemCard({ item, onQuantityChange, onRemove }: CartItemCardProps) {
                                 </svg>
                             </button>
                             <span className="w-8 text-center text-sm font-medium text-gray-900">
-                                {item.quantity}
+                                {item.Quantity}
                             </span>
                             <button
-                                onClick={() => onQuantityChange(item.id, 1)}
+                                onClick={() => onQuantityChange(item.Id, item.Quantity, 1)}
                                 className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer transition-colors"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -283,9 +303,9 @@ function CartItemCard({ item, onQuantityChange, onRemove }: CartItemCardProps) {
                             </button>
                         </div>
 
-                        {/* Price */}
+                        {/* Total price for this item */}
                         <p className="text-lg font-bold text-[#8B1A1A]">
-                            {formatPrice(item.price * item.quantity)}
+                            {formatPrice(item.UnitPrice * item.Quantity)}
                         </p>
                     </div>
                 </div>

@@ -1,75 +1,107 @@
-// ── Cart service — manages shopping cart state in localStorage ──
+// ── Cart service — communicates with backend Cart API ──
 
-export interface CartItem {
-    id: string;           // unique cart-item id
-    productId: string;    // gift-box or custom-box id
-    name: string;
-    image: string;
-    price: number;
-    quantity: number;
-    type: "gift-box" | "custom";   // "gift-box" = ready-made, "custom" = tự tạo
-    tags?: string[];               // display tags like "GIỎ QUÀ CÓ SẴN", "BIẾU ĐỐI TÁC"
-    description?: string;          // short description for custom boxes
-    components?: string[];         // items inside custom box
+import apiClient from "./apiClient";
+import type { ApiResponse } from "../types/auth";
+
+// ─── Types matching backend DTOs ───
+
+export interface CartItemDto {
+    Id: string;
+    Type: number;            // 0 = READY_MADE, 1 = MIX_MATCH
+    GiftBoxId: string | null;
+    CustomBoxId: string | null;
+    Quantity: number;
+    UnitPrice: number;
+    Name: string | null;
 }
 
-const CART_KEY = "cart";
+export interface CartDto {
+    Id: string;
+    UserId: string | null;
+    SessionId: string | null;
+    Items: CartItemDto[];
+    TotalAmount: number;
+    TotalItems: number;
+}
 
-function getCart(): CartItem[] {
-    const raw = localStorage.getItem(CART_KEY);
-    if (!raw) return [];
-    try {
-        return JSON.parse(raw) as CartItem[];
-    } catch {
-        return [];
+export interface AddToCartRequest {
+    Type: number;            // 0 = READY_MADE, 1 = MIX_MATCH
+    GiftBoxId?: string;
+    CustomBoxId?: string;
+    Quantity: number;
+}
+
+// ─── Session ID for guest users ───
+
+const SESSION_KEY = "cart_session_id";
+
+function getSessionId(): string {
+    let sid = localStorage.getItem(SESSION_KEY);
+    if (!sid) {
+        sid = crypto.randomUUID();
+        localStorage.setItem(SESSION_KEY, sid);
     }
+    return sid;
 }
 
-function saveCart(items: CartItem[]) {
-    localStorage.setItem(CART_KEY, JSON.stringify(items));
-    // Dispatch a custom event so other components (e.g., Header badge) can react
-    window.dispatchEvent(new Event("cart-updated"));
+function getHeaders() {
+    return { "X-Session-Id": getSessionId() };
 }
+
+// ─── Cart API Service ───
 
 export const cartService = {
-    getItems: (): CartItem[] => getCart(),
-
-    getCount: (): number => {
-        return getCart().reduce((sum, item) => sum + item.quantity, 0);
+    /**
+     * GET /api/Cart
+     */
+    getCart: async (): Promise<CartDto> => {
+        const res = await apiClient.get<ApiResponse<CartDto>>("/Cart", {
+            headers: getHeaders(),
+        });
+        return res.data.Data;
     },
 
-    getTotal: (): number => {
-        return getCart().reduce((sum, item) => sum + item.price * item.quantity, 0);
+    /**
+     * POST /api/Cart/add
+     */
+    addToCart: async (item: AddToCartRequest): Promise<CartDto> => {
+        const res = await apiClient.post<ApiResponse<CartDto>>("/Cart/add", item, {
+            headers: getHeaders(),
+        });
+        window.dispatchEvent(new Event("cart-updated"));
+        return res.data.Data;
     },
 
-    addItem: (item: Omit<CartItem, "id">) => {
-        const cart = getCart();
-        // Check if same product already exists
-        const existing = cart.find((c) => c.productId === item.productId && c.type === item.type);
-        if (existing) {
-            existing.quantity += item.quantity;
-        } else {
-            cart.push({ ...item, id: crypto.randomUUID() });
-        }
-        saveCart(cart);
+    /**
+     * PUT /api/Cart/update/{itemId}
+     */
+    updateQuantity: async (itemId: string, quantity: number): Promise<CartDto> => {
+        const res = await apiClient.put<ApiResponse<CartDto>>(
+            `/Cart/update/${itemId}`,
+            { Quantity: quantity },
+            { headers: getHeaders() },
+        );
+        window.dispatchEvent(new Event("cart-updated"));
+        return res.data.Data;
     },
 
-    updateQuantity: (id: string, quantity: number) => {
-        const cart = getCart();
-        const item = cart.find((c) => c.id === id);
-        if (item) {
-            item.quantity = Math.max(1, quantity);
-            saveCart(cart);
-        }
+    /**
+     * DELETE /api/Cart/remove/{itemId}
+     */
+    removeItem: async (itemId: string): Promise<void> => {
+        await apiClient.delete(`/Cart/remove/${itemId}`, {
+            headers: getHeaders(),
+        });
+        window.dispatchEvent(new Event("cart-updated"));
     },
 
-    removeItem: (id: string) => {
-        const cart = getCart().filter((c) => c.id !== id);
-        saveCart(cart);
-    },
-
-    clearCart: () => {
-        localStorage.removeItem(CART_KEY);
+    /**
+     * DELETE /api/Cart/clear
+     */
+    clearCart: async (): Promise<void> => {
+        await apiClient.delete("/Cart/clear", {
+            headers: getHeaders(),
+        });
         window.dispatchEvent(new Event("cart-updated"));
     },
 };
