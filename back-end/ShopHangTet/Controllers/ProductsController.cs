@@ -1,7 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ShopHangTet.Data;
-using ShopHangTet.Models;
+using ShopHangTet.DTOs;
+using ShopHangTet.Services;
 
 namespace ShopHangTet.Controllers
 {
@@ -9,35 +9,152 @@ namespace ShopHangTet.Controllers
     [Route("api/[controller]")]
     public class ProductsController : ControllerBase
     {
-        private readonly ShopHangTetDbContext _context;
+        private readonly IProductService _productService;
 
-        public ProductsController(ShopHangTetDbContext context) => _context = context;
+        public ProductsController(IProductService productService) => _productService = productService;
 
         [HttpGet("items")]
-        public async Task<IActionResult> GetItems() 
+        public async Task<IActionResult> GetItems([FromQuery] string? name)
         {
-            var items = await _context.Items
-                .Where(x => x.IsActive)
-                .ToListAsync();
+            var items = await _productService.GetItemsAsync(name);
+            return Ok(items);
+        }
+
+        [HttpGet("items/by-name")]
+        public async Task<IActionResult> GetItemsByName([FromQuery] string name)
+        {
+            var items = await _productService.GetItemsAsync(name);
             return Ok(items);
         }
 
         [HttpGet("gift-boxes")]
-        public async Task<IActionResult> GetGiftBoxes()
+        [HttpGet("giftboxes")]
+        public async Task<IActionResult> GetGiftBoxes([FromQuery] string? name)
         {
-            var giftBoxes = await _context.GiftBoxes
-                .Where(x => x.IsActive)
-                .ToListAsync();
+            var giftBoxes = await _productService.GetGiftBoxesAsync(name);
+            return Ok(giftBoxes);
+        }
+
+        [HttpGet("gift-boxes/by-name")]
+        [HttpGet("giftboxes/by-name")]
+        public async Task<IActionResult> GetGiftBoxesByName([FromQuery] string name)
+        {
+            var giftBoxes = await _productService.GetGiftBoxesAsync(name);
             return Ok(giftBoxes);
         }
 
         [HttpGet("collections")]
-        public async Task<IActionResult> GetCollections()
+        public async Task<IActionResult> GetCollections([FromQuery] string? name)
         {
-            var collections = await _context.Collections
-                .Where(x => x.IsActive)
-                .ToListAsync();
+            var collections = await _productService.GetCollectionsAsync(name);
             return Ok(collections);
+        }
+
+        [HttpGet("collections/by-name")]
+        public async Task<IActionResult> GetCollectionsByName([FromQuery] string name)
+        {
+            var collections = await _productService.GetCollectionsAsync(name);
+            return Ok(collections);
+        }
+
+        [HttpGet("items/{id}")]
+        public async Task<IActionResult> GetItemById(string id)
+        {
+            var item = await _productService.GetItemByIdAsync(id);
+            if (item == null) return NotFound();
+            return Ok(item);
+        }
+
+        [HttpGet("gift-boxes/{id}")]
+        [HttpGet("giftboxes/{id}")]
+        public async Task<IActionResult> GetGiftBoxById(string id)
+        {
+            var giftBox = await _productService.GetGiftBoxDetailByIdAsync(id);
+            if (giftBox == null) return NotFound();
+            return Ok(giftBox);
+        }
+
+        [HttpGet("collections/{id}")]
+        public async Task<IActionResult> GetCollectionById(string id)
+        {
+            var collection = await _productService.GetCollectionDetailByIdAsync(id);
+            if (collection == null) return NotFound();
+            return Ok(collection);
+        }
+
+        // === ADMIN: GiftBox CRUD với auto pricing ===
+
+        /// Tạo GiftBox mới — Price tự tính từ collection pricing rule
+        [HttpPost("gift-boxes")]
+        [HttpPost("giftboxes")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> CreateGiftBox([FromBody] CreateGiftBoxDto dto)
+        {
+            try
+            {
+                var giftBox = await _productService.CreateGiftBoxAsync(dto);
+                return Ok(ApiResponse<object>.SuccessResult(new
+                {
+                    id = giftBox.Id,
+                    name = giftBox.Name,
+                    price = giftBox.Price,
+                    collectionId = giftBox.CollectionId
+                }, "GiftBox created with auto-calculated price"));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
+            }
+        }
+
+        /// Cập nhật GiftBox — Price tự tính lại nếu items thay đổi
+        [HttpPut("gift-boxes/{id}")]
+        [HttpPut("giftboxes/{id}")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> UpdateGiftBox(string id, [FromBody] UpdateGiftBoxDto dto)
+        {
+            try
+            {
+                var giftBox = await _productService.UpdateGiftBoxAsync(id, dto);
+                return Ok(ApiResponse<object>.SuccessResult(new
+                {
+                    id = giftBox.Id,
+                    name = giftBox.Name,
+                    price = giftBox.Price,
+                    collectionId = giftBox.CollectionId
+                }, "GiftBox updated"));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
+            }
+        }
+
+        /// Tính giá dự kiến cho GiftBox (preview, không lưu)
+        [HttpPost("gift-boxes/calculate-price")]
+        [HttpPost("giftboxes/calculate-price")]
+        [Authorize(Roles = "ADMIN")]
+        public async Task<IActionResult> CalculateGiftBoxPrice([FromBody] CreateGiftBoxDto dto)
+        {
+            try
+            {
+                var items = dto.Items.Select(i => new ShopHangTet.Models.GiftBoxItem
+                {
+                    ItemId = i.ItemId,
+                    Quantity = i.Quantity
+                }).ToList();
+
+                var price = await _productService.CalculateGiftBoxPriceAsync(dto.CollectionId, items);
+                return Ok(ApiResponse<object>.SuccessResult(new
+                {
+                    collectionId = dto.CollectionId,
+                    calculatedPrice = price
+                }, "Price calculated from collection pricing rule"));
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
+            }
         }
     }
 }

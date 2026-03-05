@@ -25,8 +25,9 @@ public class PaymentController : ControllerBase
         _configuration = configuration;
     }
 
-    /// URL cấu hình trên SePay Dashboard: https://domain/api/payment/webhook
+    /// URL cấu hình trên SePay Dashboard:
     [HttpPost("webhook")]
+    [HttpPost("/hooks/sepay-payment")]
     public async Task<IActionResult> ReceiveWebhook([FromBody] SePayWebhookDto data)
     {
         // Bảo mật: Kiểm tra SePay Webhook Token
@@ -44,7 +45,7 @@ public class PaymentController : ControllerBase
             if (!string.Equals(receivedToken.Trim(), configuredToken, StringComparison.Ordinal))
             {
                 _logger.LogWarning("SePay webhook rejected: invalid token from IP {IP}", HttpContext.Connection.RemoteIpAddress);
-                return Ok(new { status = 200 });
+                return Ok(new { success = true, status = 200 });
             }
         }
 
@@ -57,7 +58,7 @@ public class PaymentController : ControllerBase
             if (!string.Equals(data.TransferType, "in", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Skipping non-incoming transfer: {Type}", data.TransferType);
-                return Ok(new { status = 200 });
+                return Ok(new { success = true, status = 200 });
             }
 
             // 2. Ưu tiên lấy mã đơn từ field code; fallback parse từ content
@@ -134,9 +135,7 @@ public class PaymentController : ControllerBase
             var response = new PaymentStatusResponseDto
             {
                 OrderCode = order.OrderCode,
-                Status = order.Status == OrderStatus.PAYMENT_EXPIRED_INTERNAL
-                    ? OrderStatus.PAYMENT_CONFIRMING.ToString()
-                    : order.Status.ToString(),
+                Status = order.Status.ToString(),
                 TotalAmount = order.TotalAmount,
                 IsPaid = order.Status == OrderStatus.PREPARING
                     || order.Status == OrderStatus.SHIPPING

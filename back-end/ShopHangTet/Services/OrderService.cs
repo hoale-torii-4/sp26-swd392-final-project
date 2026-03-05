@@ -42,9 +42,7 @@ namespace ShopHangTet.Services
             return new OrderTrackingResult
             {
                 OrderCode = order.OrderCode,
-                Status = order.Status == OrderStatus.PAYMENT_EXPIRED_INTERNAL
-                    ? OrderStatus.PAYMENT_CONFIRMING.ToString()
-                    : order.Status.ToString(),
+                Status = order.Status.ToString(),
                 CreatedAt = order.CreatedAt,
                 DeliveryDate = order.DeliveryDate,
                 TotalAmount = order.TotalAmount,
@@ -77,7 +75,23 @@ namespace ShopHangTet.Services
             // Inventory deduction only when transitioning to PREPARING
             if (status == Models.OrderStatus.PREPARING && order.Status != Models.OrderStatus.PREPARING)
             {
-                await ApplyInventoryOnPreparingAsync(order, updatedBy);
+                await DeductReservedInventoryAsync(order, updatedBy);
+            }
+
+            // Cancel flow:
+            // - PAYMENT_CONFIRMING: release reservation
+            // - PREPARING/SHIPPING/PARTIAL/FAILED: restock deducted inventory
+            if (status == Models.OrderStatus.CANCELLED)
+            {
+                if (order.Status == Models.OrderStatus.PAYMENT_CONFIRMING
+                    || order.Status == Models.OrderStatus.PAYMENT_EXPIRED_INTERNAL)
+                {
+                    await ReleaseInventoryReservationAsync(order, updatedBy);
+                }
+                else
+                {
+                    await RestockOrderInventoryAsync(order, updatedBy);
+                }
             }
 
             order.Status = status;
@@ -129,8 +143,8 @@ namespace ShopHangTet.Services
                 return false;
             }
 
-            // 1. Trừ kho (Inventory deduction)
-            await ApplyInventoryOnPreparingAsync(order, "SePay-Webhook");
+            // 1. Chuyển kho từ Reserved sang Deducted (xác nhận trừ)
+            await DeductReservedInventoryAsync(order, "SePay-Webhook");
 
             // 2. Cập nhật trạng thái sang PREPARING
             order.Status = OrderStatus.PREPARING;
@@ -163,14 +177,48 @@ namespace ShopHangTet.Services
             return $"SHT{timestamp}{random}";
         }
 
-        private async Task ApplyInventoryOnPreparingAsync(OrderModel order, string updatedBy)
+        /// Reserve inventory khi tạo đơn hàng — tăng ReservedQuantity, chưa trừ StockQuantity
+        private async Task ReserveInventoryAsync(OrderModel order, string updatedBy)
         {
             foreach (var orderItem in order.Items)
             {
                 if (orderItem.Type == OrderItemType.READY_MADE)
                 {
                     if (orderItem.GiftBoxId == null) continue;
+                    var giftBoxId = orderItem.GiftBoxId.Value.ToString();
+                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == giftBoxId);
+                    if (giftBox == null) continue;
 
+                    foreach (var giftBoxItem in giftBox.Items)
+                    {
+                        var quantity = giftBoxItem.Quantity * orderItem.Quantity;
+                        await ReserveItemStockAsync(giftBoxItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                    }
+                }
+                else if (orderItem.Type == OrderItemType.MIX_MATCH)
+                {
+                    if (orderItem.CustomBoxId == null) continue;
+                    var customBoxId = orderItem.CustomBoxId.Value.ToString();
+                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == customBoxId);
+                    if (customBox == null) continue;
+
+                    foreach (var customItem in customBox.Items)
+                    {
+                        var quantity = customItem.Quantity * orderItem.Quantity;
+                        await ReserveItemStockAsync(customItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                    }
+                }
+            }
+        }
+
+        /// Chuyển từ Reserved sang Deducted khi thanh toán xác nhận / chuyển sang PREPARING
+        private async Task DeductReservedInventoryAsync(OrderModel order, string updatedBy)
+        {
+            foreach (var orderItem in order.Items)
+            {
+                if (orderItem.Type == OrderItemType.READY_MADE)
+                {
+                    if (orderItem.GiftBoxId == null) continue;
                     var giftBoxId = orderItem.GiftBoxId.Value.ToString();
                     var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == giftBoxId);
                     if (giftBox == null) continue;
@@ -184,7 +232,6 @@ namespace ShopHangTet.Services
                 else if (orderItem.Type == OrderItemType.MIX_MATCH)
                 {
                     if (orderItem.CustomBoxId == null) continue;
-
                     var customBoxId = orderItem.CustomBoxId.Value.ToString();
                     var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == customBoxId);
                     if (customBox == null) continue;
@@ -196,6 +243,132 @@ namespace ShopHangTet.Services
                     }
                 }
             }
+        }
+
+        /// Release inventory khi đơn hàng bị cancel hoặc hết hạn thanh toán
+        public async Task ReleaseInventoryReservationAsync(OrderModel order, string updatedBy)
+        {
+            foreach (var orderItem in order.Items)
+            {
+                if (orderItem.Type == OrderItemType.READY_MADE)
+                {
+                    if (orderItem.GiftBoxId == null) continue;
+                    var giftBoxId = orderItem.GiftBoxId.Value.ToString();
+                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == giftBoxId);
+                    if (giftBox == null) continue;
+
+                    foreach (var giftBoxItem in giftBox.Items)
+                    {
+                        var quantity = giftBoxItem.Quantity * orderItem.Quantity;
+                        await ReleaseItemStockAsync(giftBoxItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                    }
+                }
+                else if (orderItem.Type == OrderItemType.MIX_MATCH)
+                {
+                    if (orderItem.CustomBoxId == null) continue;
+                    var customBoxId = orderItem.CustomBoxId.Value.ToString();
+                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == customBoxId);
+                    if (customBox == null) continue;
+
+                    foreach (var customItem in customBox.Items)
+                    {
+                        var quantity = customItem.Quantity * orderItem.Quantity;
+                        await ReleaseItemStockAsync(customItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                    }
+                }
+            }
+        }
+
+        /// Aggregate delivery statuses thành order status (B2B)
+        public async Task<OrderStatus> AggregateDeliveryStatusAsync(string orderId)
+        {
+            var deliveries = await _context.OrderDeliveries
+                .Where(d => d.OrderId == orderId)
+                .ToListAsync();
+
+            if (!deliveries.Any()) return OrderStatus.SHIPPING;
+
+            var allCancelled = deliveries.All(d => d.Status == "CANCELLED");
+            var allDelivered = deliveries.All(d => d.Status == "DELIVERED");
+            var anyFailed = deliveries.Any(d => d.Status == "FAILED");
+            var anyDelivered = deliveries.Any(d => d.Status == "DELIVERED");
+            var anyShipping = deliveries.Any(d => d.Status == "SHIPPING" || d.Status == "PENDING");
+
+            if (allCancelled) return OrderStatus.CANCELLED;
+            if (allDelivered) return OrderStatus.COMPLETED;
+            if (anyShipping) return OrderStatus.SHIPPING;
+            if (anyFailed && anyDelivered) return OrderStatus.PARTIAL_DELIVERY;
+            if (anyFailed) return OrderStatus.DELIVERY_FAILED;
+            return OrderStatus.SHIPPING;
+        }
+
+        /// Cập nhật delivery status và tự aggregate order status
+        public async Task UpdateDeliveryStatusAsync(string deliveryId, string status, string? failureReason = null)
+        {
+            var delivery = await _context.OrderDeliveries.FirstOrDefaultAsync(d => d.Id == deliveryId);
+            if (delivery == null) throw new InvalidOperationException("Delivery not found");
+
+            delivery.Status = status;
+            delivery.LastAttemptAt = DateTime.UtcNow;
+
+            if (status == "FAILED")
+            {
+                delivery.FailureReason = failureReason;
+                delivery.RetryCount++;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // Aggregate order status từ tất cả deliveries
+            var aggregatedStatus = await AggregateDeliveryStatusAsync(delivery.OrderId);
+            var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == ObjectId.Parse(delivery.OrderId));
+            if (order != null && order.Status != aggregatedStatus)
+            {
+                order.Status = aggregatedStatus;
+                order.StatusHistory.Add(new OrderStatusHistory
+                {
+                    Status = aggregatedStatus,
+                    Timestamp = DateTime.UtcNow,
+                    UpdatedBy = "System-DeliveryAggregation",
+                    Notes = $"Trạng thái đơn cập nhật từ delivery aggregation: {aggregatedStatus}"
+                });
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+        }
+
+        /// Reship — thử giao lại delivery đã fail (nếu chưa vượt maxRetries)
+        public async Task<bool> ReshipDeliveryAsync(string deliveryId)
+        {
+            var delivery = await _context.OrderDeliveries.FirstOrDefaultAsync(d => d.Id == deliveryId);
+            if (delivery == null) throw new InvalidOperationException("Delivery not found");
+            if (delivery.Status != "FAILED") throw new InvalidOperationException("Only failed deliveries can be reshipped");
+            if (delivery.RetryCount >= delivery.MaxRetries)
+                throw new InvalidOperationException($"Max retries ({delivery.MaxRetries}) exceeded for this delivery");
+
+            delivery.Status = "SHIPPING";
+            delivery.LastAttemptAt = DateTime.UtcNow;
+            delivery.FailureReason = null;
+            await _context.SaveChangesAsync();
+
+            // Re-aggregate order status
+            var aggregatedStatus = await AggregateDeliveryStatusAsync(delivery.OrderId);
+            var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == ObjectId.Parse(delivery.OrderId));
+            if (order != null)
+            {
+                order.Status = aggregatedStatus;
+                order.StatusHistory.Add(new OrderStatusHistory
+                {
+                    Status = aggregatedStatus,
+                    Timestamp = DateTime.UtcNow,
+                    UpdatedBy = "System-Reship",
+                    Notes = $"Giao lại delivery {deliveryId} (lần {delivery.RetryCount + 1})"
+                });
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+
+            return true;
         }
 
         private async Task<bool> TryReserveSlotAsync(string? slotId)
@@ -232,8 +405,18 @@ namespace ShopHangTet.Services
         private bool IsValidStatusTransition(OrderStatus currentStatus, OrderStatus nextStatus)
         {
             return (currentStatus == OrderStatus.PAYMENT_CONFIRMING && nextStatus == OrderStatus.PREPARING)
+                   || (currentStatus == OrderStatus.PAYMENT_CONFIRMING && nextStatus == OrderStatus.CANCELLED)
+                   || (currentStatus == OrderStatus.PREPARING && nextStatus == OrderStatus.CANCELLED)
                    || (currentStatus == OrderStatus.PREPARING && nextStatus == OrderStatus.SHIPPING)
-                   || (currentStatus == OrderStatus.SHIPPING && nextStatus == OrderStatus.COMPLETED);
+                   || (currentStatus == OrderStatus.SHIPPING && nextStatus == OrderStatus.COMPLETED)
+                   || (currentStatus == OrderStatus.SHIPPING && nextStatus == OrderStatus.CANCELLED)
+                   || (currentStatus == OrderStatus.SHIPPING && nextStatus == OrderStatus.PARTIAL_DELIVERY)
+                   || (currentStatus == OrderStatus.SHIPPING && nextStatus == OrderStatus.DELIVERY_FAILED)
+                   || (currentStatus == OrderStatus.DELIVERY_FAILED && nextStatus == OrderStatus.SHIPPING) // reship
+                   || (currentStatus == OrderStatus.DELIVERY_FAILED && nextStatus == OrderStatus.CANCELLED)
+                   || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.SHIPPING) // reship remaining
+                   || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.COMPLETED)
+                   || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.CANCELLED);
         }
 
         private async Task<List<OrderItemSnapshotItem>> BuildGiftBoxSnapshotItemsAsync(GiftBox giftBox)
@@ -252,7 +435,7 @@ namespace ShopHangTet.Services
                     ItemId = x.ItemId,
                     ItemName = item?.Name ?? string.Empty,
                     Quantity = x.Quantity,
-                    UnitPrice = item?.Price ?? 0
+                    UnitPrice = x.ItemPriceSnapshot > 0 ? x.ItemPriceSnapshot : (item?.Price ?? 0)
                 };
             }).ToList();
         }
@@ -278,6 +461,33 @@ namespace ShopHangTet.Services
             }).ToList();
         }
 
+        /// Reserve: tăng ReservedQuantity (chưa trừ StockQuantity)
+        private async Task ReserveItemStockAsync(string itemId, int quantity, string orderId, string updatedBy)
+        {
+            if (quantity <= 0) return;
+
+            var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
+            if (item == null) return;
+
+            if (item.AvailableQuantity < quantity)
+            {
+                throw new InvalidOperationException(
+                    $"Không đủ tồn kho cho sản phẩm '{item.Name}'. Cần: {quantity}, Có sẵn: {item.AvailableQuantity}");
+            }
+
+            item.ReservedQuantity += quantity;
+
+            _context.InventoryLogs.Add(new InventoryLog
+            {
+                OrderId = orderId,
+                ItemId = itemId,
+                Quantity = -quantity,
+                Action = "RESERVE",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        /// Deduct: trừ StockQuantity và giảm ReservedQuantity (khi confirm payment)
         private async Task DeductItemStockAsync(string itemId, int quantity, string orderId, string updatedBy)
         {
             if (quantity <= 0) return;
@@ -285,18 +495,90 @@ namespace ShopHangTet.Services
             var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
             if (item == null) return;
 
-            // Deduct stock
             item.StockQuantity -= quantity;
+            item.ReservedQuantity = Math.Max(0, item.ReservedQuantity - quantity);
 
-            //Chỉ log DEDUCT khi Order chuyển sang PREPARING
             _context.InventoryLogs.Add(new InventoryLog
             {
                 OrderId = orderId,
                 ItemId = itemId,
-                Quantity = -quantity, // Âm cho DEDUCT
+                Quantity = -quantity,
                 Action = "DEDUCT",
                 CreatedAt = DateTime.UtcNow
             });
+        }
+
+        /// Release: giảm ReservedQuantity (khi cancel/expire)
+        private async Task ReleaseItemStockAsync(string itemId, int quantity, string orderId, string updatedBy)
+        {
+            if (quantity <= 0) return;
+
+            var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
+            if (item == null) return;
+
+            item.ReservedQuantity = Math.Max(0, item.ReservedQuantity - quantity);
+
+            _context.InventoryLogs.Add(new InventoryLog
+            {
+                OrderId = orderId,
+                ItemId = itemId,
+                Quantity = quantity, // Dương cho RELEASE
+                Action = "RELEASE",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        /// Restock: cộng lại StockQuantity khi đơn đã deduct bị hủy
+        private async Task RestockItemStockAsync(string itemId, int quantity, string orderId, string updatedBy)
+        {
+            if (quantity <= 0) return;
+
+            var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
+            if (item == null) return;
+
+            item.StockQuantity += quantity;
+
+            _context.InventoryLogs.Add(new InventoryLog
+            {
+                OrderId = orderId,
+                ItemId = itemId,
+                Quantity = quantity,
+                Action = "RESTOCK",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        private async Task RestockOrderInventoryAsync(OrderModel order, string updatedBy)
+        {
+            foreach (var orderItem in order.Items)
+            {
+                if (orderItem.Type == OrderItemType.READY_MADE)
+                {
+                    if (orderItem.GiftBoxId == null) continue;
+                    var giftBoxId = orderItem.GiftBoxId.Value.ToString();
+                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == giftBoxId);
+                    if (giftBox == null) continue;
+
+                    foreach (var giftBoxItem in giftBox.Items)
+                    {
+                        var quantity = giftBoxItem.Quantity * orderItem.Quantity;
+                        await RestockItemStockAsync(giftBoxItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                    }
+                }
+                else if (orderItem.Type == OrderItemType.MIX_MATCH)
+                {
+                    if (orderItem.CustomBoxId == null) continue;
+                    var customBoxId = orderItem.CustomBoxId.Value.ToString();
+                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == customBoxId);
+                    if (customBox == null) continue;
+
+                    foreach (var customItem in customBox.Items)
+                    {
+                        var quantity = customItem.Quantity * orderItem.Quantity;
+                        await RestockItemStockAsync(customItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                    }
+                }
+            }
         }
 
         /// Đặt hàng B2C (Guest hoặc Member) - 1 địa chỉ duy nhất
@@ -354,6 +636,9 @@ namespace ShopHangTet.Services
                     UpdatedBy = "System",
                     Notes = "Đơn hàng được tạo - Đang xác nhận thanh toán"
                 });
+
+                // Reserve inventory khi tạo đơn để tránh oversell
+                await ReserveInventoryAsync(order, "System-PlaceOrder");
 
                 _context.Orders.Add(order);
                 await _context.SaveChangesAsync();
@@ -431,6 +716,9 @@ namespace ShopHangTet.Services
                     Notes = "Đơn hàng B2B được tạo - Đang xác nhận thanh toán"
                 });
 
+                // Reserve inventory khi tạo đơn để tránh oversell
+                await ReserveInventoryAsync(order, "System-PlaceOrder");
+
                 _context.Orders.Add(order);
                 await _context.SaveChangesAsync();
 
@@ -506,33 +794,81 @@ namespace ShopHangTet.Services
             var items = await _context.Items.Where(x => itemIds.Contains(x.Id)).ToListAsync();
             var itemMap = items.ToDictionary(x => x.Id, x => x);
 
-            // Đếm theo category
-            result.DrinkCount = customBox.Items.Count(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.DRINK);
-            result.FoodCount = customBox.Items.Count(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.FOOD);
-            result.NutCount = customBox.Items.Count(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.NUT);
-            result.AlcoholCount = customBox.Items.Count(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.ALCOHOL);
+            // Đếm theo QUANTITY (không phải số dòng item)
+            result.TotalItemCount = customBox.Items
+                .Where(cbi => itemMap.ContainsKey(cbi.ItemId))
+                .Sum(cbi => cbi.Quantity);
 
-            //Rules: ≥1 DRINK, 2-4 FOOD, ≤1 ALCOHOL
-            if (result.DrinkCount < 1)
+            result.DrinkCount = customBox.Items
+                .Where(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.DRINK)
+                .Sum(cbi => cbi.Quantity);
+
+            result.AlcoholCount = customBox.Items
+                .Where(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.ALCOHOL)
+                .Sum(cbi => cbi.Quantity);
+
+            result.NutCount = customBox.Items
+                .Where(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.NUT)
+                .Sum(cbi => cbi.Quantity);
+
+            result.FoodCount = customBox.Items
+                .Where(cbi => itemMap.ContainsKey(cbi.ItemId) && itemMap[cbi.ItemId].Category == ItemCategory.FOOD)
+                .Sum(cbi => cbi.Quantity);
+
+            result.SnackCount = result.NutCount + result.FoodCount;
+
+            var savoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                result.Errors.Add("Mix & Match phải có ít nhất 1 đồ uống");
+                "Khô gà lá chanh",
+                "Khô bò",
+                "Chà bông cá hồi",
+                "Lạp xưởng tươi"
+            };
+
+            result.SavoryCount = customBox.Items
+                .Where(cbi => itemMap.ContainsKey(cbi.ItemId) && savoryNames.Contains(itemMap[cbi.ItemId].Name))
+                .Sum(cbi => cbi.Quantity);
+
+            result.HasChivas12 = customBox.Items.Any(cbi =>
+                itemMap.ContainsKey(cbi.ItemId)
+                && itemMap[cbi.ItemId].Name.Contains("Chivas 12", StringComparison.OrdinalIgnoreCase));
+
+            result.HasChivas21 = customBox.Items.Any(cbi =>
+                itemMap.ContainsKey(cbi.ItemId)
+                && itemMap[cbi.ItemId].Name.Contains("Chivas 21", StringComparison.OrdinalIgnoreCase));
+
+            if (result.TotalItemCount < 4 || result.TotalItemCount > 6)
+            {
+                result.Errors.Add("Mix & Match phải có tổng từ 4 đến 6 món");
                 result.IsValid = false;
             }
 
-            if (result.FoodCount < 2)
+            if (result.DrinkCount + result.AlcoholCount < 1)
             {
-                result.Errors.Add("Mix & Match phải có ít nhất 2 món ăn");
-                result.IsValid = false;
-            }
-            else if (result.FoodCount > 4)
-            {
-                result.Errors.Add("Mix & Match không được có quá 4 món ăn");
+                result.Errors.Add("Mix & Match phải có ít nhất 1 sản phẩm nhóm đồ uống (Trà hoặc Rượu)");
                 result.IsValid = false;
             }
 
-            if (result.AlcoholCount > 1)
+            if (result.SnackCount < 2)
             {
-                result.Errors.Add("Mix & Match không được có quá 1 rượu");
+                result.Errors.Add("Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo)");
+                result.IsValid = false;
+            }
+
+            if (result.SavoryCount > 2)
+            {
+                result.Errors.Add("Nhóm đặc sản mặn được chọn tối đa 2 sản phẩm");
+                result.IsValid = false;
+            }
+
+            if (result.HasChivas21 && result.TotalItemCount > 4)
+            {
+                result.Errors.Add("Nếu hộp có Chivas 21, tổng số item tối đa là 4");
+                result.IsValid = false;
+            }
+            else if (result.HasChivas12 && result.TotalItemCount > 5)
+            {
+                result.Errors.Add("Nếu hộp có Chivas 12, tổng số item tối đa là 5");
                 result.IsValid = false;
             }
 
@@ -689,7 +1025,7 @@ namespace ShopHangTet.Services
                         ItemId = item.ItemId,
                         ItemName = itemDetail.Name,
                         Quantity = item.Quantity,
-                        UnitPrice = itemDetail.Price
+                        UnitPrice = item.ItemPriceSnapshot > 0 ? item.ItemPriceSnapshot : itemDetail.Price
                     });
                 }
             }

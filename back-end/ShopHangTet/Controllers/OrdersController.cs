@@ -248,4 +248,55 @@ public class OrdersController : ControllerBase
             });
         }
     }
+
+    // === DELIVERY MANAGEMENT ===
+
+    /// Cập nhật delivery status (STAFF) — tự aggregate order status
+    [Authorize(Roles = "STAFF")]
+    [HttpPut("deliveries/{deliveryId}/status")]
+    public async Task<IActionResult> UpdateDeliveryStatus(string deliveryId, [FromBody] UpdateDeliveryStatusDto request)
+    {
+        try
+        {
+            await _orderService.UpdateDeliveryStatusAsync(deliveryId, request.Status, request.FailureReason);
+            return Ok(new ApiResponse<string>
+            {
+                Success = true,
+                Message = $"Delivery status updated to {request.Status}"
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+    }
+
+    /// Reship delivery đã fail (STAFF)
+    [Authorize(Roles = "STAFF")]
+    [HttpPost("deliveries/{deliveryId}/reship")]
+    public async Task<IActionResult> ReshipDelivery(string deliveryId)
+    {
+        try
+        {
+            var result = await _orderService.ReshipDeliveryAsync(deliveryId);
+            return Ok(new ApiResponse<bool>
+            {
+                Success = true,
+                Message = "Delivery reshipped successfully",
+                Data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+    }
 }
