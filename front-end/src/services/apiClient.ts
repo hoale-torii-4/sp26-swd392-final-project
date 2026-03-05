@@ -29,7 +29,7 @@ apiClient.interceptors.response.use(
             const message =
                 typeof error.response.data === "string"
                     ? error.response.data
-                    : error.response.data?.message ?? "Đã xảy ra lỗi từ máy chủ.";
+                    : error.response.data?.Message ?? "Đã xảy ra lỗi từ máy chủ.";
 
             return Promise.reject({ message, status: error.response.status });
         }

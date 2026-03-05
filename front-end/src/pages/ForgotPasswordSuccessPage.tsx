@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { authService } from "../services/authService";
 
 export default function ForgotPasswordSuccessPage() {
+    const location = useLocation();
+    const email = (location.state as { email?: string })?.email || "";
+
     const [countdown, setCountdown] = useState(60);
     const [canResend, setCanResend] = useState(false);
+    const [resendMsg, setResendMsg] = useState<string | null>(null);
 
     useEffect(() => {
         if (countdown <= 0) {
@@ -14,11 +19,17 @@ export default function ForgotPasswordSuccessPage() {
         return () => clearTimeout(timer);
     }, [countdown]);
 
-    const handleResend = () => {
-        if (!canResend) return;
+    const handleResend = async () => {
+        if (!canResend || !email) return;
+        setResendMsg(null);
+        try {
+            await authService.forgotPassword(email);
+            setResendMsg("Đã gửi lại mã OTP!");
+        } catch {
+            setResendMsg("Không thể gửi lại. Vui lòng thử lại.");
+        }
         setCountdown(60);
         setCanResend(false);
-        // TODO: trigger resend API call
     };
 
     return (
@@ -117,12 +128,18 @@ export default function ForgotPasswordSuccessPage() {
                     bạn. Vui lòng kiểm tra hộp thư (bao gồm cả thư mục Spam).
                 </p>
 
-                {/* Home Button */}
+                {/* Resend success/error msg */}
+                {resendMsg && (
+                    <p className="mb-4 text-xs text-gray-500">{resendMsg}</p>
+                )}
+
+                {/* Go to Reset Password */}
                 <Link
-                    to="/"
+                    to="/reset-password"
+                    state={{ email }}
                     className="block w-full rounded-lg bg-red-700 px-4 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors text-center"
                 >
-                    Về trang chủ
+                    Đặt lại mật khẩu
                 </Link>
 
                 {/* Resend Link */}
