@@ -11,6 +11,14 @@ jobs:
   # KIỂM TRA BACK-END (.NET)
   build-backend:
     runs-on: ubuntu-latest
+    
+    # BƯỚC PHÉP THUẬT: Mượn 1 con MongoDB ảo chạy ngầm trên Github
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+
     steps:
     - name: Tải code về máy ảo
       uses: actions/checkout@v3
@@ -27,6 +35,15 @@ jobs:
     - name: Kiểm tra lỗi cú pháp (Build)
       working-directory: ./back-end/ShopHangTet
       run: dotnet build --no-restore
+
+    # BƯỚC CHẶN CỬA: Chạy Test chọc thẳng vào MongoDB ảo
+    # (Đảm bảo bạn đã tạo thư mục ShopHangTet.Tests theo hướng dẫn trước đó)
+    - name: Kiểm thử tích hợp Database (Integration Tests)
+      working-directory: ./back-end/ShopHangTet.Tests 
+      run: dotnet test
+      env:
+        # Ghi đè chuỗi kết nối để nó trỏ vào con MongoDB ảo cổng 27017
+        ConnectionStrings__MongoConnection: "mongodb://localhost:27017/ShopHangTet_TestDB"
 
   # KIỂM TRA FRONT-END (React Vite)
   build-frontend:
