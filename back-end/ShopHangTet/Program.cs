@@ -104,6 +104,8 @@ builder.Services.AddScoped<IDeliverySlotRepository, DeliverySlotRepository>();
 
 //Đăng ký Application Services
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<IProductService, ProductService>();
+builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHostedService<OrderExpirationBackgroundService>();
 // builder.Services.AddScoped<OrderService>();
 

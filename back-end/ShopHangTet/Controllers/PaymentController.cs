@@ -135,9 +135,7 @@ public class PaymentController : ControllerBase
             var response = new PaymentStatusResponseDto
             {
                 OrderCode = order.OrderCode,
-                Status = order.Status == OrderStatus.PAYMENT_EXPIRED_INTERNAL
-                    ? OrderStatus.PAYMENT_CONFIRMING.ToString()
-                    : order.Status.ToString(),
+                Status = order.Status.ToString(),
                 TotalAmount = order.TotalAmount,
                 IsPaid = order.Status == OrderStatus.PREPARING
                     || order.Status == OrderStatus.SHIPPING

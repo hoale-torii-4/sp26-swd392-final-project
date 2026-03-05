@@ -160,6 +160,9 @@ namespace ShopHangTet.DTOs
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
+        public string? CoverImage { get; set; }
+        public decimal PricingMultiplier { get; set; }
+        public decimal PackagingFee { get; set; }
         public bool IsActive { get; set; } = true;
         public int DisplayOrder { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -235,17 +238,20 @@ namespace ShopHangTet.DTOs
     }
 
     /// Rule cho Mix & Match:
-    /// - Ít nhất 1 đồ uống
-    /// - 2-4 món ăn  
-    /// - Tối đa 1 rượu
+    /// - Tổng 4-6 món
+    /// - Ít nhất 1 đồ uống (Trà hoặc Rượu)
+    /// - Ít nhất 2 snack (Hạt/Bánh/Kẹo)
+    /// - Đặc sản mặn tối đa 2
+    /// - Có Chivas 21: tối đa 4 món; có Chivas 12: tối đa 5 món
     public class MixMatchRulesDto
     {
-        public int MinDrinks { get; set; } = 1;
-        public int MaxDrinks { get; set; } = 3;
-        public int MinFood { get; set; } = 2;
-        public int MaxFood { get; set; } = 4;
-        public int MaxAlcohol { get; set; } = 1;
-        public decimal MinTotalPrice { get; set; } = 0;
+        public int MinTotalItems { get; set; } = 4;
+        public int MaxTotalItems { get; set; } = 6;
+        public int MinBeverageItems { get; set; } = 1;
+        public int MinSnackItems { get; set; } = 2;
+        public int MaxSavoryItems { get; set; } = 2;
+        public int MaxItemsWhenHasChivas12 { get; set; } = 5;
+        public int MaxItemsWhenHasChivas21 { get; set; } = 4;
     }
 
     public class ValidationResultDto
@@ -445,13 +451,24 @@ namespace ShopHangTet.DTOs
     {
         public bool IsValid { get; set; }
         public List<string> Errors { get; set; } = new();
+        public int TotalItemCount { get; set; }
         public int DrinkCount { get; set; }
         public int FoodCount { get; set; }
         public int NutCount { get; set; }
+        public int SnackCount { get; set; }
+        public int SavoryCount { get; set; }
         public int AlcoholCount { get; set; }
+        public bool HasChivas12 { get; set; }
+        public bool HasChivas21 { get; set; }
         
-        ///Rules: ≥1 DRINK, 2-4 FOOD, ≤1 ALCOHOL
-        public bool MeetsRules => DrinkCount >= 1 && FoodCount >= 2 && FoodCount <= 4 && AlcoholCount <= 1;
+        public bool MeetsRules =>
+            TotalItemCount >= 4
+            && TotalItemCount <= 6
+            && (DrinkCount + AlcoholCount) >= 1
+            && SnackCount >= 2
+            && SavoryCount <= 2
+            && (!HasChivas21 || TotalItemCount <= 4)
+            && (!HasChivas12 || TotalItemCount <= 5);
     }
 
     // ========== ORDER RESPONSE DTOs ==========
@@ -671,5 +688,54 @@ namespace ShopHangTet.DTOs
         public string Status { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
         public bool IsPaid { get; set; }
+    }
+
+    // ========== GIFTBOX ADMIN DTOs ==========
+    /// Tạo GiftBox mới — Price sẽ được tính tự động từ collection rule
+    public class CreateGiftBoxDto
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        /// Nếu null/0, hệ thống sẽ tự tính giá từ collection pricing rule
+        public decimal? PriceOverride { get; set; }
+
+        public List<string> Images { get; set; } = new();
+
+        [Required]
+        public string CollectionId { get; set; } = string.Empty;
+
+        public List<string> Tags { get; set; } = new();
+
+        [Required]
+        [MinLength(1)]
+        public List<GiftBoxItemDto> Items { get; set; } = new();
+    }
+
+    /// Cập nhật GiftBox — Price sẽ được tính lại nếu items thay đổi
+    public class UpdateGiftBoxDto
+    {
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+
+        /// Nếu null, hệ thống sẽ tự tính lại giá từ collection pricing rule
+        public decimal? PriceOverride { get; set; }
+
+        public List<string>? Images { get; set; }
+        public string? CollectionId { get; set; }
+        public List<string>? Tags { get; set; }
+        public List<GiftBoxItemDto>? Items { get; set; }
+        public bool? IsActive { get; set; }
+    }
+
+    // ========== DELIVERY MANAGEMENT DTOs ==========
+    public class UpdateDeliveryStatusDto
+    {
+        [Required]
+        public string Status { get; set; } = string.Empty; // SHIPPING, DELIVERED, FAILED
+
+        public string? FailureReason { get; set; }
     }
 }
