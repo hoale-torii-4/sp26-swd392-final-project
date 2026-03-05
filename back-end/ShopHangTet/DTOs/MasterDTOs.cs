@@ -153,6 +153,10 @@ namespace ShopHangTet.DTOs
         [MinLength(6)]
         public string NewPassword { get; set; } = string.Empty;
     }
+    public class ResendOtpDto
+    {
+        public string Email { get; set; } = string.Empty;
+    }
 
     // ========== COLLECTION DTOs ==========
     public class CollectionDto

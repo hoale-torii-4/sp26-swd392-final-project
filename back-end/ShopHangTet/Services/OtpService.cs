@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 
 namespace ShopHangTet.Services
 {
@@ -18,17 +18,34 @@ namespace ShopHangTet.Services
         {
             try
             {
-                // Generate 6-digit OTP
+                var emailKey = email.ToLower();
+                var cooldownKey = $"otp_cooldown_{emailKey}";
+                var cacheKey = $"otp_{emailKey}";
+
+                // Check cooldown
+                // If the cooldown key still exists in RAM
+                if (_cache.TryGetValue(cooldownKey, out _))
+                {
+                    throw new InvalidOperationException("Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP.");
+                }
+
+                // 2. Generate 6-digit OTP
                 var random = new Random();
                 var otp = random.Next(100000, 999999).ToString();
 
-                // Store in cache with expiry
-                var cacheKey = $"otp_{email.ToLower()}";
+                // 3. Store OTP in cache with 5-minute expiry
                 _cache.Set(cacheKey, otp, _otpExpiry);
 
+                // 4. Cooldown setup
+                _cache.Set(cooldownKey, true, TimeSpan.FromSeconds(60));
+
                 _logger.LogInformation($"OTP generated for {email}: {otp}");
-                
+
                 return await Task.FromResult(otp);
+            }
+            catch (InvalidOperationException)
+            {
+                throw;
             }
             catch (Exception ex)
             {

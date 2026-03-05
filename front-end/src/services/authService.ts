@@ -4,6 +4,7 @@ import type {
     RegisterResponse,
     LoginRequest,
     LoginResponse,
+    ApiResponse,
     User,
 } from "../types/auth";
 
@@ -111,5 +112,53 @@ export const authService = {
         }
 
         return result;
+    },
+
+    /**
+     * POST /api/Auth/verify-email
+     * Verifies the 6-digit OTP sent to the user's email after registration.
+     */
+    verifyOtp: async (data: { email: string; otp: string }): Promise<ApiResponse> => {
+        const response = await apiClient.post<ApiResponse>(
+            `${AUTH_ENDPOINT}/verify-email`,
+            data,
+        );
+        return response.data;
+    },
+
+    /**
+     * POST /api/Auth/resend-otp
+     * Resends the OTP to the user's email.
+     */
+    resendOtp: async (email: string): Promise<ApiResponse> => {
+        const response = await apiClient.post<ApiResponse>(
+            `${AUTH_ENDPOINT}/resend-otp`,
+            { email },
+        );
+        return response.data;
+    },
+
+    /**
+     * POST /api/Auth/forgot-password
+     * Sends a password reset email / OTP to the user.
+     */
+    forgotPassword: async (email: string): Promise<ApiResponse> => {
+        const response = await apiClient.post<ApiResponse>(
+            `${AUTH_ENDPOINT}/forgot-password`,
+            { email },
+        );
+        return response.data;
+    },
+
+    /**
+     * POST /api/Auth/reset-password
+     * Resets the password using the email, OTP, and new password.
+     */
+    resetPassword: async (data: { email: string; otp: string; newPassword: string }): Promise<ApiResponse> => {
+        const response = await apiClient.post<ApiResponse>(
+            `${AUTH_ENDPOINT}/reset-password`,
+            data,
+        );
+        return response.data;
     },
 };

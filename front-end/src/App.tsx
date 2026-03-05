@@ -11,6 +11,7 @@ import AboutPage from './pages/AboutPage'
 import AccountPage from './pages/AccountPage'
 import GiftBoxesPage from './pages/GiftBoxesPage'
 import CartPage from './pages/CartPage'
+import VerifyEmailPage from './pages/VerifyEmailPage'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -24,6 +25,7 @@ function App() {
           <Route path="/home" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/verify-email" element={<VerifyEmailPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/forgot-password/success" element={<ForgotPasswordSuccessPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />

@@ -52,8 +52,8 @@ export default function RegisterPage() {
                     fullName: values.fullname,
                     phone: values.phone || null,
                 });
-                navigate("/login", {
-                    state: { message: "Đăng ký thành công! Vui lòng đăng nhập." },
+                navigate("/verify-email", {
+                    state: { email: values.email },
                 });
             } catch (error) {
                 const apiError = error as ApiError;
