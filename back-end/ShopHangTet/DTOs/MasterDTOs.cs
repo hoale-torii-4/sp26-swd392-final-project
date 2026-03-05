@@ -734,6 +734,17 @@ namespace ShopHangTet.DTOs
         public bool? IsActive { get; set; }
     }
 
+    /// DTO riêng cho việc tính giá preview (không cần các trường văn trang trí)
+    public class CalculateGiftBoxPriceDto
+    {
+        [Required]
+        public string CollectionId { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(1)]
+        public List<GiftBoxItemDto> Items { get; set; } = new();
+    }
+
     // ========== DELIVERY MANAGEMENT DTOs ==========
     public class UpdateDeliveryStatusDto
     {

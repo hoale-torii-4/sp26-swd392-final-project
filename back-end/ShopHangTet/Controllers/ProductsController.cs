@@ -11,7 +11,10 @@ namespace ShopHangTet.Controllers
     {
         private readonly IProductService _productService;
 
-        public ProductsController(IProductService productService) => _productService = productService;
+        public ProductsController(IProductService productService)
+        {
+            _productService = productService;
+        }
 
         [HttpGet("items")]
         public async Task<IActionResult> GetItems([FromQuery] string? name)
@@ -20,24 +23,8 @@ namespace ShopHangTet.Controllers
             return Ok(items);
         }
 
-        [HttpGet("items/by-name")]
-        public async Task<IActionResult> GetItemsByName([FromQuery] string name)
-        {
-            var items = await _productService.GetItemsAsync(name);
-            return Ok(items);
-        }
-
         [HttpGet("gift-boxes")]
-        [HttpGet("giftboxes")]
         public async Task<IActionResult> GetGiftBoxes([FromQuery] string? name)
-        {
-            var giftBoxes = await _productService.GetGiftBoxesAsync(name);
-            return Ok(giftBoxes);
-        }
-
-        [HttpGet("gift-boxes/by-name")]
-        [HttpGet("giftboxes/by-name")]
-        public async Task<IActionResult> GetGiftBoxesByName([FromQuery] string name)
         {
             var giftBoxes = await _productService.GetGiftBoxesAsync(name);
             return Ok(giftBoxes);
@@ -45,13 +32,6 @@ namespace ShopHangTet.Controllers
 
         [HttpGet("collections")]
         public async Task<IActionResult> GetCollections([FromQuery] string? name)
-        {
-            var collections = await _productService.GetCollectionsAsync(name);
-            return Ok(collections);
-        }
-
-        [HttpGet("collections/by-name")]
-        public async Task<IActionResult> GetCollectionsByName([FromQuery] string name)
         {
             var collections = await _productService.GetCollectionsAsync(name);
             return Ok(collections);
@@ -66,7 +46,6 @@ namespace ShopHangTet.Controllers
         }
 
         [HttpGet("gift-boxes/{id}")]
-        [HttpGet("giftboxes/{id}")]
         public async Task<IActionResult> GetGiftBoxById(string id)
         {
             var giftBox = await _productService.GetGiftBoxDetailByIdAsync(id);
@@ -86,7 +65,6 @@ namespace ShopHangTet.Controllers
 
         /// Tạo GiftBox mới — Price tự tính từ collection pricing rule
         [HttpPost("gift-boxes")]
-        [HttpPost("giftboxes")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> CreateGiftBox([FromBody] CreateGiftBoxDto dto)
         {
@@ -109,7 +87,6 @@ namespace ShopHangTet.Controllers
 
         /// Cập nhật GiftBox — Price tự tính lại nếu items thay đổi
         [HttpPut("gift-boxes/{id}")]
-        [HttpPut("giftboxes/{id}")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> UpdateGiftBox(string id, [FromBody] UpdateGiftBoxDto dto)
         {
@@ -132,9 +109,8 @@ namespace ShopHangTet.Controllers
 
         /// Tính giá dự kiến cho GiftBox (preview, không lưu)
         [HttpPost("gift-boxes/calculate-price")]
-        [HttpPost("giftboxes/calculate-price")]
         [Authorize(Roles = "ADMIN")]
-        public async Task<IActionResult> CalculateGiftBoxPrice([FromBody] CreateGiftBoxDto dto)
+        public async Task<IActionResult> CalculateGiftBoxPrice([FromBody] CalculateGiftBoxPriceDto dto)
         {
             try
             {
