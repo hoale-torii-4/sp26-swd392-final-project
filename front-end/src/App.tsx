@@ -12,6 +12,7 @@ import AccountPage from './pages/AccountPage'
 import GiftBoxesPage from './pages/GiftBoxesPage'
 import CartPage from './pages/CartPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
+import AIChatBox from './components/AIChatBox'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
@@ -35,6 +36,7 @@ function App() {
           <Route path="/gift-boxes" element={<GiftBoxesPage />} />
           <Route path="/cart" element={<CartPage />} />
         </Routes>
+        <AIChatBox />
       </BrowserRouter>
     </GoogleOAuthProvider>
   )
