@@ -91,12 +91,12 @@ builder.Services.AddScoped<IDeliverySlotRepository, DeliverySlotRepository>();
 
 //Đăng ký Application Services
 builder.Services.AddScoped<IOrderService, OrderService>();
+builder.Services.AddScoped<ICartService, CartService>();
 // builder.Services.AddScoped<OrderService>();
 
 // TODO PHASE 2: Implement và uncomment các services sau
 // builder.Services.AddScoped<IUserService, UserService>();
 // builder.Services.AddScoped<IProductService, ProductService>();
-// builder.Services.AddScoped<ICartService, CartService>();
 // builder.Services.AddScoped<IAddressService, AddressService>();
 // builder.Services.AddScoped<IOrderService, OrderService>();
 // builder.Services.AddScoped<IReviewService, ReviewService>();
