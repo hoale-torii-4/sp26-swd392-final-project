@@ -4,7 +4,7 @@ using System.ComponentModel.DataAnnotations;
 namespace ShopHangTet.Models;
 
 /// <summary>
-/// Slot giao hàng theo ngày (Scheduled Delivery + Slot Locking)
+/// Ngày giao hàng (Scheduled Delivery)
 /// </summary>
 public class DeliverySlot
 {
@@ -12,9 +12,8 @@ public class DeliverySlot
     public ObjectId Id { get; set; }
     
     public DateTime DeliveryDate { get; set; }
-    public string TimeSlot { get; set; } = string.Empty; // "8AM-12PM", "1PM-5PM", "6PM-9PM"
     
-    public int MaxOrdersPerSlot { get; set; } = 50; // Giới hạn số đơn
+    public int MaxOrdersPerDay { get; set; } = 100; // Giới hạn số đơn trong ngày
     public int CurrentOrderCount { get; set; } = 0;
     
     public bool IsLocked { get; set; } = false; // Tự động khóa khi đạt max

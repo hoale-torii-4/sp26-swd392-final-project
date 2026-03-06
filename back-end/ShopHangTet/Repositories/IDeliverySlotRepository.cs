@@ -6,7 +6,7 @@ public interface IDeliverySlotRepository
 {
     Task<DeliverySlot?> GetByIdAsync(string id);
     Task<IEnumerable<DeliverySlot>> GetAllAsync();
-    Task<IEnumerable<DeliverySlot>> GetByDateAsync(DateTime date);
+    Task<DeliverySlot?> GetByDateAsync(DateTime date);
     Task<IEnumerable<DeliverySlot>> GetAvailableSlotsAsync(DateTime startDate, DateTime endDate);
 
     Task<DeliverySlot> CreateAsync(DeliverySlot slot);

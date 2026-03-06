@@ -3,8 +3,10 @@ using ShopHangTet.Models;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Security.Cryptography;
 
 namespace ShopHangTet.Services
 {
@@ -14,15 +16,18 @@ namespace ShopHangTet.Services
         private readonly ShopHangTetDbContext _context;
         private readonly IDeliverySlotRepository _slotRepo;
         private readonly ILogger<OrderService> _logger;
+        private readonly IMongoCollection<OrderModel> _orderCollection;
 
         public OrderService(
             ShopHangTetDbContext context,
             IDeliverySlotRepository slotRepo,
-            ILogger<OrderService> logger)
+            ILogger<OrderService> logger,
+            IMongoDatabase mongoDatabase)
         {
             _context = context;
             _slotRepo = slotRepo;
             _logger = logger;
+            _orderCollection = mongoDatabase.GetCollection<OrderModel>("Orders");
         }
 
         /// Tra cứu đơn hàng (cho Guest)
@@ -90,11 +95,106 @@ namespace ShopHangTet.Services
             return order;
         }
 
+        public async Task<bool> ConfirmPaymentAsync(string orderCode, string updatedBy, string? paymentRef = null)
+        {
+            if (string.IsNullOrWhiteSpace(orderCode))
+            {
+                throw new InvalidOperationException("Order code is required");
+            }
+
+            var now = DateTime.UtcNow;
+            var note = string.IsNullOrWhiteSpace(paymentRef)
+                ? "Payment confirmed by webhook"
+                : $"Payment confirmed by webhook. Ref: {paymentRef}";
+
+            // Atomic idempotency lock: only transition PAYMENT_CONFIRMING -> PROCESSING_PAYMENT once.
+            var filter = Builders<OrderModel>.Filter.And(
+                Builders<OrderModel>.Filter.Eq(x => x.OrderCode, orderCode),
+                Builders<OrderModel>.Filter.Eq(x => x.Status, OrderStatus.PAYMENT_CONFIRMING)
+            );
+
+            var update = Builders<OrderModel>.Update
+                .Set(x => x.Status, OrderStatus.PROCESSING_PAYMENT)
+                .Set(x => x.UpdatedAt, now)
+                .Push(x => x.StatusHistory, new OrderStatusHistory
+                {
+                    Status = OrderStatus.PROCESSING_PAYMENT,
+                    Timestamp = now,
+                    UpdatedBy = updatedBy,
+                    Notes = note
+                });
+
+            var transitionResult = await _orderCollection.UpdateOneAsync(filter, update);
+            if (transitionResult.ModifiedCount == 0)
+            {
+                _logger.LogInformation("Duplicate or stale payment webhook ignored for {OrderCode}", orderCode);
+                return false;
+            }
+
+            var order = await _context.Orders.FirstOrDefaultAsync(x => x.OrderCode == orderCode);
+            if (order == null)
+            {
+                throw new InvalidOperationException("Order not found after status transition");
+            }
+
+            try
+            {
+                await ApplyInventoryOnPreparingAsync(order, updatedBy);
+                await _context.SaveChangesAsync();
+
+                var finalFilter = Builders<OrderModel>.Filter.And(
+                    Builders<OrderModel>.Filter.Eq(x => x.OrderCode, orderCode),
+                    Builders<OrderModel>.Filter.Eq(x => x.Status, OrderStatus.PROCESSING_PAYMENT)
+                );
+
+                var finalUpdate = Builders<OrderModel>.Update
+                    .Set(x => x.Status, OrderStatus.PREPARING)
+                    .Set(x => x.UpdatedAt, DateTime.UtcNow)
+                    .Push(x => x.StatusHistory, new OrderStatusHistory
+                    {
+                        Status = OrderStatus.PREPARING,
+                        Timestamp = DateTime.UtcNow,
+                        UpdatedBy = updatedBy,
+                        Notes = "Payment confirmed and inventory deducted"
+                    });
+
+                var finalResult = await _orderCollection.UpdateOneAsync(finalFilter, finalUpdate);
+                if (finalResult.ModifiedCount == 0)
+                {
+                    throw new InvalidOperationException("Failed to finalize payment status transition");
+                }
+
+                return true;
+            }
+            catch
+            {
+                // Compensation: reset to PAYMENT_CONFIRMING so webhook can be retried safely.
+                var rollbackFilter = Builders<OrderModel>.Filter.And(
+                    Builders<OrderModel>.Filter.Eq(x => x.OrderCode, orderCode),
+                    Builders<OrderModel>.Filter.Eq(x => x.Status, OrderStatus.PROCESSING_PAYMENT)
+                );
+
+                var rollbackUpdate = Builders<OrderModel>.Update
+                    .Set(x => x.Status, OrderStatus.PAYMENT_CONFIRMING)
+                    .Set(x => x.UpdatedAt, DateTime.UtcNow)
+                    .Push(x => x.StatusHistory, new OrderStatusHistory
+                    {
+                        Status = OrderStatus.PAYMENT_CONFIRMING,
+                        Timestamp = DateTime.UtcNow,
+                        UpdatedBy = "System",
+                        Notes = "Rollback payment confirmation due to inventory update failure"
+                    });
+
+                await _orderCollection.UpdateOneAsync(rollbackFilter, rollbackUpdate);
+                throw;
+            }
+        }
+
         private string GenerateOrderCode()
         {
-            var timestamp = DateTime.UtcNow.ToString("yyMMdd");
-            var random = new Random().Next(1000, 9999);
-            return $"SHT{timestamp}{random}";
+            var datePart = DateTime.UtcNow.ToString("yyMMdd");
+            var randomPart = RandomNumberGenerator.GetInt32(1000, 10000);
+            return $"SHT{datePart}{randomPart}";
         }
 
         private async Task ApplyInventoryOnPreparingAsync(OrderModel order, string updatedBy)
@@ -166,6 +266,8 @@ namespace ShopHangTet.Services
         private bool IsValidStatusTransition(OrderStatus currentStatus, OrderStatus nextStatus)
         {
             return (currentStatus == OrderStatus.PAYMENT_CONFIRMING && nextStatus == OrderStatus.PREPARING)
+                   || (currentStatus == OrderStatus.PAYMENT_CONFIRMING && nextStatus == OrderStatus.PROCESSING_PAYMENT)
+                   || (currentStatus == OrderStatus.PROCESSING_PAYMENT && nextStatus == OrderStatus.PREPARING)
                    || (currentStatus == OrderStatus.PREPARING && nextStatus == OrderStatus.SHIPPING)
                    || (currentStatus == OrderStatus.SHIPPING && nextStatus == OrderStatus.COMPLETED);
         }
@@ -218,6 +320,11 @@ namespace ShopHangTet.Services
 
             var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
             if (item == null) return;
+
+            if (item.StockQuantity < quantity)
+            {
+                throw new InvalidOperationException($"Insufficient stock for item {item.Name}");
+            }
 
             // Deduct stock
             item.StockQuantity -= quantity;
@@ -300,15 +407,15 @@ namespace ShopHangTet.Services
         }
 
         /// Đặt hàng B2B (Member only) - OrderDelivery + OrderDeliveryItem
-        public async Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto)
+        public async Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto, string userId)
         {
-            var validation = await ValidateB2BOrderAsync(dto);
+            var validation = await ValidateB2BOrderAsync(dto, userId);
             if (!validation.IsValid)
             {
                 throw new InvalidOperationException(string.Join("; ", validation.Errors));
             }
 
-            _logger.LogInformation($"Creating B2B order for user {dto.UserId}");
+            _logger.LogInformation($"Creating B2B order for user {userId}");
 
             if (!await TryReserveSlotAsync(dto.DeliverySlotId))
             {
@@ -322,7 +429,7 @@ namespace ShopHangTet.Services
                 // B2B: KHÔNG gán DeliveryAddress vào Order
                 var addressIds = dto.DeliveryAllocations.Select(x => x.AddressId).ToList();
                 var addresses = await _context.Addresses
-                    .Where(x => addressIds.Contains(x.Id) && x.UserId == dto.UserId)
+                    .Where(x => addressIds.Contains(x.Id) && x.UserId == userId)
                     .ToListAsync();
 
                 if (addresses.Count != addressIds.Count)
@@ -335,7 +442,7 @@ namespace ShopHangTet.Services
                     Id = ObjectId.GenerateNewId(),
                     OrderCode = GenerateOrderCode(),
                     OrderType = OrderType.B2B,
-                    UserId = ObjectId.Parse(dto.UserId),
+                    UserId = ObjectId.Parse(userId),
                     CustomerName = dto.CustomerName,
                     CustomerEmail = dto.CustomerEmail,
                     CustomerPhone = dto.CustomerPhone,
@@ -485,48 +592,169 @@ namespace ShopHangTet.Services
             if (dto.Items.Count == 0)
                 result.Errors.Add("At least one item is required");
 
-            // Validate Mix & Match items
-            foreach (var item in dto.Items.Where(x => x.Type == OrderItemType.MIX_MATCH))
-            {
-                if (!string.IsNullOrEmpty(item.CustomBoxId))
-                {
-                    var validation = await ValidateMixMatchRulesAsync(item.CustomBoxId);
-                    if (!validation.IsValid)
-                    {
-                        result.Errors.AddRange(validation.Errors);
-                    }
-                }
-            }
+            await ValidateOrderItemsAsync(dto.Items, result);
+            await ValidateStockAvailabilityAsync(dto.Items, result);
 
             result.IsValid = result.Errors.Count == 0;
             return result;
         }
 
-        public async Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto)
+        public async Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto, string userId)
         {
             var result = new OrderValidationResult { IsValid = true };
 
-            if (string.IsNullOrEmpty(dto.UserId))
+            if (string.IsNullOrWhiteSpace(userId))
                 result.Errors.Add("B2B requires login - UserId is required");
 
             if (dto.DeliveryAllocations.Count == 0)
                 result.Errors.Add("At least one delivery address is required for B2B");
 
-            // Validate Mix & Match items
-            foreach (var item in dto.Items.Where(x => x.Type == OrderItemType.MIX_MATCH))
+            await ValidateOrderItemsAsync(dto.Items, result);
+            await ValidateStockAvailabilityAsync(dto.Items, result);
+
+            result.IsValid = result.Errors.Count == 0;
+            return result;
+        }
+
+        private async Task ValidateStockAvailabilityAsync(List<OrderItemDto> items, OrderValidationResult result)
+        {
+            var requiredByItemId = new Dictionary<string, int>();
+
+            foreach (var orderItem in items)
             {
-                if (!string.IsNullOrEmpty(item.CustomBoxId))
+                if (orderItem.Quantity <= 0) continue;
+
+                if (orderItem.Type == OrderItemType.READY_MADE && !string.IsNullOrWhiteSpace(orderItem.GiftBoxId))
                 {
-                    var validation = await ValidateMixMatchRulesAsync(item.CustomBoxId);
-                    if (!validation.IsValid)
+                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == orderItem.GiftBoxId && x.IsActive);
+                    if (giftBox == null) continue;
+
+                    foreach (var giftBoxItem in giftBox.Items)
                     {
-                        result.Errors.AddRange(validation.Errors);
+                        var requiredQty = giftBoxItem.Quantity * orderItem.Quantity;
+                        if (requiredByItemId.ContainsKey(giftBoxItem.ItemId))
+                        {
+                            requiredByItemId[giftBoxItem.ItemId] += requiredQty;
+                        }
+                        else
+                        {
+                            requiredByItemId[giftBoxItem.ItemId] = requiredQty;
+                        }
+                    }
+                }
+                else if (orderItem.Type == OrderItemType.MIX_MATCH && !string.IsNullOrWhiteSpace(orderItem.CustomBoxId))
+                {
+                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == orderItem.CustomBoxId);
+                    if (customBox == null) continue;
+
+                    foreach (var customItem in customBox.Items)
+                    {
+                        var requiredQty = customItem.Quantity * orderItem.Quantity;
+                        if (requiredByItemId.ContainsKey(customItem.ItemId))
+                        {
+                            requiredByItemId[customItem.ItemId] += requiredQty;
+                        }
+                        else
+                        {
+                            requiredByItemId[customItem.ItemId] = requiredQty;
+                        }
                     }
                 }
             }
 
-            result.IsValid = result.Errors.Count == 0;
-            return result;
+            if (!requiredByItemId.Any()) return;
+
+            var requiredItemIds = requiredByItemId.Keys.ToList();
+            var dbItems = await _context.Items.Where(x => requiredItemIds.Contains(x.Id)).ToListAsync();
+            var itemMap = dbItems.ToDictionary(x => x.Id, x => x);
+
+            foreach (var kvp in requiredByItemId)
+            {
+                if (!itemMap.TryGetValue(kvp.Key, out var item))
+                {
+                    result.Errors.Add($"Referenced item not found: {kvp.Key}");
+                    continue;
+                }
+
+                if (!item.IsActive)
+                {
+                    result.Errors.Add($"Item is inactive: {item.Name}");
+                    continue;
+                }
+
+                if (item.StockQuantity < kvp.Value)
+                {
+                    result.Errors.Add($"Insufficient stock for item {item.Name}. Required: {kvp.Value}, Available: {item.StockQuantity}");
+                }
+            }
+        }
+
+        private async Task ValidateOrderItemsAsync(List<OrderItemDto> items, OrderValidationResult result)
+        {
+            foreach (var item in items)
+            {
+                if (!Enum.IsDefined(typeof(OrderItemType), item.Type))
+                {
+                    result.Errors.Add("Invalid order item type");
+                    continue;
+                }
+
+                if (item.Quantity <= 0)
+                {
+                    result.Errors.Add("Quantity must be greater than 0");
+                }
+
+                if (item.Type == OrderItemType.READY_MADE)
+                {
+                    if (string.IsNullOrWhiteSpace(item.GiftBoxId))
+                    {
+                        result.Errors.Add("GiftBoxId is required for READY_MADE items");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.CustomBoxId))
+                    {
+                        result.Errors.Add("CustomBoxId must be null for READY_MADE items");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.GiftBoxId))
+                    {
+                        var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == item.GiftBoxId && x.IsActive);
+                        if (giftBox == null)
+                        {
+                            result.Errors.Add("GiftBox not found or inactive");
+                        }
+                    }
+                }
+                else if (item.Type == OrderItemType.MIX_MATCH)
+                {
+                    if (string.IsNullOrWhiteSpace(item.CustomBoxId))
+                    {
+                        result.Errors.Add("CustomBoxId is required for MIX_MATCH items");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.GiftBoxId))
+                    {
+                        result.Errors.Add("GiftBoxId must be null for MIX_MATCH items");
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(item.CustomBoxId))
+                    {
+                        var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == item.CustomBoxId);
+                        if (customBox == null)
+                        {
+                            result.Errors.Add("CustomBox not found");
+                        }
+                        else
+                        {
+                            var validation = await ValidateMixMatchRulesAsync(item.CustomBoxId);
+                            if (!validation.IsValid)
+                            {
+                                result.Errors.AddRange(validation.Errors);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Helper methods for new DTOs

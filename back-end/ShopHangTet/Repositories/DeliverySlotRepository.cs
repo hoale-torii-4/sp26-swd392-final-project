@@ -24,7 +24,7 @@ public class DeliverySlotRepository : IDeliverySlotRepository
         return await _collection.Find(_ => true).ToListAsync();
     }
 
-    public async Task<IEnumerable<DeliverySlot>> GetByDateAsync(DateTime date)
+    public async Task<DeliverySlot?> GetByDateAsync(DateTime date)
     {
         var startOfDay = date.Date;
         var endOfDay = startOfDay.AddDays(1);
@@ -34,7 +34,7 @@ public class DeliverySlotRepository : IDeliverySlotRepository
             Builders<DeliverySlot>.Filter.Lt(x => x.DeliveryDate, endOfDay)
         );
         
-        return await _collection.Find(filter).ToListAsync();
+        return await _collection.Find(filter).FirstOrDefaultAsync();
     }
 
     public async Task<IEnumerable<DeliverySlot>> GetAvailableSlotsAsync(DateTime startDate, DateTime endDate)
@@ -42,7 +42,8 @@ public class DeliverySlotRepository : IDeliverySlotRepository
         var filter = Builders<DeliverySlot>.Filter.And(
             Builders<DeliverySlot>.Filter.Gte(x => x.DeliveryDate, startDate),
             Builders<DeliverySlot>.Filter.Lte(x => x.DeliveryDate, endDate),
-            Builders<DeliverySlot>.Filter.Eq(x => x.IsLocked, false)
+            Builders<DeliverySlot>.Filter.Eq(x => x.IsLocked, false),
+            Builders<DeliverySlot>.Filter.Where(x => x.CurrentOrderCount < x.MaxOrdersPerDay)
         );
         
         return await _collection.Find(filter).SortBy(x => x.DeliveryDate).ToListAsync();
@@ -75,7 +76,7 @@ public class DeliverySlotRepository : IDeliverySlotRepository
             Builders<DeliverySlot>.Filter.Eq(x => x.Id, ObjectId.Parse(slotId)),
             Builders<DeliverySlot>.Filter.Eq(x => x.IsLocked, false),
             // ⚠️ QUAN TRỌNG: Chỉ increment nếu chưa đạt max
-            Builders<DeliverySlot>.Filter.Where(x => x.CurrentOrderCount < x.MaxOrdersPerSlot)
+            Builders<DeliverySlot>.Filter.Where(x => x.CurrentOrderCount < x.MaxOrdersPerDay)
         );
         
         var update = Builders<DeliverySlot>.Update
@@ -92,10 +93,10 @@ public class DeliverySlotRepository : IDeliverySlotRepository
         if (slot == null) return false;
         
         UpdateDefinition<DeliverySlot> finalUpdate;
-        if (slot.CurrentOrderCount + 1 >= slot.MaxOrdersPerSlot)
+        if (slot.CurrentOrderCount + 1 >= slot.MaxOrdersPerDay)
         {
             finalUpdate = updateWithLock;
-            Console.WriteLine($" [Slot Lock] Slot {slotId} will be locked after this order");
+            Console.WriteLine($" [Day Lock] Day {slotId} will be locked after this order");
         }
         else
         {
@@ -106,11 +107,11 @@ public class DeliverySlotRepository : IDeliverySlotRepository
         
         if (result.ModifiedCount == 0)
         {
-            Console.WriteLine($" [Slot Full] Slot {slotId} is full or locked");
+            Console.WriteLine($" [Day Full] Day {slotId} is full or locked");
             return false;
         }
         
-        Console.WriteLine($" [Slot Incremented] Slot {slotId}: {slot.CurrentOrderCount} -> {slot.CurrentOrderCount + 1}");
+        Console.WriteLine($" [Day Incremented] Day {slotId}: {slot.CurrentOrderCount} -> {slot.CurrentOrderCount + 1}");
         return true;
     }
 
@@ -142,6 +143,6 @@ public class DeliverySlotRepository : IDeliverySlotRepository
         var slot = await GetByIdAsync(slotId);
         if (slot == null) return false;
         
-        return !slot.IsLocked && slot.CurrentOrderCount < slot.MaxOrdersPerSlot;
+        return !slot.IsLocked && slot.CurrentOrderCount < slot.MaxOrdersPerDay;
     }
 }

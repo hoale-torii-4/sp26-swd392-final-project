@@ -24,12 +24,10 @@ namespace ShopHangTet.Data
 
     // Cart & Mix & Match
     public DbSet<Cart> Carts { get; set; }
-    public DbSet<CartItem> CartItems { get; set; }
     public DbSet<CustomBox> CustomBoxes { get; set; }
 
     // Orders
     public DbSet<OrderModel> Orders { get; set; }
-    public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<OrderDelivery> OrderDeliveries { get; set; }
     public DbSet<OrderDeliveryItem> OrderDeliveryItems { get; set; }
 
@@ -59,11 +57,9 @@ namespace ShopHangTet.Data
         modelBuilder.Entity<Tag>();
 
         modelBuilder.Entity<Cart>();
-        modelBuilder.Entity<CartItem>();
         modelBuilder.Entity<CustomBox>();
 
         modelBuilder.Entity<OrderModel>();
-        modelBuilder.Entity<OrderItem>();
         modelBuilder.Entity<OrderDelivery>();
         modelBuilder.Entity<OrderDeliveryItem>();
 
@@ -78,6 +74,13 @@ namespace ShopHangTet.Data
         // Owned collections for embedded items
         modelBuilder.Entity<GiftBox>().OwnsMany(x => x.Items);
         modelBuilder.Entity<CustomBox>().OwnsMany(x => x.Items);
+        modelBuilder.Entity<Cart>().OwnsMany(x => x.Items);
+        modelBuilder.Entity<OrderModel>().OwnsMany(x => x.Items, orderItemBuilder =>
+        {
+            orderItemBuilder.OwnsMany(x => x.SnapshotItems);
+        });
+        modelBuilder.Entity<OrderModel>().OwnsMany(x => x.StatusHistory);
+        modelBuilder.Entity<OrderModel>().OwnsOne(x => x.DeliveryAddress);
     }
 }
 }

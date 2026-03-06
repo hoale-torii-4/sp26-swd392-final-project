@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Caching.Memory;
+using System.Security.Cryptography;
 
 namespace ShopHangTet.Services
 {
@@ -19,8 +20,7 @@ namespace ShopHangTet.Services
             try
             {
                 // Generate 6-digit OTP
-                var random = new Random();
-                var otp = random.Next(100000, 999999).ToString();
+                var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
 
                 // Store in cache with expiry
                 var cacheKey = $"otp_{email.ToLower()}";

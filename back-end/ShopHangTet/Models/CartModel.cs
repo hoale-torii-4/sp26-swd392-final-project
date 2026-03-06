@@ -44,9 +44,6 @@ namespace ShopHangTet.Models
         [BsonElement("quantity")]
         public int Quantity { get; set; }
 
-        [BsonElement("unitPrice")]
-        public decimal UnitPrice { get; set; }
-
         [BsonElement("addedAt")]
         public DateTime AddedAt { get; set; } = DateTime.UtcNow;
     }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using MongoDB.Bson;
 using ShopHangTet.Data;
 using ShopHangTet.Models;
 
@@ -18,9 +19,11 @@ public static class SeedData
             await SeedItemsAsync(context);
             await SeedGiftBoxesAsync(context);
             await SeedDeliverySlotsAsync(context);
+            await SeedDemoCustomBoxAsync(context);
+            await SeedDemoOrderAndInventoryLogsAsync(context);
 
             await context.SaveChangesAsync();
-            Console.WriteLine("----> Seed du lieu thanh cong: Tags, Collections, Items, GiftBoxes, DeliverySlots");
+            Console.WriteLine("----> Seed du lieu thanh cong: Tags, Collections, Items, GiftBoxes, DeliverySlots, DemoCustomBox, DemoOrder, DemoInventoryLogs");
         }
         catch (Exception ex)
         {
@@ -352,26 +355,7 @@ public static class SeedData
             slots.Add(new DeliverySlot
             {
                 DeliveryDate = date,
-                TimeSlot = "8AM-12PM",
-                MaxOrdersPerSlot = 50,
-                CurrentOrderCount = 0,
-                IsLocked = false
-            });
-
-            slots.Add(new DeliverySlot
-            {
-                DeliveryDate = date,
-                TimeSlot = "1PM-5PM",
-                MaxOrdersPerSlot = 50,
-                CurrentOrderCount = 0,
-                IsLocked = false
-            });
-
-            slots.Add(new DeliverySlot
-            {
-                DeliveryDate = date,
-                TimeSlot = "6PM-9PM",
-                MaxOrdersPerSlot = 30,
+                MaxOrdersPerDay = 100,
                 CurrentOrderCount = 0,
                 IsLocked = false
             });
@@ -379,5 +363,139 @@ public static class SeedData
 
         await context.DeliverySlots.AddRangeAsync(slots);
         Console.WriteLine($"----> Seeded {slots.Count} DeliverySlots");
+    }
+
+    private static async Task SeedDemoCustomBoxAsync(ShopHangTetDbContext context)
+    {
+        const string demoMarker = "DEMO_CUSTOM_BOX";
+        if (await context.CustomBoxes.AnyAsync(x => x.GreetingMessage == demoMarker)) return;
+
+        var drinkItem = await context.Items.FirstOrDefaultAsync(x => x.Category == ItemCategory.DRINK && x.IsActive);
+        var foodItem = await context.Items.FirstOrDefaultAsync(x => x.Category == ItemCategory.FOOD && x.IsActive);
+        var nutItem = await context.Items.FirstOrDefaultAsync(x => x.Category == ItemCategory.NUT && x.IsActive);
+
+        if (drinkItem == null || foodItem == null || nutItem == null)
+        {
+            Console.WriteLine("----> Skip demo custom box seed: missing DRINK/FOOD/NUT item");
+            return;
+        }
+
+        var customBoxItems = new List<CustomBoxItem>
+        {
+            new() { ItemId = drinkItem.Id, Quantity = 1 },
+            new() { ItemId = foodItem.Id, Quantity = 2 },
+            new() { ItemId = nutItem.Id, Quantity = 1 }
+        };
+
+        var demoCustomBox = new CustomBox
+        {
+            Items = customBoxItems,
+            TotalPrice = (drinkItem.Price * 1) + (foodItem.Price * 2) + (nutItem.Price * 1),
+            GreetingMessage = demoMarker,
+            CanvaCardLink = "https://demo.local/custom-box-1",
+            HideInvoice = false,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await context.CustomBoxes.AddAsync(demoCustomBox);
+        Console.WriteLine("----> Seeded demo CustomBox for Mix & Match");
+    }
+
+    private static async Task SeedDemoOrderAndInventoryLogsAsync(ShopHangTetDbContext context)
+    {
+        const string demoOrderCode = "SHT9999990001";
+        if (await context.Orders.AnyAsync(x => x.OrderCode == demoOrderCode)) return;
+
+        var giftBox = await context.GiftBoxes.FirstOrDefaultAsync(x => x.IsActive);
+        if (giftBox == null)
+        {
+            Console.WriteLine("----> Skip demo order seed: no active GiftBox");
+            return;
+        }
+
+        var itemIds = giftBox.Items.Select(x => x.ItemId).ToList();
+        var itemMap = await context.Items
+            .Where(x => itemIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x);
+
+        var snapshotItems = giftBox.Items.Select(x =>
+        {
+            itemMap.TryGetValue(x.ItemId, out var sourceItem);
+            return new OrderItemSnapshotItem
+            {
+                ItemId = x.ItemId,
+                ItemName = sourceItem?.Name ?? "Unknown Item",
+                Quantity = x.Quantity,
+                UnitPrice = sourceItem?.Price ?? 0
+            };
+        }).ToList();
+
+        var order = new OrderModel
+        {
+            Id = ObjectId.GenerateNewId(),
+            OrderCode = demoOrderCode,
+            OrderType = OrderType.B2C,
+            CustomerName = "Demo Customer",
+            CustomerEmail = "demo@example.com",
+            CustomerPhone = "0900000000",
+            Items = new List<OrderItem>
+            {
+                new()
+                {
+                    ProductName = giftBox.Name,
+                    Type = OrderItemType.READY_MADE,
+                    Quantity = 1,
+                    UnitPrice = giftBox.Price,
+                    TotalPrice = giftBox.Price,
+                    SnapshotItems = snapshotItems,
+                    GiftBoxId = ObjectId.Parse(giftBox.Id)
+                }
+            },
+            DeliveryAddress = new DeliveryAddress
+            {
+                RecipientName = "Demo Customer",
+                RecipientPhone = "0900000000",
+                AddressLine = "123 Demo Street",
+                Ward = "Demo Ward",
+                District = "Demo District",
+                City = "Ho Chi Minh",
+                Notes = "Demo seed order",
+                Quantity = 1,
+                GreetingMessage = "Demo greeting",
+                HideInvoice = false
+            },
+            DeliveryDate = DateTime.UtcNow.AddDays(1),
+            SubTotal = 420000,
+            ShippingFee = 30000,
+            TotalAmount = 450000,
+            Status = OrderStatus.PAYMENT_CONFIRMING,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        order.StatusHistory.Add(new OrderStatusHistory
+        {
+            Status = OrderStatus.PAYMENT_CONFIRMING,
+            Timestamp = DateTime.UtcNow,
+            UpdatedBy = "System",
+            Notes = "Demo seeded order waiting for payment"
+        });
+
+        await context.Orders.AddAsync(order);
+
+        var demoLogItems = giftBox.Items.Take(2).ToList();
+        foreach (var logItem in demoLogItems)
+        {
+            context.InventoryLogs.Add(new InventoryLog
+            {
+                OrderId = order.Id.ToString(),
+                ItemId = logItem.ItemId,
+                Quantity = -1,
+                Action = "DEDUCT",
+                CreatedAt = DateTime.UtcNow
+            });
+        }
+
+        Console.WriteLine("----> Seeded demo Order PAYMENT_CONFIRMING and InventoryLogs");
     }
 }

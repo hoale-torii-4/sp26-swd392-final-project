@@ -8,11 +8,11 @@ namespace ShopHangTet.Services
     {
         // ===Compliant Methods - Tách riêng B2C và B2B ===
         Task<OrderModel> PlaceB2COrderAsync(CreateOrderB2CDto dto);
-        Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto);
+        Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto, string userId);
         
         // === Order Validation ===
         Task<OrderValidationResult> ValidateB2COrderAsync(CreateOrderB2CDto dto);
-        Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto);
+        Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto, string userId);
         
         // ===Mix & Match Validation ===
         Task<MixMatchValidationResult> ValidateMixMatchRulesAsync(string customBoxId);
@@ -22,6 +22,9 @@ namespace ShopHangTet.Services
 
         // === Status & Inventory ===
         Task<OrderModel> UpdateStatusAsync(string orderId, OrderStatus status, string updatedBy, string? notes = null);
+
+        // === Payment webhook idempotency ===
+        Task<bool> ConfirmPaymentAsync(string orderCode, string updatedBy, string? paymentRef = null);
     }
 
     public class OrderValidationResult

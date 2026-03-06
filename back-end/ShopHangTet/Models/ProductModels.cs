@@ -132,6 +132,15 @@ namespace ShopHangTet.Models
         [BsonElement("totalPrice")]
         public decimal TotalPrice { get; set; }
 
+        [BsonElement("greetingMessage")]
+        public string? GreetingMessage { get; set; }
+
+        [BsonElement("canvaCardLink")]
+        public string? CanvaCardLink { get; set; }
+
+        [BsonElement("hideInvoice")]
+        public bool HideInvoice { get; set; }
+
         [BsonElement("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
