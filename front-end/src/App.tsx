@@ -10,6 +10,7 @@ import GuidePage from './pages/GuidePage'
 import AboutPage from './pages/AboutPage'
 import AccountPage from './pages/AccountPage'
 import GiftBoxesPage from './pages/GiftBoxesPage'
+import ProductDetailPage from './pages/ProductDetailPage'
 import CartPage from './pages/CartPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import AIChatBox from './components/AIChatBox'
@@ -34,6 +35,7 @@ function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/gift-boxes" element={<GiftBoxesPage />} />
+          <Route path="/gift-boxes/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
         </Routes>
         <AIChatBox />
