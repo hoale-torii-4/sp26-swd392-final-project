@@ -29,7 +29,6 @@ public class OrderModel
     
     // Scheduled delivery
     public DateTime DeliveryDate { get; set; }
-    public ObjectId? DeliverySlotId { get; set; }
     public string? GreetingMessage { get; set; }
     public string? GreetingCardUrl { get; set; }
     

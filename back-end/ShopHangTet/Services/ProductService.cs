@@ -49,6 +49,23 @@ namespace ShopHangTet.Services
                 .Where(x => collectionIds.Contains(x.Id) && x.IsActive)
                 .ToDictionaryAsync(x => x.Id, x => x.Name);
 
+            var itemIds = giftBoxes
+                .SelectMany(x => x.Items)
+                .Select(i => i.ItemId)
+                .Distinct()
+                .ToList();
+            var items = await _context.Items
+                .Where(x => itemIds.Contains(x.Id) && x.IsActive)
+                .ToDictionaryAsync(x => x.Id, x => x);
+
+            var tagIds = giftBoxes
+                .SelectMany(x => x.Tags)
+                .Distinct()
+                .ToList();
+            var tags = await _context.Tags
+                .Where(x => tagIds.Contains(x.Id) && x.IsActive)
+                .ToDictionaryAsync(x => x.Id, x => x.Name);
+
             return giftBoxes
                 .Select(x => new GiftBoxListDto
                 {
@@ -57,8 +74,23 @@ namespace ShopHangTet.Services
                     Description = x.Description,
                     Price = x.Price,
                     Image = x.Images.FirstOrDefault(),
-                    CollectionId = x.CollectionId,
-                    CollectionName = collections.TryGetValue(x.CollectionId, out var collectionName) ? collectionName : string.Empty,
+                    Collection = collections.TryGetValue(x.CollectionId, out var collectionName) ? collectionName : string.Empty,
+                    Tags = x.Tags
+                        .Select(tagId => tags.TryGetValue(tagId, out var tagName) ? tagName : string.Empty)
+                        .Where(tagName => !string.IsNullOrWhiteSpace(tagName))
+                        .ToList(),
+                    Items = x.Items.Select(gi =>
+                    {
+                        items.TryGetValue(gi.ItemId, out var item);
+                        return new GiftBoxItemFlatDto
+                        {
+                            Id = gi.ItemId,
+                            Name = item?.Name ?? string.Empty,
+                            Price = gi.ItemPriceSnapshot > 0 ? gi.ItemPriceSnapshot : item?.Price ?? 0,
+                            Image = item?.Images.FirstOrDefault(),
+                            Quantity = gi.Quantity
+                        };
+                    }).ToList(),
                     IsActive = x.IsActive,
                     CreatedAt = x.CreatedAt
                 })
@@ -78,7 +110,7 @@ namespace ShopHangTet.Services
             var itemIds = giftBox.Items.Select(i => i.ItemId).Distinct().ToList();
             var items = await _context.Items
                 .Where(it => itemIds.Contains(it.Id) && it.IsActive)
-                .ToListAsync();
+                .ToDictionaryAsync(it => it.Id, it => it);
 
             var collection = await _context.Collections
                 .FirstOrDefaultAsync(x => x.Id == giftBox.CollectionId && x.IsActive);
@@ -86,7 +118,7 @@ namespace ShopHangTet.Services
             var tagIds = giftBox.Tags.Distinct().ToList();
             var tags = await _context.Tags
                 .Where(t => tagIds.Contains(t.Id) && t.IsActive)
-                .ToListAsync();
+                .ToDictionaryAsync(t => t.Id, t => t.Name);
 
             return new GiftBoxDetailDto
             {
@@ -94,28 +126,24 @@ namespace ShopHangTet.Services
                 Name = giftBox.Name,
                 Description = giftBox.Description,
                 Price = giftBox.Price,
+                Image = giftBox.Images.FirstOrDefault(),
                 Images = giftBox.Images,
-                Collection = collection == null
-                    ? null
-                    : new CollectionSummaryDto
+                Collection = collection?.Name ?? string.Empty,
+                Tags = giftBox.Tags
+                    .Select(tagId => tags.TryGetValue(tagId, out var tagName) ? tagName : string.Empty)
+                    .Where(tagName => !string.IsNullOrWhiteSpace(tagName))
+                    .ToList(),
+                Items = giftBox.Items.Select(gi =>
+                {
+                    items.TryGetValue(gi.ItemId, out var item);
+                    return new GiftBoxItemFlatDto
                     {
-                        Id = collection.Id,
-                        Name = collection.Name,
-                        CoverImage = collection.CoverImage
-                    },
-                Tags = tags.Select(t => new TagSummaryDto
-                {
-                    Id = t.Id,
-                    Name = t.Name,
-                    Type = t.Type
-                }).ToList(),
-                Items = giftBox.Items.Select(gi => new GiftBoxDetailItemDto
-                {
-                    ItemId = gi.ItemId,
-                    Quantity = gi.Quantity,
-                    Name = items.FirstOrDefault(it => it.Id == gi.ItemId)?.Name ?? string.Empty,
-                    PriceSnapshot = gi.ItemPriceSnapshot,
-                    Images = items.FirstOrDefault(it => it.Id == gi.ItemId)?.Images ?? new List<string>()
+                        Id = gi.ItemId,
+                        Name = item?.Name ?? string.Empty,
+                        Price = gi.ItemPriceSnapshot > 0 ? gi.ItemPriceSnapshot : item?.Price ?? 0,
+                        Image = item?.Images.FirstOrDefault(),
+                        Quantity = gi.Quantity
+                    };
                 }).ToList(),
                 IsActive = giftBox.IsActive,
                 CreatedAt = giftBox.CreatedAt
@@ -175,10 +203,11 @@ namespace ShopHangTet.Services
                     Description = x.Description,
                     Price = x.Price,
                     Image = x.Images.FirstOrDefault(),
-                    CollectionId = x.CollectionId,
-                    CollectionName = collection.Name,
+                    Collection = collection.Name,
                     IsActive = x.IsActive,
-                    CreatedAt = x.CreatedAt
+                    CreatedAt = x.CreatedAt,
+                    Tags = new List<string>(),
+                    Items = new List<GiftBoxItemFlatDto>()
                 })
                 .ToListAsync();
 
