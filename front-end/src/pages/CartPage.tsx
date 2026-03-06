@@ -183,12 +183,12 @@ export default function CartPage() {
                                 </div>
 
                                 {/* Checkout button */}
-                                <button className="w-full mt-5 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2">
+                                <Link to="/checkout" className="w-full mt-5 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2">
                                     Thanh toán
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
-                                </button>
+                                </Link>
 
                                 {/* Helper note */}
                                 <p className="mt-4 text-xs text-gray-400 flex items-start gap-1.5">

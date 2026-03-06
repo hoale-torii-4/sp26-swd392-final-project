@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { productService, type GiftBox } from "../services/productService";
+import { productService, type GiftBoxListDto } from "../services/productService";
 import heroBg from "../assets/giftbox-hero.png";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
@@ -34,7 +34,7 @@ function formatPrice(v: number | undefined) {
 
 export default function GiftBoxesPage() {
     /* ── data ── */
-    const [giftBoxes, setGiftBoxes] = useState<GiftBox[]>([]);
+    const [giftBoxes, setGiftBoxes] = useState<GiftBoxListDto[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
@@ -338,8 +338,8 @@ export default function GiftBoxesPage() {
    PRODUCT CARD — extracted for clarity
    ══════════════════════════════════════════════════ */
 
-function ProductCard({ box }: { box: GiftBox }) {
-    const mainImage = box.Images?.[0] || "";
+function ProductCard({ box }: { box: GiftBoxListDto }) {
+    const mainImage = box.Image || "";
     const hasImage = mainImage.length > 0;
 
     return (
@@ -382,7 +382,7 @@ function ProductCard({ box }: { box: GiftBox }) {
                     {formatPrice(box.Price)}
                 </p>
                 <Link
-                    to={`/gift-box/${box.Id}`}
+                    to={`/gift-boxes/${box.Id}`}
                     className="inline-flex items-center justify-center w-full py-2.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-xs font-bold tracking-[0.15em] uppercase rounded-lg hover:bg-[#8B1A1A] hover:text-white transition-colors"
                 >
                     Chi tiết

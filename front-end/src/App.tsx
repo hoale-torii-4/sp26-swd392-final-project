@@ -10,7 +10,9 @@ import GuidePage from './pages/GuidePage'
 import AboutPage from './pages/AboutPage'
 import AccountPage from './pages/AccountPage'
 import GiftBoxesPage from './pages/GiftBoxesPage'
+import ProductDetailPage from './pages/ProductDetailPage'
 import CartPage from './pages/CartPage'
+import CheckoutPage from './pages/CheckoutPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import AIChatBox from './components/AIChatBox'
 import { GoogleOAuthProvider } from '@react-oauth/google'
@@ -34,7 +36,9 @@ function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/gift-boxes" element={<GiftBoxesPage />} />
+          <Route path="/gift-boxes/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
+          <Route path="/checkout" element={<CheckoutPage />} />
         </Routes>
         <AIChatBox />
       </BrowserRouter>
