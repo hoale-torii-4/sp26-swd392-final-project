@@ -38,6 +38,8 @@ namespace ShopHangTet.Controllers
                 return BadRequest(ApiResponse<object>.ErrorResult("Email này đã được sử dụng."));
             }
 
+            string otpCode = new Random().Next(100000, 999999).ToString();
+
             var newUser = new UserModel
             {
                 Email = request.Email,
@@ -48,16 +50,101 @@ namespace ShopHangTet.Controllers
                 Status = UserStatus.ACTIVE,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow,
-                IsEmailVerified = false
+                IsEmailVerified = false,
+                OtpCode = otpCode,
+                OtpExpiry = DateTime.UtcNow.AddMinutes(5)
             };
 
             _context.Users.Add(newUser);
             await _context.SaveChangesAsync();
 
-            _ = _emailService.SendWelcomeEmailAsync(newUser.Email, newUser.FullName);
-            return Ok(ApiResponse<object>.SuccessResult(new { UserId = newUser.Id }, "Đăng ký thành công!"));
-        }
+            bool isSent = await _emailService.SendOtpAsync(newUser.Email, otpCode);
 
+            if (!isSent)
+            {
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Tạo tài khoản thành công nhưng hệ thống gửi mail đang lỗi."));
+            }
+
+            _ = _emailService.SendWelcomeEmailAsync(newUser.Email, newUser.FullName);
+            return Ok(ApiResponse<object>.SuccessResult(new { UserId = newUser.Id }, "Đăng ký thành công! Vui lòng kiểm tra email để nhận mã OTP."));
+        }
+        // ===========================
+        // 1.5. VERIFY EMAIL (account created and saved to db immediately, if user cannot receive otp, go to API 1.7)
+        // ===========================
+        [HttpPost("verify-email")]
+        public async Task<IActionResult> VerifyEmail([FromBody] OtpVerifyDto request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (user == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Không tìm thấy người dùng với email này."));
+            }
+
+            if (user.IsEmailVerified)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Tài khoản này đã được xác thực trước đó."));
+            }
+
+            if (user.OtpCode != request.Otp || user.OtpExpiry < DateTime.UtcNow)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Mã OTP không hợp lệ hoặc đã hết hạn."));
+            }
+
+            user.IsEmailVerified = true;
+            user.OtpCode = null;   
+            user.OtpExpiry = null; 
+            user.Status = UserStatus.ACTIVE;
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Xác thực email thành công! Bạn đã có thể đăng nhập."));
+        }
+        // ===========================
+        // 1.7. RESEND REGISTER OTP (When there is a user's email exist in db didn't receive the otp and need to resend during registration)
+        // ONLY FOR UNVERIFIED EMAIL (isEmailVerified = false)
+        // ===========================
+        [HttpPost("resend-register-otp")]
+        public async Task<IActionResult> ResendRegisterOtp([FromBody] ResendOtpDto request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+
+            if (user == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Không tìm thấy tài khoản nào đăng ký với email này."));
+            }
+
+            if (user.IsEmailVerified)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Tài khoản này đã được xác thực thành công. Vui lòng đăng nhập thẳng vào hệ thống!"));
+            }
+
+            if (user.OtpExpiry.HasValue && user.OtpExpiry.Value > DateTime.UtcNow.AddMinutes(4))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP mới."));
+            }
+
+            // 1. Generate new OTP code with 6 random digits
+            string otpCode = new Random().Next(100000, 999999).ToString();
+
+            // 2. Save OTP and expired after 5 minutes in database
+            user.OtpCode = otpCode;
+            user.OtpExpiry = DateTime.UtcNow.AddMinutes(5);
+            user.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            // 3. Brevo email sending
+            bool isSent = await _emailService.SendOtpAsync(user.Email, otpCode);
+
+            if (!isSent)
+            {
+                return StatusCode(500, ApiResponse<object>.ErrorResult("Tạo mã thành công nhưng hệ thống gửi mail đang gặp sự cố. Vui lòng thử lại sau."));
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(null, "Đã gửi lại mã xác nhận OTP. Vui lòng kiểm tra cả hòm thư Spam (Thư rác)."));
+        }
         // ===========================
         // 2. LOGIN
         // ===========================
@@ -66,9 +153,20 @@ namespace ShopHangTet.Controllers
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
-            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             {
                 return Unauthorized(ApiResponse<object>.ErrorResult("Email hoặc mật khẩu không đúng."));
+            }
+
+            // Check Verify Email
+            if (!user.IsEmailVerified)
+            {
+                return BadRequest(new
+                {
+                    Success = false,
+                    Message = "Tài khoản chưa được xác thực. Vui lòng kiểm tra email để lấy mã OTP xác nhận!",
+                    Data = new { email = user.Email, isEmailVerified = false } // Trả về data để Front-end biết nhảy trang
+                });
             }
 
             if (user.Status != UserStatus.ACTIVE)
@@ -79,7 +177,7 @@ namespace ShopHangTet.Controllers
             // Create token
             var token = _jwtService.GenerateToken(user);
 
-            // Encapsulate response in LoginResponseDto format
+            // Encapsulate response in LoginResponseDto format (Profile)
             var loginResponse = CreateLoginResponse(user, token);
 
             return Ok(ApiResponse<LoginResponseDto>.SuccessResult(loginResponse, "Đăng nhập thành công!"));
@@ -97,8 +195,7 @@ namespace ShopHangTet.Controllers
 
                 var settings = new GoogleJsonWebSignature.ValidationSettings()
                 {
-                    // Tạm tắt Audience để test với token của Playground
-                    // Audience = new List<string>() { clientId } 
+                    Audience = new List<string>() { clientId }
                 };
 
                 // Verify Google Token
@@ -173,7 +270,7 @@ namespace ShopHangTet.Controllers
             };
         }
         // ===========================
-        // 4. FORGOT PASSWORD (QUÊN MẬT KHẨU - GỬI OTP)
+        // 4. FORGOT PASSWORD (OTP)
         // ===========================
         [HttpPost("forgot-password")]
         public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto request)
@@ -183,6 +280,12 @@ namespace ShopHangTet.Controllers
             if (user == null)
             {
                 return Ok(ApiResponse<object>.SuccessResult(null, "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi."));
+            }
+
+            // If otpexpiry > 4 minutes, it means user just requested OTP and need to wait until 5 minutes to request again. This is to prevent spamming OTP request.
+            if (user.OtpExpiry.HasValue && user.OtpExpiry.Value > DateTime.UtcNow.AddMinutes(4))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP mới."));
             }
 
             // 6 random digits OTP generation

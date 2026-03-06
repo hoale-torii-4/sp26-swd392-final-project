@@ -6,20 +6,24 @@ namespace ShopHangTet.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [ApiExplorerSettings(IgnoreApi = true)]
     public class SystemController : ControllerBase
     {
         private readonly ILogger<SystemController> _logger;
         private readonly IJwtService? _jwtService;
         private readonly IOtpService? _otpService;
         private readonly IEmailService? _emailService;
+        private readonly IWebHostEnvironment _environment;
 
         public SystemController(
             ILogger<SystemController> logger,
+            IWebHostEnvironment environment,
             IJwtService? jwtService = null,
             IOtpService? otpService = null,
             IEmailService? emailService = null)
         {
             _logger = logger;
+            _environment = environment;
             _jwtService = jwtService;
             _otpService = otpService;
             _emailService = emailService;
@@ -76,6 +80,11 @@ namespace ShopHangTet.Controllers
         [HttpPost("test-jwt")]
         public IActionResult TestJwt([FromBody] TestJwtRequest request)
         {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
             try
             {
                 if (_jwtService == null)
@@ -123,6 +132,11 @@ namespace ShopHangTet.Controllers
         [HttpPost("test-otp")]
         public async Task<IActionResult> TestOtp([FromBody] TestOtpRequest request)
         {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
             try
             {
                 if (_otpService == null)

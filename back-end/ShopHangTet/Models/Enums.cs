@@ -3,11 +3,13 @@ namespace ShopHangTet.Models;
 public enum OrderStatus
 {
     PAYMENT_CONFIRMING,
-    PROCESSING_PAYMENT,
-    PAYMENT_EXPIRED,
+    PAYMENT_EXPIRED_INTERNAL,
     PREPARING,
     SHIPPING,
-    COMPLETED
+    PARTIAL_DELIVERY,
+    DELIVERY_FAILED,
+    COMPLETED,
+    CANCELLED
 }
 
 public enum OrderType
@@ -26,7 +28,7 @@ public enum OrderItemType
 public enum ItemCategory
 {
     DRINK,
-    FOOD, 
+    FOOD,
     NUT,
     ALCOHOL
 }

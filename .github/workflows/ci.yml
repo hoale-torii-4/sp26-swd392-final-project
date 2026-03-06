@@ -1,0 +1,66 @@
+name: ShopHangTet CI Pipeline
+
+# Robot sẽ tự động chạy khi có người Push code hoặc tạo Pull Request vào nhánh main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # KIỂM TRA BACK-END (.NET)
+  build-backend:
+    runs-on: ubuntu-latest
+    
+    # BƯỚC PHÉP THUẬT: Mượn 1 con MongoDB ảo chạy ngầm trên Github
+    services:
+      mongodb:
+        image: mongo:latest
+        ports:
+          - 27017:27017
+
+    steps:
+    - name: Tải code về máy ảo
+      uses: actions/checkout@v3
+
+    - name: Cài đặt môi trường .NET
+      uses: actions/setup-dotnet@v3
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Tải các thư viện (Restore)
+      working-directory: ./back-end/ShopHangTet
+      run: dotnet restore
+
+    - name: Kiểm tra lỗi cú pháp (Build)
+      working-directory: ./back-end/ShopHangTet
+      run: dotnet build --no-restore
+
+    # BƯỚC CHẶN CỬA: Chạy Test chọc thẳng vào MongoDB ảo
+    # (Đảm bảo bạn đã tạo thư mục ShopHangTet.Tests theo hướng dẫn trước đó)
+    - name: Kiểm thử tích hợp Database (Integration Tests)
+      working-directory: ./back-end/ShopHangTet.Tests 
+      run: dotnet test
+      env:
+        # Ghi đè chuỗi kết nối để nó trỏ vào con MongoDB ảo cổng 27017
+        ConnectionStrings__MongoConnection: "mongodb://localhost:27017/ShopHangTet_TestDB"
+
+  # KIỂM TRA FRONT-END (React Vite)
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Tải code về máy ảo
+      uses: actions/checkout@v3
+
+    - name: Cài đặt môi trường Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+
+    - name: Cài đặt các gói thư viện npm
+      working-directory: ./front-end
+      run: npm install
+
+    - name: Kiểm tra lỗi và đóng gói (Build)
+      working-directory: ./front-end
+      run: npm run build

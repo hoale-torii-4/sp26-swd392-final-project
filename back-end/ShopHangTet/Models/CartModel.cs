@@ -32,6 +32,14 @@ namespace ShopHangTet.Models
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
 
+        public string CartId { get; set; } = string.Empty;
+
+        [BsonElement("userId")]
+        public string? UserId { get; set; } 
+
+        [BsonElement("sessionId")]
+        public string? SessionId { get; set; }
+
         [BsonElement("type")]
         public OrderItemType Type { get; set; } = OrderItemType.READY_MADE; // READY_MADE, MIX_MATCH
 

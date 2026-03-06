@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Caching.Memory;
-using System.Security.Cryptography;
 
 namespace ShopHangTet.Services
 {
@@ -17,74 +16,51 @@ namespace ShopHangTet.Services
 
         public async Task<string> GenerateOtpAsync(string email)
         {
-            try
-            {
-                // Generate 6-digit OTP
-                var otp = RandomNumberGenerator.GetInt32(100000, 1000000).ToString();
+            var emailKey = email.ToLower();
+            var cooldownKey = $"otp_cooldown_{emailKey}";
+            var cacheKey = $"otp_{emailKey}";
 
-                // Store in cache with expiry
-                var cacheKey = $"otp_{email.ToLower()}";
-                _cache.Set(cacheKey, otp, _otpExpiry);
-
-                _logger.LogInformation($"OTP generated for {email}: {otp}");
-                
-                return await Task.FromResult(otp);
-            }
-            catch (Exception ex)
+            if (_cache.TryGetValue(cooldownKey, out _))
             {
-                _logger.LogError(ex, $"Failed to generate OTP for {email}");
-                throw;
+                throw new InvalidOperationException("Vui lòng đợi 60 giây trước khi yêu cầu gửi lại mã OTP.");
             }
+
+            var random = new Random();
+            var otp = random.Next(100000, 999999).ToString();
+
+            _cache.Set(cacheKey, otp, _otpExpiry);
+            _cache.Set(cooldownKey, true, TimeSpan.FromSeconds(60));
+
+            _logger.LogInformation($"OTP generated for {email}: {otp}");
+
+            return await Task.FromResult(otp);
         }
 
         public async Task<bool> ValidateOtpAsync(string email, string otp)
         {
-            try
+            var cacheKey = $"otp_{email.ToLower()}";
+
+            if (_cache.TryGetValue(cacheKey, out string? cachedOtp))
             {
-                var cacheKey = $"otp_{email.ToLower()}";
-                
-                if (_cache.TryGetValue(cacheKey, out string? cachedOtp))
+                var isValid = cachedOtp == otp;
+
+                if (isValid)
                 {
-                    var isValid = cachedOtp == otp;
-                    
-                    if (isValid)
-                    {
-                        // Remove OTP from cache after successful validation
-                        _cache.Remove(cacheKey);
-                        _logger.LogInformation($"OTP validated successfully for {email}");
-                    }
-                    else
-                    {
-                        _logger.LogWarning($"Invalid OTP attempt for {email}");
-                    }
-                    
-                    return await Task.FromResult(isValid);
+                    _cache.Remove(cacheKey);
                 }
 
-                _logger.LogWarning($"OTP not found or expired for {email}");
-                return await Task.FromResult(false);
+                return await Task.FromResult(isValid);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to validate OTP for {email}");
-                return false;
-            }
+
+            return await Task.FromResult(false);
         }
 
         public async Task<bool> InvalidateOtpAsync(string email)
         {
-            try
-            {
-                var cacheKey = $"otp_{email.ToLower()}";
-                _cache.Remove(cacheKey);
-                _logger.LogInformation($"OTP invalidated for {email}");
-                return await Task.FromResult(true);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Failed to invalidate OTP for {email}");
-                return false;
-            }
+            var cacheKey = $"otp_{email.ToLower()}";
+            _cache.Remove(cacheKey);
+
+            return await Task.FromResult(true);
         }
     }
 }

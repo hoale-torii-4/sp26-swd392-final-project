@@ -3,130 +3,225 @@ using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 
-namespace ShopHangTet.Services;
-
-public class CartService : ICartService
+namespace ShopHangTet.Services
 {
-    private readonly ShopHangTetDbContext _context;
-
-    public CartService(ShopHangTetDbContext context)
+    public class CartService : ICartService
     {
-        _context = context;
-    }
+        private readonly ShopHangTetDbContext _context;
 
-    public async Task<ApiResponse<CartDto>> GetCartAsync(string? userId, string? sessionId)
-    {
-        var cart = await FindCartAsync(userId, sessionId);
-
-        if (cart == null)
-            return ApiResponse<CartDto>.SuccessResult(new CartDto(), "Cart empty");
-
-        return ApiResponse<CartDto>.SuccessResult(MapCart(cart));
-    }
-
-    public async Task<ApiResponse<CartDto>> AddToCartAsync(string? userId, string? sessionId, AddToCartDto dto)
-    {
-        var cart = await GetOrCreateCartAsync(userId, sessionId);
-
-        cart.Items.Add(new CartItem
+        public CartService(ShopHangTetDbContext context)
         {
-            Type = dto.Type,
-            GiftBoxId = dto.GiftBoxId,
-            CustomBoxId = dto.CustomBoxId,
-            Quantity = dto.Quantity
-        });
+            _context = context;
+        }
 
-        await _context.SaveChangesAsync();
+        private async Task<Cart?> GetCartByOwnerAsync(string? userId, string? sessionId)
+        {
+            if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(sessionId))
+                return null;
 
-        return ApiResponse<CartDto>.SuccessResult(MapCart(cart));
-    }
+            var cart = await _context.Set<Cart>()
+                .FirstOrDefaultAsync(c =>
+                    (!string.IsNullOrWhiteSpace(userId) && c.UserId == userId) ||
+                    (!string.IsNullOrWhiteSpace(sessionId) && c.SessionId == sessionId));
 
-    public async Task<ApiResponse<CartDto>> UpdateCartItemAsync(string? userId, string? sessionId, string itemId, UpdateCartItemDto dto)
-    {
-        var cart = await FindCartAsync(userId, sessionId);
+            if (cart != null)
+            {
+                cart.Items = await _context.Set<CartItem>()
+                    .Where(i => i.CartId == cart.Id)
+                    .ToListAsync();
+            }
 
-        var item = cart?.Items.FirstOrDefault(x => x.Id == itemId);
-
-        if (item == null)
-            return ApiResponse<CartDto>.ErrorResult("Item not found");
-
-        item.Quantity = dto.Quantity;
-
-        await _context.SaveChangesAsync();
-
-        return ApiResponse<CartDto>.SuccessResult(MapCart(cart!));
-    }
-
-    public async Task<ApiResponse<CartDto>> RemoveFromCartItemAsync(string? userId, string? sessionId, string itemId)
-    {
-        var cart = await FindCartAsync(userId, sessionId);
-
-        if (cart == null)
-            return ApiResponse<CartDto>.ErrorResult("Cart not found");
-
-        cart.Items.RemoveAll(x => x.Id == itemId);
-
-        await _context.SaveChangesAsync();
-
-        return ApiResponse<CartDto>.SuccessResult(MapCart(cart));
-    }
-
-    public async Task<ApiResponse<CartDto>> ClearCartAsync(string? userId, string? sessionId)
-    {
-        var cart = await FindCartAsync(userId, sessionId);
-
-        if (cart == null)
-            return ApiResponse<CartDto>.ErrorResult("Cart not found");
-
-        cart.Items.Clear();
-
-        await _context.SaveChangesAsync();
-
-        return ApiResponse<CartDto>.SuccessResult(MapCart(cart));
-    }
-
-    private async Task<Cart?> FindCartAsync(string? userId, string? sessionId)
-    {
-        if (!string.IsNullOrWhiteSpace(userId))
-            return await _context.Carts.FirstOrDefaultAsync(x => x.UserId == userId);
-
-        if (!string.IsNullOrWhiteSpace(sessionId))
-            return await _context.Carts.FirstOrDefaultAsync(x => x.SessionId == sessionId);
-
-        return null;
-    }
-
-    private async Task<Cart> GetOrCreateCartAsync(string? userId, string? sessionId)
-    {
-        var cart = await FindCartAsync(userId, sessionId);
-
-        if (cart != null)
             return cart;
+        }
 
-        cart = new Cart
+        private async Task<CartDto> MapToDtoAsync(Cart cart)
         {
-            UserId = userId,
-            SessionId = sessionId,
-            UpdatedAt = DateTime.UtcNow
-        };
+            var dto = new CartDto
+            {
+                Id = cart.Id,
+                UserId = cart.UserId,
+                SessionId = cart.SessionId,
+                TotalAmount = cart.Items.Sum(i => i.Quantity * i.UnitPrice),
+                TotalItems = cart.Items.Sum(i => i.Quantity),
+                Items = new List<CartItemDto>()
+            };
 
-        _context.Carts.Add(cart);
+            foreach (var item in cart.Items)
+            {
+                string name = "Sản phẩm không xác định";
 
-        await _context.SaveChangesAsync();
+                if (item.Type == OrderItemType.READY_MADE && !string.IsNullOrEmpty(item.GiftBoxId))
+                {
+                    var giftBox = await _context.Set<GiftBox>()
+                        .FirstOrDefaultAsync(g => g.Id == item.GiftBoxId);
 
-        return cart;
-    }
+                    if (giftBox != null) name = giftBox.Name;
+                }
+                else if (item.Type == OrderItemType.MIX_MATCH)
+                {
+                    name = "Hộp quà tự chọn (Mix & Match)";
+                }
 
-    private CartDto MapCart(Cart cart)
-    {
-        return new CartDto
+                dto.Items.Add(new CartItemDto
+                {
+                    Id = item.Id,
+                    Type = item.Type,
+                    GiftBoxId = item.GiftBoxId,
+                    CustomBoxId = item.CustomBoxId,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice,
+                    Name = name
+                });
+            }
+
+            return dto;
+        }
+
+        public async Task<ApiResponse<CartDto>> GetCartAsync(string? userId, string? sessionId)
         {
-            Id = cart.Id,
-            UserId = cart.UserId,
-            SessionId = cart.SessionId,
-            TotalItems = cart.Items.Sum(x => x.Quantity),
-            TotalAmount = 0,
-            Items = []
-        };
+            var cart = await GetCartByOwnerAsync(userId, sessionId);
+
+            if (cart == null)
+            {
+                return ApiResponse<CartDto>.SuccessResult(new CartDto
+                {
+                    UserId = userId,
+                    SessionId = sessionId
+                });
+            }
+
+            return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart));
+        }
+
+        public async Task<ApiResponse<CartDto>> AddToCartAsync(string? userId, string? sessionId, AddToCartDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(sessionId))
+                return ApiResponse<CartDto>.ErrorResult("Không xác định được người dùng!");
+
+            var cart = await GetCartByOwnerAsync(userId, sessionId);
+
+            if (cart == null)
+            {
+                cart = new Cart
+                {
+                    UserId = userId,
+                    SessionId = sessionId
+                };
+
+                _context.Set<Cart>().Add(cart);
+                await _context.SaveChangesAsync();
+
+                cart.Items = new List<CartItem>();
+            }
+
+            decimal unitPrice = 0;
+
+            if (dto.Type == OrderItemType.READY_MADE && !string.IsNullOrEmpty(dto.GiftBoxId))
+            {
+                var giftBox = await _context.Set<GiftBox>()
+                    .FirstOrDefaultAsync(g => g.Id == dto.GiftBoxId);
+
+                if (giftBox == null)
+                    return ApiResponse<CartDto>.ErrorResult("Không tìm thấy hộp quà!");
+
+                unitPrice = giftBox.Price;
+            }
+
+            var existingItem = cart.Items.FirstOrDefault(i =>
+                i.Type == dto.Type &&
+                ((dto.Type == OrderItemType.READY_MADE && i.GiftBoxId == dto.GiftBoxId) ||
+                 (dto.Type == OrderItemType.MIX_MATCH && i.CustomBoxId == dto.CustomBoxId)));
+
+            if (existingItem != null)
+            {
+                existingItem.Quantity += dto.Quantity;
+                existingItem.UnitPrice = unitPrice;
+
+                _context.Set<CartItem>().Update(existingItem);
+            }
+            else
+            {
+                var newItem = new CartItem
+                {
+                    CartId = cart.Id,
+                    UserId = cart.UserId,
+                    SessionId = cart.SessionId,
+                    Type = dto.Type,
+                    GiftBoxId = dto.GiftBoxId,
+                    CustomBoxId = dto.CustomBoxId,
+                    Quantity = dto.Quantity,
+                    UnitPrice = unitPrice,
+                    AddedAt = DateTime.UtcNow
+                };
+
+                cart.Items.Add(newItem);
+                _context.Set<CartItem>().Add(newItem);
+            }
+
+            cart.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart), "Đã thêm vào giỏ hàng");
+        }
+
+        public async Task<ApiResponse<CartDto>> UpdateCartItemAsync(string? userId, string? sessionId, string cartItemId, UpdateCartItemDto dto)
+        {
+            var cart = await GetCartByOwnerAsync(userId, sessionId);
+
+            if (cart == null)
+                return ApiResponse<CartDto>.ErrorResult("Giỏ hàng trống!");
+
+            var item = cart.Items.FirstOrDefault(i => i.Id == cartItemId);
+
+            if (item == null)
+                return ApiResponse<CartDto>.ErrorResult("Không tìm thấy sản phẩm!");
+
+            item.Quantity = dto.Quantity;
+
+            _context.Set<CartItem>().Update(item);
+
+            cart.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart), "Đã cập nhật số lượng");
+        }
+
+        public async Task<ApiResponse<bool>> RemoveFromCartItemAsync(string? userId, string? sessionId, string cartItemId)
+        {
+            var cart = await GetCartByOwnerAsync(userId, sessionId);
+
+            if (cart == null)
+                return ApiResponse<bool>.ErrorResult("Giỏ hàng trống!");
+
+            var item = cart.Items.FirstOrDefault(i => i.Id == cartItemId);
+
+            if (item == null)
+                return ApiResponse<bool>.ErrorResult("Không tìm thấy item để xóa!");
+
+            _context.Set<CartItem>().Remove(item);
+
+            cart.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<bool>.SuccessResult(true, "Đã xóa sản phẩm");
+        }
+
+        public async Task<ApiResponse<bool>> ClearCartAsync(string? userId, string? sessionId)
+        {
+            var cart = await GetCartByOwnerAsync(userId, sessionId);
+
+            if (cart == null)
+                return ApiResponse<bool>.ErrorResult("Giỏ hàng trống!");
+
+            if (cart.Items.Any())
+            {
+                _context.Set<CartItem>().RemoveRange(cart.Items);
+                cart.UpdatedAt = DateTime.UtcNow;
+
+                await _context.SaveChangesAsync();
+            }
+
+            return ApiResponse<bool>.SuccessResult(true, "Đã làm sạch giỏ hàng");
+        }
     }
 }
