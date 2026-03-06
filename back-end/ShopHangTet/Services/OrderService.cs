@@ -1,4 +1,3 @@
-using ShopHangTet.Repositories;
 using ShopHangTet.Models;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;
@@ -14,16 +13,13 @@ namespace ShopHangTet.Services
         private static readonly TimeSpan PaymentConfirmationWindow = TimeSpan.FromMinutes(10);
 
         private readonly ShopHangTetDbContext _context;
-        private readonly IDeliverySlotRepository _slotRepo;
         private readonly ILogger<OrderService> _logger;
 
         public OrderService(
             ShopHangTetDbContext context,
-            IDeliverySlotRepository slotRepo,
             ILogger<OrderService> logger)
         {
             _context = context;
-            _slotRepo = slotRepo;
             _logger = logger;
         }
 
@@ -371,31 +367,6 @@ namespace ShopHangTet.Services
             return true;
         }
 
-        private async Task<bool> TryReserveSlotAsync(string? slotId)
-        {
-            if (string.IsNullOrEmpty(slotId))
-            {
-                return true;
-            }
-
-            if (!await _slotRepo.IsSlotAvailableAsync(slotId))
-            {
-                return false;
-            }
-
-            return await _slotRepo.IncrementOrderCountAsync(slotId);
-        }
-
-        private async Task RollbackSlotAsync(string? slotId)
-        {
-            if (string.IsNullOrEmpty(slotId))
-            {
-                return;
-            }
-
-            await _slotRepo.DecrementOrderCountAsync(slotId);
-        }
-
         private static bool IsValidEmail(string email)
         {
             var validator = new EmailAddressAttribute();
@@ -592,65 +563,51 @@ namespace ShopHangTet.Services
 
             _logger.LogInformation($"Creating B2C order for {dto.CustomerEmail}");
 
-            if (!await TryReserveSlotAsync(dto.DeliverySlotId))
+            var orderItems = await BuildOrderItemsFromB2CAsync(dto.Items);
+            var totalQuantity = orderItems.Sum(x => x.Quantity);
+            var shippingFee = ShouldApplyTestShippingOverride(orderItems)
+                ? 0
+                : CalculateShippingFee(1);
+
+            var order = new OrderModel
             {
-                throw new InvalidOperationException("Delivery slot is not available");
-            }
+                Id = ObjectId.GenerateNewId(),
+                OrderCode = GenerateOrderCode(),
+                OrderType = OrderType.B2C,
+                UserId = string.IsNullOrEmpty(dto.UserId) ? null : ObjectId.Parse(dto.UserId),
+                CustomerName = dto.CustomerName,
+                CustomerEmail = dto.CustomerEmail,
+                CustomerPhone = dto.CustomerPhone,
+                Items = orderItems,
+                // B2C: Single DeliveryAddress
+                DeliveryAddress = MapDeliveryAddressFromDto(dto, totalQuantity),
+                DeliveryDate = dto.DeliveryDate,
+                GreetingMessage = dto.GreetingMessage,
+                GreetingCardUrl = dto.GreetingCardUrl,
+                SubTotal = orderItems.Sum(x => x.TotalPrice),
+                ShippingFee = shippingFee,
+                Status = OrderStatus.PAYMENT_CONFIRMING,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
 
-            try
+            order.TotalAmount = order.SubTotal + order.ShippingFee;
+            order.StatusHistory.Add(new OrderStatusHistory
             {
-                var orderItems = await BuildOrderItemsFromB2CAsync(dto.Items);
-                var totalQuantity = orderItems.Sum(x => x.Quantity);
-                var shippingFee = ShouldApplyTestShippingOverride(orderItems)
-                    ? 0
-                    : CalculateShippingFee(1);
+                Status = OrderStatus.PAYMENT_CONFIRMING,
+                Timestamp = DateTime.UtcNow,
+                UpdatedBy = "System",
+                Notes = "Đơn hàng được tạo - Đang xác nhận thanh toán"
+            });
 
-                var order = new OrderModel
-                {
-                    Id = ObjectId.GenerateNewId(),
-                    OrderCode = GenerateOrderCode(),
-                    OrderType = OrderType.B2C,
-                    UserId = string.IsNullOrEmpty(dto.UserId) ? null : ObjectId.Parse(dto.UserId),
-                    CustomerName = dto.CustomerName,
-                    CustomerEmail = dto.CustomerEmail,
-                    CustomerPhone = dto.CustomerPhone,
-                    Items = orderItems,
-                    // B2C: Single DeliveryAddress
-                    DeliveryAddress = MapDeliveryAddressFromDto(dto, totalQuantity),
-                    DeliveryDate = dto.DeliveryDate,
-                    DeliverySlotId = string.IsNullOrEmpty(dto.DeliverySlotId) ? null : ObjectId.Parse(dto.DeliverySlotId),
-                    GreetingMessage = dto.GreetingMessage,
-                    GreetingCardUrl = dto.GreetingCardUrl,
-                    SubTotal = orderItems.Sum(x => x.TotalPrice),
-                    ShippingFee = shippingFee,
-                    Status = OrderStatus.PAYMENT_CONFIRMING,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                };
+            // Reserve inventory khi tạo đơn để tránh oversell
+            await ReserveInventoryAsync(order, "System-PlaceOrder");
 
-                order.TotalAmount = order.SubTotal + order.ShippingFee;
-                order.StatusHistory.Add(new OrderStatusHistory
-                {
-                    Status = OrderStatus.PAYMENT_CONFIRMING,
-                    Timestamp = DateTime.UtcNow,
-                    UpdatedBy = "System",
-                    Notes = "Đơn hàng được tạo - Đang xác nhận thanh toán"
-                });
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
 
-                // Reserve inventory khi tạo đơn để tránh oversell
-                await ReserveInventoryAsync(order, "System-PlaceOrder");
-
-                _context.Orders.Add(order);
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"B2C Order created: {order.OrderCode}");
-                return order;
-            }
-            catch
-            {
-                await RollbackSlotAsync(dto.DeliverySlotId);
-                throw;
-            }
+            _logger.LogInformation($"B2C Order created: {order.OrderCode}");
+            return order;
         }
 
         /// Đặt hàng B2B (Member only) - OrderDelivery + OrderDeliveryItem
@@ -664,109 +621,95 @@ namespace ShopHangTet.Services
 
             _logger.LogInformation($"Creating B2B order for user {dto.UserId}");
 
-            if (!await TryReserveSlotAsync(dto.DeliverySlotId))
+            var orderItems = await BuildOrderItemsFromB2BAsync(dto.Items);
+                
+            // B2B: KHÔNG gán DeliveryAddress vào Order
+            var addressIds = dto.DeliveryAllocations.Select(x => x.AddressId).ToList();
+            var addresses = await _context.Addresses
+                .Where(x => addressIds.Contains(x.Id) && x.UserId == dto.UserId)
+                .ToListAsync();
+
+            if (addresses.Count != addressIds.Count)
             {
-                throw new InvalidOperationException("Delivery slot is not available");
+                throw new InvalidOperationException("Một hoặc nhiều địa chỉ không hợp lệ");
             }
 
-            try
+            var order = new OrderModel
             {
-                var orderItems = await BuildOrderItemsFromB2BAsync(dto.Items);
-                
-                // B2B: KHÔNG gán DeliveryAddress vào Order
-                var addressIds = dto.DeliveryAllocations.Select(x => x.AddressId).ToList();
-                var addresses = await _context.Addresses
-                    .Where(x => addressIds.Contains(x.Id) && x.UserId == dto.UserId)
-                    .ToListAsync();
+                Id = ObjectId.GenerateNewId(),
+                OrderCode = GenerateOrderCode(),
+                OrderType = OrderType.B2B,
+                UserId = ObjectId.Parse(dto.UserId),
+                CustomerName = dto.CustomerName,
+                CustomerEmail = dto.CustomerEmail,
+                CustomerPhone = dto.CustomerPhone,
+                Items = orderItems,
+                // B2B KHÔNG có DeliveryAddress - dùng OrderDelivery table
+                DeliveryAddress = null,
+                DeliveryDate = dto.DeliveryDate,
+                GreetingMessage = dto.GreetingMessage,
+                GreetingCardUrl = dto.GreetingCardUrl,
+                SubTotal = orderItems.Sum(x => x.TotalPrice),
+                ShippingFee = CalculateB2BShippingFee(addresses.Count),
+                Status = OrderStatus.PAYMENT_CONFIRMING,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
 
-                if (addresses.Count != addressIds.Count)
-                {
-                    throw new InvalidOperationException("Một hoặc nhiều địa chỉ không hợp lệ");
-                }
+            order.TotalAmount = order.SubTotal + order.ShippingFee;
+            order.StatusHistory.Add(new OrderStatusHistory
+            {
+                Status = OrderStatus.PAYMENT_CONFIRMING,
+                Timestamp = DateTime.UtcNow,
+                UpdatedBy = "System",
+                Notes = "Đơn hàng B2B được tạo - Đang xác nhận thanh toán"
+            });
 
-                var order = new OrderModel
+            // Reserve inventory khi tạo đơn để tránh oversell
+            await ReserveInventoryAsync(order, "System-PlaceOrder");
+
+            _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            // B2B: Tạo OrderDelivery và OrderDeliveryItem
+            foreach (var allocation in dto.DeliveryAllocations)
+            {
+                var orderDelivery = new OrderDelivery
                 {
-                    Id = ObjectId.GenerateNewId(),
-                    OrderCode = GenerateOrderCode(),
-                    OrderType = OrderType.B2B,
-                    UserId = ObjectId.Parse(dto.UserId),
-                    CustomerName = dto.CustomerName,
-                    CustomerEmail = dto.CustomerEmail,
-                    CustomerPhone = dto.CustomerPhone,
-                    Items = orderItems,
-                    // B2B KHÔNG có DeliveryAddress - dùng OrderDelivery table
-                    DeliveryAddress = null,
-                    DeliveryDate = dto.DeliveryDate,
-                    DeliverySlotId = string.IsNullOrEmpty(dto.DeliverySlotId) ? null : ObjectId.Parse(dto.DeliverySlotId),
-                    GreetingMessage = dto.GreetingMessage,
-                    GreetingCardUrl = dto.GreetingCardUrl,
-                    SubTotal = orderItems.Sum(x => x.TotalPrice),
-                    ShippingFee = CalculateB2BShippingFee(addresses.Count),
-                    Status = OrderStatus.PAYMENT_CONFIRMING,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
+                    OrderId = order.Id.ToString(),
+                    AddressId = allocation.AddressId,
+                    Status = "PENDING",
+                    CreatedAt = DateTime.UtcNow
                 };
+                _context.OrderDeliveries.Add(orderDelivery);
+                await _context.SaveChangesAsync(); // Để có OrderDelivery.Id
 
-                order.TotalAmount = order.SubTotal + order.ShippingFee;
-                order.StatusHistory.Add(new OrderStatusHistory
+                // Tạo OrderDeliveryItem cho từng allocation
+                foreach (var itemAllocation in allocation.ItemAllocations)
                 {
-                    Status = OrderStatus.PAYMENT_CONFIRMING,
-                    Timestamp = DateTime.UtcNow,
-                    UpdatedBy = "System",
-                    Notes = "Đơn hàng B2B được tạo - Đang xác nhận thanh toán"
-                });
-
-                // Reserve inventory khi tạo đơn để tránh oversell
-                await ReserveInventoryAsync(order, "System-PlaceOrder");
-
-                _context.Orders.Add(order);
-                await _context.SaveChangesAsync();
-
-                // B2B: Tạo OrderDelivery và OrderDeliveryItem
-                foreach (var allocation in dto.DeliveryAllocations)
-                {
-                    var orderDelivery = new OrderDelivery
+                    // Map OrderItemIndex to actual OrderItem
+                    if (itemAllocation.OrderItemIndex < 0 || itemAllocation.OrderItemIndex >= orderItems.Count)
                     {
-                        OrderId = order.Id.ToString(),
-                        AddressId = allocation.AddressId,
-                        Status = "PENDING",
+                        throw new InvalidOperationException($"Invalid OrderItemIndex: {itemAllocation.OrderItemIndex}");
+                    }
+
+                    var orderItem = orderItems[itemAllocation.OrderItemIndex];
+                    var orderItemId = orderItem.GiftBoxId?.ToString() ?? orderItem.CustomBoxId?.ToString() ?? "";
+
+                    var orderDeliveryItem = new OrderDeliveryItem
+                    {
+                        OrderDeliveryId = orderDelivery.Id,
+                        OrderItemId = orderItemId,
+                        Quantity = itemAllocation.Quantity,
                         CreatedAt = DateTime.UtcNow
                     };
-                    _context.OrderDeliveries.Add(orderDelivery);
-                    await _context.SaveChangesAsync(); // Để có OrderDelivery.Id
-
-                    // Tạo OrderDeliveryItem cho từng allocation
-                    foreach (var itemAllocation in allocation.ItemAllocations)
-                    {
-                        // Map OrderItemIndex to actual OrderItem
-                        if (itemAllocation.OrderItemIndex < 0 || itemAllocation.OrderItemIndex >= orderItems.Count)
-                        {
-                            throw new InvalidOperationException($"Invalid OrderItemIndex: {itemAllocation.OrderItemIndex}");
-                        }
-                        
-                        var orderItem = orderItems[itemAllocation.OrderItemIndex];
-                        var orderItemId = orderItem.GiftBoxId?.ToString() ?? orderItem.CustomBoxId?.ToString() ?? "";
-                        
-                        var orderDeliveryItem = new OrderDeliveryItem
-                        {
-                            OrderDeliveryId = orderDelivery.Id,
-                            OrderItemId = orderItemId,
-                            Quantity = itemAllocation.Quantity,
-                            CreatedAt = DateTime.UtcNow
-                        };
-                        _context.OrderDeliveryItems.Add(orderDeliveryItem);
-                    }
+                    _context.OrderDeliveryItems.Add(orderDeliveryItem);
                 }
-                await _context.SaveChangesAsync();
+            }
+            await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"B2B Order created: {order.OrderCode}");
-                return order;
-            }
-            catch
-            {
-                await RollbackSlotAsync(dto.DeliverySlotId);
-                throw;
-            }
+            _logger.LogInformation($"B2B Order created: {order.OrderCode}");
+            return order;
         }
 
         ///Mix & Match Rules Validation

@@ -84,9 +84,6 @@ namespace ShopHangTet.Models
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
 
-        [BsonElement("deliverySlotLimit")]
-        public int DeliverySlotLimit { get; set; } = 50;
-
         [BsonElement("emailTemplate")]
         public string EmailTemplate { get; set; } = string.Empty;
 

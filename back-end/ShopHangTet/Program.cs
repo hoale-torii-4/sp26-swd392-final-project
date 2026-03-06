@@ -99,16 +99,11 @@ builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
-//Đăng ký Repository Dependencies
-builder.Services.AddScoped<IDeliverySlotRepository, DeliverySlotRepository>();
-
 //Đăng ký Application Services
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHostedService<OrderExpirationBackgroundService>();
-// builder.Services.AddScoped<OrderService>();
-builder.Services.AddScoped<ICartService, CartService>();
 
 // Đăng ký AI Service
 var openRouterApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY");

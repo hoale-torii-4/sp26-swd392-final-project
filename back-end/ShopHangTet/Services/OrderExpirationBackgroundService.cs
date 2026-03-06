@@ -83,20 +83,6 @@ public class OrderExpirationBackgroundService : BackgroundService
             });
             order.UpdatedAt = DateTime.UtcNow;
 
-            if (order.DeliverySlotId.HasValue)
-            {
-                var slot = await context.DeliverySlots
-                    .FirstOrDefaultAsync(x => x.Id == order.DeliverySlotId.Value, cancellationToken);
-
-                if (slot != null && slot.CurrentOrderCount > 0)
-                {
-                    slot.CurrentOrderCount--;
-                    if (slot.CurrentOrderCount < slot.MaxOrdersPerSlot)
-                    {
-                        slot.IsLocked = false;
-                    }
-                }
-            }
         }
 
         await context.SaveChangesAsync(cancellationToken);

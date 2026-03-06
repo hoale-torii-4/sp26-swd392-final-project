@@ -353,8 +353,6 @@ namespace ShopHangTet.DTOs
         
         [Required]
         public DateTime DeliveryDate { get; set; }
-        
-        public string? DeliverySlotId { get; set; }
     }
 
     /// DTO cho đơn hàng B2B - nhiều địa chỉ giao hàng
@@ -388,8 +386,6 @@ namespace ShopHangTet.DTOs
 
         [Required]
         public DateTime DeliveryDate { get; set; }
-        
-        public string? DeliverySlotId { get; set; }
     }
 
     /// B2B Delivery Allocation - Phân bổ TỪNG SẢN PHẨM cho TỪNG ĐỊA CHỈ
