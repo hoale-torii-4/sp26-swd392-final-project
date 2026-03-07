@@ -17,11 +17,14 @@ namespace ShopHangTet.Services
         public async Task<List<Item>> GetItemsAsync(string? name = null)
         {
             var query = _context.Items.Where(x => x.IsActive);
-
             if (!string.IsNullOrWhiteSpace(name))
             {
-                var normalizedName = name.Trim();
-                query = query.Where(x => x.Name.Contains(normalizedName));
+                // Cắt khoảng trắng 2 đầu và đưa về chữ thường
+                var normalizedName = name.Trim().ToLower();
+
+                // Nếu thích cẩn thận hơn, bạn có thể thay thế dấu gạch ngang thành khoảng trắng để tìm kiếm thoáng hơn
+                // Nhưng tạm thời cứ dùng .ToLower().Contains(normalizedName) kết hợp với Prompt xịn là đủ gánh team rồi!
+                query = query.Where(x => x.Name.ToLower().Contains(normalizedName));
             }
 
             return await query.ToListAsync();
@@ -39,8 +42,12 @@ namespace ShopHangTet.Services
 
             if (!string.IsNullOrWhiteSpace(name))
             {
-                var normalizedName = name.Trim();
-                query = query.Where(x => x.Name.Contains(normalizedName));
+                // Cắt khoảng trắng 2 đầu và đưa về chữ thường
+                var normalizedName = name.Trim().ToLower();
+
+                // Nếu thích cẩn thận hơn, bạn có thể thay thế dấu gạch ngang thành khoảng trắng để tìm kiếm thoáng hơn
+                // Nhưng tạm thời cứ dùng .ToLower().Contains(normalizedName) kết hợp với Prompt xịn là đủ gánh team rồi!
+                query = query.Where(x => x.Name.ToLower().Contains(normalizedName));
             }
 
             var giftBoxes = await query.ToListAsync();
@@ -156,8 +163,12 @@ namespace ShopHangTet.Services
 
             if (!string.IsNullOrWhiteSpace(name))
             {
-                var normalizedName = name.Trim();
-                query = query.Where(x => x.Name.Contains(normalizedName));
+                // Cắt khoảng trắng 2 đầu và đưa về chữ thường
+                var normalizedName = name.Trim().ToLower();
+
+                // Nếu thích cẩn thận hơn, bạn có thể thay thế dấu gạch ngang thành khoảng trắng để tìm kiếm thoáng hơn
+                // Nhưng tạm thời cứ dùng .ToLower().Contains(normalizedName) kết hợp với Prompt xịn là đủ gánh team rồi!
+                query = query.Where(x => x.Name.ToLower().Contains(normalizedName));
             }
 
             var collections = await query

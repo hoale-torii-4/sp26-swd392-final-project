@@ -12,26 +12,27 @@ namespace ShopHangTet.Services
         {
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri("https://openrouter.ai/api/v1/")
+                // 1. Đổi BaseAddress sang cổng chuẩn OpenAI của Google!
+                BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/openai/")
             };
 
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", apiKey);
 
-            _httpClient.DefaultRequestHeaders.Add("HTTP-Referer", "http://localhost");
-            _httpClient.DefaultRequestHeaders.Add("X-Title", "ShopHangTet");
+            // Xóa mấy cái Header HTTP-Referer với X-Title đi vì Google không cần cái này
         }
 
         public async Task<string> AskAsync(string message)
         {
             var requestBody = new
             {
-                model = "qwen/qwen3-vl-235b-a22b-thinking",
+                // 2. Điền chính xác tên model xịn nhất mà bạn vừa tìm được
+                model = "gemini-2.5-flash",
                 messages = new[]
-                {
-                    new { role = "user", content = message }
-                },
-                max_tokens = 1000
+                    {
+            new { role = "user", content = message }
+        },
+                max_tokens = 2000
             };
 
             var content = new StringContent(
