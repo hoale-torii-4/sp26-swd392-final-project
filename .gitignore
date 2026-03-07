@@ -140,6 +140,9 @@ vite.config.ts.timestamp-*
 # ==========================================
 # ASP.NET Core / C# (Backend)
 # ==========================================
+# Ignore all build folders globally
+[Bb]in/
+[Oo]bj/
 bin/
 obj/
 out/

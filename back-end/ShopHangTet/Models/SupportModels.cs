@@ -84,9 +84,6 @@ namespace ShopHangTet.Models
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
 
-        [BsonElement("deliverySlotLimit")]
-        public int DeliverySlotLimit { get; set; } = 50;
-
         [BsonElement("emailTemplate")]
         public string EmailTemplate { get; set; } = string.Empty;
 
@@ -144,7 +141,7 @@ namespace ShopHangTet.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }
 
-    /// Inventory Log Model - CHỈ trigger khi Order -> PREPARING
+    /// Inventory Log Model - Ghi nhận RESERVE / DEDUCT / RELEASE
     public class InventoryLog
     {
         [BsonId]
@@ -156,11 +153,12 @@ namespace ShopHangTet.Models
 
         [BsonElement("itemId")]
         public string ItemId { get; set; } = string.Empty; // FK to Item
+
         [BsonElement("quantity")]
-        public int Quantity { get; set; } // Số lượng (âm cho DEDUCT)
+        public int Quantity { get; set; } // Số lượng (âm cho DEDUCT/RESERVE)
 
         [BsonElement("action")]
-        public string Action { get; set; } = "DEDUCT"; // CHỈ DEDUCT
+        public string Action { get; set; } = "RESERVE"; // RESERVE, DEDUCT, RELEASE, RESTOCK
 
         [BsonElement("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -180,7 +178,19 @@ namespace ShopHangTet.Models
         public string AddressId { get; set; } = string.Empty; // FK to Address
 
         [BsonElement("status")]
-        public string Status { get; set; } = "PENDING";
+        public string Status { get; set; } = "PENDING"; // PENDING, SHIPPING, DELIVERED, FAILED
+
+        [BsonElement("retryCount")]
+        public int RetryCount { get; set; } = 0; // Số lần giao lại
+
+        [BsonElement("maxRetries")]
+        public int MaxRetries { get; set; } = 3; // Số lần giao lại tối đa
+
+        [BsonElement("lastAttemptAt")]
+        public DateTime? LastAttemptAt { get; set; }
+
+        [BsonElement("failureReason")]
+        public string? FailureReason { get; set; }
 
         [BsonElement("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

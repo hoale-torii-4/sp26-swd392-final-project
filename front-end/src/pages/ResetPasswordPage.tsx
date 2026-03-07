@@ -1,9 +1,13 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useFormik } from "formik";
 import * as Yup from "yup";
+import { authService } from "../services/authService";
 
 const resetPasswordSchema = Yup.object({
+    otp: Yup.string()
+        .required("Vui lòng nhập mã OTP")
+        .matches(/^\d{6}$/, "Mã OTP gồm 6 chữ số"),
     newPassword: Yup.string()
         .required("Vui lòng nhập mật khẩu mới")
         .min(6, "Mật khẩu phải có ít nhất 6 ký tự"),
@@ -13,15 +17,47 @@ const resetPasswordSchema = Yup.object({
 });
 
 export default function ResetPasswordPage() {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const email = (location.state as { email?: string })?.email || "";
+
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [serverError, setServerError] = useState<string | null>(null);
+
+    // Redirect if no email provided
+    useEffect(() => {
+        if (!email) navigate("/forgot-password", { replace: true });
+    }, [email, navigate]);
 
     const formik = useFormik({
-        initialValues: { newPassword: "", confirmNewPassword: "" },
+        initialValues: { otp: "", newPassword: "", confirmNewPassword: "" },
         validationSchema: resetPasswordSchema,
-        onSubmit: (values) => {
-            console.log("Reset password:", values);
-            // TODO: call reset password API
+        onSubmit: async (values) => {
+            setServerError(null);
+            setIsLoading(true);
+            try {
+                const response = await authService.resetPassword({
+                    email,
+                    otp: values.otp,
+                    newPassword: values.newPassword,
+                });
+                console.log(response);
+                if (response.Success) {
+                    navigate("/login", {
+                        state: { message: "Đặt lại mật khẩu thành công! Vui lòng đăng nhập." },
+                    });
+                } else {
+                    setServerError(response.Message || "Đặt lại mật khẩu thất bại.");
+                }
+            } catch (error: unknown) {
+                const axiosErr = error as { response?: { data?: { Message?: string } }; message?: string };
+                const msg = axiosErr?.response?.data?.Message || axiosErr?.message || "Đặt lại mật khẩu thất bại. Vui lòng thử lại.";
+                setServerError(msg);
+            } finally {
+                setIsLoading(false);
+            }
         },
     });
 
@@ -102,11 +138,61 @@ export default function ResetPasswordPage() {
                     Vui lòng thiết lập mật khẩu mới cho tài khoản của bạn.
                 </p>
 
+                {/* Server Error */}
+                {serverError && (
+                    <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 text-left">
+                        {serverError}
+                    </div>
+                )}
+
                 {/* Form */}
                 <form
                     onSubmit={formik.handleSubmit}
                     className="space-y-5 text-left"
                 >
+                    {/* OTP Code */}
+                    <div>
+                        <label
+                            htmlFor="otp"
+                            className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5"
+                        >
+                            Mã OTP
+                        </label>
+                        <div className="relative">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
+                                <svg
+                                    className="w-4.5 h-4.5"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                >
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={1.5}
+                                        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+                                    />
+                                </svg>
+                            </span>
+                            <input
+                                id="otp"
+                                type="text"
+                                inputMode="numeric"
+                                maxLength={6}
+                                placeholder="Nhập mã 6 chữ số"
+                                {...formik.getFieldProps("otp")}
+                                className={`w-full rounded-lg border pl-11 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:ring-1 tracking-[0.3em] font-mono ${formik.touched.otp && formik.errors.otp
+                                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                                    : "border-gray-300 focus:border-red-500 focus:ring-red-500"
+                                    }`}
+                            />
+                        </div>
+                        {formik.touched.otp && formik.errors.otp && (
+                            <p className="mt-1 text-xs text-red-500">{formik.errors.otp}</p>
+                        )}
+                        <p className="mt-1 text-xs text-gray-400">Mã OTP đã được gửi đến email của bạn</p>
+                    </div>
+
                     {/* New Password */}
                     <div>
                         <label
@@ -137,8 +223,8 @@ export default function ResetPasswordPage() {
                                 placeholder="••••••••"
                                 {...formik.getFieldProps("newPassword")}
                                 className={`w-full rounded-lg border pl-11 pr-11 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:ring-1 ${formik.touched.newPassword && formik.errors.newPassword
-                                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                                        : "border-gray-300 focus:border-red-500 focus:ring-red-500"
+                                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                                    : "border-gray-300 focus:border-red-500 focus:ring-red-500"
                                     }`}
                             />
                             <button
@@ -193,8 +279,8 @@ export default function ResetPasswordPage() {
                                 placeholder="••••••••"
                                 {...formik.getFieldProps("confirmNewPassword")}
                                 className={`w-full rounded-lg border pl-11 pr-11 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:ring-1 ${formik.touched.confirmNewPassword && formik.errors.confirmNewPassword
-                                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                                        : "border-gray-300 focus:border-red-500 focus:ring-red-500"
+                                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                                    : "border-gray-300 focus:border-red-500 focus:ring-red-500"
                                     }`}
                             />
                             <button
@@ -222,9 +308,16 @@ export default function ResetPasswordPage() {
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        className="w-full rounded-lg bg-red-700 px-4 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer"
+                        disabled={isLoading}
+                        className="w-full rounded-lg bg-red-700 px-4 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        Cập nhật mật khẩu
+                        {isLoading && (
+                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        )}
+                        {isLoading ? "Đang cập nhật..." : "Cập nhật mật khẩu"}
                     </button>
                 </form>
 

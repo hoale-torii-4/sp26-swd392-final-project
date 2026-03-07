@@ -1,6 +1,9 @@
 using ShopHangTet.Models;
-using System.Net.Mail;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Mail;
+using System.Text;
+using System.Text.Json;
 
 namespace ShopHangTet.Services
 {
@@ -8,51 +11,76 @@ namespace ShopHangTet.Services
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<EmailService> _logger;
+        private readonly HttpClient _httpClient; // Thêm HttpClient cho Brevo
 
         public EmailService(IConfiguration configuration, ILogger<EmailService> logger)
         {
             _configuration = configuration;
             _logger = logger;
+            _httpClient = new HttpClient();
         }
 
+        // REPLACE SMTP LOGIC WITH BREVO API
         public async Task<bool> SendEmailAsync(string to, string subject, string body, bool isHtml = true)
         {
             try
             {
-                var smtpSettings = _configuration.GetSection("Smtp");
-                var host = smtpSettings["Host"] ?? "smtp.gmail.com";
-                var port = int.Parse(smtpSettings["Port"] ?? "587");
-                var username = smtpSettings["Username"] ?? "";
-                var password = smtpSettings["Password"] ?? "";
-                var from = smtpSettings["From"] ?? username;
+                // Brevo API credentials
+                var apiKey = Environment.GetEnvironmentVariable("Brevo__ApiKey") ?? _configuration["Brevo:ApiKey"];
+                var senderEmail = Environment.GetEnvironmentVariable("Brevo__SenderEmail") ?? _configuration["Brevo:SenderEmail"];
+                var senderName = Environment.GetEnvironmentVariable("Brevo__SenderName") ?? _configuration["Brevo:SenderName"] ?? "Shop Hàng Tết";
 
-                if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+                if (string.IsNullOrEmpty(apiKey) || string.IsNullOrEmpty(senderEmail))
                 {
-                    _logger.LogWarning("SMTP credentials not configured. Email not sent.");
-                    return true; // Return true để không block flow
+                    _logger.LogWarning("Brevo API credentials not configured. Email not sent.");
+                    return true; // Return true to avoid blocking order processing, but log the issue for later resolution
                 }
 
-                using var client = new SmtpClient(host, port)
+                var requestUri = "https://api.brevo.com/v3/smtp/email";
+
+                // Data payload for Brevo API
+                var payload = new
                 {
-                    Credentials = new NetworkCredential(username, password),
-                    EnableSsl = true
+                    sender = new { name = senderName, email = senderEmail },
+                    to = new[] { new { email = to } },
+                    subject = subject,
+                    htmlContent = isHtml ? body : null,
+                    textContent = !isHtml ? body : null
                 };
 
-                var message = new MailMessage(from!, to, subject, body)
-                {
-                    IsBodyHtml = isHtml
-                };
+                var jsonPayload = JsonSerializer.Serialize(payload);
+                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-                await client.SendMailAsync(message);
-                _logger.LogInformation($"Email sent successfully to {to}");
-                return true;
+                // Attach API key in headers
+                _httpClient.DefaultRequestHeaders.Clear();
+                _httpClient.DefaultRequestHeaders.Add("api-key", apiKey);
+                _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+                // HTTP Request
+                var response = await _httpClient.PostAsync(requestUri, content);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation($"Email sent successfully via Brevo API to {to}");
+                    return true;
+                }
+                else
+                {
+                    var errorMsg = await response.Content.ReadAsStringAsync();
+                    _logger.LogError($"Failed to send email via Brevo. Error: {errorMsg}");
+                    return false;
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Failed to send email to {to}");
+                _logger.LogError(ex, $"Exception occurred while sending email to {to}");
                 return false;
             }
         }
+
+        // =========================================================================================
+        // ORIGINAL LOGIC
+        // =========================================================================================
 
         public async Task<bool> SendOtpAsync(string email, string otpCode)
         {

@@ -42,9 +42,6 @@ namespace ShopHangTet.Data
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<SystemConfig> SystemConfigs { get; set; }
 
-    // Delivery Slots
-    public DbSet<DeliverySlot> DeliverySlots { get; set; }
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -73,7 +70,6 @@ namespace ShopHangTet.Data
         modelBuilder.Entity<ChatSession>();
         modelBuilder.Entity<ChatMessage>();
         modelBuilder.Entity<SystemConfig>();
-        modelBuilder.Entity<DeliverySlot>();
 
         // Owned collections for embedded items
         modelBuilder.Entity<GiftBox>().OwnsMany(x => x.Items);

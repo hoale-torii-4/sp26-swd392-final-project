@@ -9,22 +9,44 @@ export interface RegisterRequest {
     phone: string | null;
 }
 
-export interface RegisterResponse {
-    message: string;
-    userId: string;
-}
-
 export interface LoginRequest {
     email: string;
     password: string;
 }
 
-export interface LoginResponse {
-    token: string;
+// ──────────────────────────────────────────────
+// API Response types (actual back-end format)
+// ──────────────────────────────────────────────
+
+export interface User {
+    Id: string;
+    Email: string;
+    FullName: string;
+    Phone: string;
+    Role: number;
+    Status: number;
+    CreatedAt: string;
 }
 
+export interface LoginData {
+    Token: string;
+    User: User;
+    ExpiresAt: string;
+}
+
+export interface ApiResponse<T = unknown> {
+    Success: boolean;
+    Message: string;
+    Data: T;
+    Errors: string[];
+    Timestamp: string;
+}
+
+export type LoginResponse = ApiResponse<LoginData>;
+export type RegisterResponse = ApiResponse<{ userId: string }>;
+
 // ──────────────────────────────────────────────
-// Generic API response wrapper
+// Generic API error
 // ──────────────────────────────────────────────
 
 export interface ApiError {

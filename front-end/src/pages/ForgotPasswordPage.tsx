@@ -1,6 +1,9 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useFormik } from "formik";
 import * as Yup from "yup";
+import { authService } from "../services/authService";
+import type { ApiError } from "../types/auth";
 
 const forgotPasswordSchema = Yup.object({
     email: Yup.string()
@@ -9,12 +12,31 @@ const forgotPasswordSchema = Yup.object({
 });
 
 export default function ForgotPasswordPage() {
+    const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(false);
+    const [serverError, setServerError] = useState<string | null>(null);
+
     const formik = useFormik({
         initialValues: { email: "" },
         validationSchema: forgotPasswordSchema,
-        onSubmit: (values) => {
-            console.log("Forgot password:", values);
-            // TODO: call forgot password API
+        onSubmit: async (values) => {
+            setServerError(null);
+            setIsLoading(true);
+            try {
+                const response = await authService.forgotPassword(values.email);
+                if (response.Success) {
+                    navigate("/forgot-password/success", {
+                        state: { email: values.email },
+                    });
+                } else {
+                    setServerError(response.Message || "Không thể gửi email khôi phục.");
+                }
+            } catch (error) {
+                const apiError = error as ApiError;
+                setServerError(apiError.message || "Không thể gửi email khôi phục. Vui lòng thử lại.");
+            } finally {
+                setIsLoading(false);
+            }
         },
     });
     return (
@@ -93,6 +115,13 @@ export default function ForgotPasswordPage() {
                     bạn có thể đặt lại mật khẩu mới.
                 </p>
 
+                {/* Server Error */}
+                {serverError && (
+                    <div className="mb-5 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 text-left">
+                        {serverError}
+                    </div>
+                )}
+
                 {/* Form */}
                 <form onSubmit={formik.handleSubmit}>
                     {/* Email Input */}
@@ -125,8 +154,8 @@ export default function ForgotPasswordPage() {
                                 placeholder="ten.nguoidung@example.com"
                                 {...formik.getFieldProps("email")}
                                 className={`w-full rounded-lg border pl-11 pr-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none transition-colors focus:ring-1 ${formik.touched.email && formik.errors.email
-                                        ? "border-red-500 focus:border-red-500 focus:ring-red-500"
-                                        : "border-gray-300 focus:border-red-500 focus:ring-red-500"
+                                    ? "border-red-500 focus:border-red-500 focus:ring-red-500"
+                                    : "border-gray-300 focus:border-red-500 focus:ring-red-500"
                                     }`}
                             />
                         </div>
@@ -138,9 +167,16 @@ export default function ForgotPasswordPage() {
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        className="w-full rounded-lg bg-red-700 px-4 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer"
+                        disabled={isLoading}
+                        className="w-full rounded-lg bg-red-700 px-4 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
-                        Gửi liên kết khôi phục
+                        {isLoading && (
+                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                        )}
+                        {isLoading ? "Đang gửi..." : "Gửi liên kết khôi phục"}
                     </button>
                 </form>
 
