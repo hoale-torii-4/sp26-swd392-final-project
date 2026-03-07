@@ -27,7 +27,7 @@ namespace ShopHangTet.Services
             var requestBody = new
             {
                 // 2. Điền chính xác tên model xịn nhất mà bạn vừa tìm được
-                model = "gemini-2.5-flash",
+                model = "gemini-1.5-flash",
                 messages = new[]
                     {
             new { role = "user", content = message }
