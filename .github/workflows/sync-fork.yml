@@ -1,0 +1,21 @@
+name: Sync Fork
+
+# Tự động sync sang fork mỗi khi push vào main
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Cho phép chạy thủ công từ GitHub UI
+
+jobs:
+  sync-fork:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo chính
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push sang fork to deploy
+        run: |
+          git remote add fork https://x-access-token:${{ secrets.FORK_PAT }}@github.com/Yiunny/sp26-swd392-final-project.git
+          git push fork main --force

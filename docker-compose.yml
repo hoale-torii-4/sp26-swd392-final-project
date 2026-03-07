@@ -15,9 +15,10 @@ services:
       retries: 10
       start_period: 40s
 
-  # Backend API
+  # Backend API (.NET)
   backend:
     build: ./back-end/ShopHangTet
+    container_name: shop_hang_tet_backend
     ports:
       - "5000:8080"
     environment:
@@ -27,6 +28,38 @@ services:
       db:
         condition: service_healthy
     restart: on-failure
+
+  # Backend API (Node.js)
+  backend-nodejs:
+    build: ./back-end-nodejs
+    container_name: shop_hang_tet_backend_nodejs
+    ports:
+      - "5001:5001"
+    environment:
+      - MONGO_URI=mongodb://db:27017
+      - DB_NAME=ShopHangTetDb
+      - PORT=5001
+      - NODE_ENV=development
+      - JWT_SECRET_KEY=ShopHangTet_DefaultSecretKey_2024_MongoDB_VerySecureKey123456789
+      - JWT_ISSUER=ShopHangTet
+      - JWT_AUDIENCE=ShopHangTet.Client
+      - JWT_EXPIRES_IN=7d
+      - SMTP_HOST=smtp.gmail.com
+      - SMTP_PORT=587
+      - SMTP_USERNAME=shophangtet.dev@gmail.com
+      - SMTP_PASSWORD=hangtet88.com
+      - SMTP_FROM=Shop Hàng Tết <shophangtet.dev@gmail.com>
+      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5001/api/system/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   mongo_data:

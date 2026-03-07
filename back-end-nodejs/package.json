@@ -1,0 +1,30 @@
+{
+  "name": "shop-hang-tet-api",
+  "version": "1.0.0",
+  "description": "Shop Hàng Tết API - Node.js Express Backend",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node src/data/seedData.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "nodemailer": "^6.9.16",
+    "node-cache": "^5.1.2",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1",
+    "google-auth-library": "^9.14.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "keywords": ["shop-hang-tet", "express", "mongodb", "nodejs"],
+  "license": "ISC"
+}
