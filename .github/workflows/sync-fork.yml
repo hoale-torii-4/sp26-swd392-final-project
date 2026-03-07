@@ -10,7 +10,7 @@ jobs:
   sync-fork:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repo chính
+      - name: Checkout repo chính 
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
