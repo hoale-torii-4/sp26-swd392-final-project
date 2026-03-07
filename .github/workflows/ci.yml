@@ -89,7 +89,7 @@ jobs:
   sync-fork:
     runs-on: ubuntu-latest
     needs: [build-backend, build-frontend, build-backend-nodejs]
-    if: github.event_name == 'push'
+    if: github.repository == 'hoale-torii-4/sp26-swd392-final-project' && github.event_name == 'push'
     steps:
       - name: Checkout repo chính
         uses: actions/checkout@v4
