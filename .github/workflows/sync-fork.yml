@@ -17,5 +17,6 @@ jobs:
 
       - name: Push sang fork to deploy
         run: |
+          echo "${{ secrets.FORK_PAT }}"
           git remote add fork https://x-access-token:${{ secrets.FORK_PAT }}@github.com/Yiunny/sp26-swd392-final-project.git
           git push fork main --force
