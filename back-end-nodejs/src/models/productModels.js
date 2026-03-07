@@ -6,6 +6,9 @@ const collectionSchema = new mongoose.Schema(
   {
     name: { type: String, default: '' },
     description: { type: String, default: '' },
+    coverImage: { type: String, default: null },
+    pricingMultiplier: { type: Number, default: 1.35 },
+    packagingFee: { type: Number, default: 150000 },
     isActive: { type: Boolean, default: true },
     displayOrder: { type: Number, default: 0 },
   },
@@ -31,6 +34,7 @@ const giftBoxItemSchema = new mongoose.Schema(
   {
     itemId: { type: String, default: '' },
     quantity: { type: Number, default: 0 },
+    itemPriceSnapshot: { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -61,8 +65,10 @@ const itemSchema = new mongoose.Schema(
       enum: Object.values(ItemCategory),
     },
     price: { type: Number, default: 0 },
+    images: [{ type: String }],
     isAlcohol: { type: Boolean, default: false },
     stockQuantity: { type: Number, default: 0 },
+    reservedQuantity: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

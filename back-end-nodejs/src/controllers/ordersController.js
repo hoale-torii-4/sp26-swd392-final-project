@@ -1,6 +1,6 @@
 import { Router } from 'express';
+import { ApiResponse, validateCreateOrderB2CDto, validateCreateOrderB2BDto } from '../dtos/index.js';
 import { authenticate, authorize } from '../middlewares/index.js';
-import { ApiResponse } from '../dtos/index.js';
 
 /**
  * Orders Controller - Tương đương OrdersController.cs
@@ -9,171 +9,160 @@ import { ApiResponse } from '../dtos/index.js';
 export function createOrdersRouter(orderService, emailService) {
   const router = Router();
 
-  // ========== Tạo đơn hàng B2C (Guest hoặc Member) ==========
+  // ========== POST /api/orders/b2c ==========
   router.post('/b2c', async (req, res) => {
     try {
-      console.log(`Creating B2C order for email: ${req.body.CustomerEmail}`);
-
-      // Validate
-      const validation = await orderService.validateB2COrder(req.body);
-      if (!validation.IsValid) {
-        return res.status(400).json(
-          ApiResponse.error('Validation failed', validation.Errors)
-        );
+      const errors = validateCreateOrderB2CDto(req.body);
+      if (errors.length > 0) {
+        return res.status(400).json(ApiResponse.error('Validation failed', errors));
       }
 
-      // Create order
       const order = await orderService.placeB2COrder(req.body);
 
-      // Send confirmation email (non-blocking)
-      try {
-        await emailService.sendOrderConfirmation(
-          req.body.CustomerEmail,
-          order.orderCode,
-          order.totalAmount
-        );
-      } catch (ex) {
-        console.warn(`Email sending failed for order ${order.orderCode}:`, ex.message);
-      }
+      // Gửi email xác nhận (non-blocking)
+      emailService.sendOrderConfirmation(order.customerEmail, order).catch(() => { });
 
       return res.status(200).json(
-        ApiResponse.success(
-          {
-            orderId: order._id.toString(),
-            orderCode: order.orderCode,
-            orderType: order.orderType,
-            status: order.status,
-            totalAmount: order.totalAmount,
-            createdAt: order.createdAt,
-          },
-          'B2C Order created successfully'
-        )
+        ApiResponse.success({
+          OrderCode: order.orderCode,
+          TotalAmount: order.totalAmount,
+          Status: order.status,
+          Message: 'Đơn hàng B2C tạo thành công.',
+        })
       );
     } catch (error) {
-      console.error('Error creating B2C order:', error);
+      console.error('PlaceB2COrder error:', error);
       return res.status(400).json(ApiResponse.error(error.message));
     }
   });
 
-  // ========== Tạo đơn hàng B2B (Member - nhiều địa chỉ) ==========
+  // ========== POST /api/orders/b2b ==========
   router.post('/b2b', authenticate, async (req, res) => {
     try {
-      console.log(`Creating B2B order for user: ${req.body.UserId}`);
+      req.body.UserId = req.user.sub;
 
-      const validation = await orderService.validateB2BOrder(req.body);
-      if (!validation.IsValid) {
-        return res.status(400).json(
-          ApiResponse.error('B2B Validation failed', validation.Errors)
-        );
+      const errors = validateCreateOrderB2BDto(req.body);
+      if (errors.length > 0) {
+        return res.status(400).json(ApiResponse.error('Validation failed', errors));
       }
 
       const order = await orderService.placeB2BOrder(req.body);
 
-      try {
-        await emailService.sendOrderConfirmation(
-          req.body.CustomerEmail,
-          order.orderCode,
-          order.totalAmount
-        );
-      } catch (ex) {
-        console.warn(`Email sending failed for order ${order.orderCode}:`, ex.message);
-      }
+      // Gửi email xác nhận (non-blocking)
+      emailService.sendOrderConfirmation(order.customerEmail, order).catch(() => { });
 
       return res.status(200).json(
-        ApiResponse.success(
-          {
-            orderId: order._id.toString(),
-            orderCode: order.orderCode,
-            orderType: order.orderType,
-            status: order.status,
-            totalAmount: order.totalAmount,
-            deliveryAddressCount: req.body.DeliveryAllocations?.length || 0,
-            createdAt: order.createdAt,
-          },
-          'B2B Order created successfully'
-        )
+        ApiResponse.success({
+          OrderCode: order.orderCode,
+          TotalAmount: order.totalAmount,
+          Status: order.status,
+          Message: 'Đơn hàng B2B tạo thành công.',
+        })
       );
     } catch (error) {
-      console.error('Error creating B2B order:', error);
+      console.error('PlaceB2BOrder error:', error);
       return res.status(400).json(ApiResponse.error(error.message));
     }
   });
 
-  // ========== Track đơn hàng cho guest ==========
+  // ========== GET /api/orders/track ==========
   router.get('/track', async (req, res) => {
     try {
       const { orderCode, email } = req.query;
-      const tracking = await orderService.trackOrder(orderCode, email);
-      if (!tracking) {
-        return res.status(404).json({ message: 'Order not found' });
+      if (!orderCode || !email) {
+        return res.status(400).json(ApiResponse.error('orderCode and email are required'));
       }
-      return res.status(200).json(tracking);
+
+      const result = await orderService.trackOrder(orderCode, email);
+      if (!result) {
+        return res.status(404).json(ApiResponse.error('Không tìm thấy đơn hàng.'));
+      }
+
+      return res.status(200).json(ApiResponse.success(result));
     } catch (error) {
-      return res.status(400).json({ message: error.message });
+      console.error('TrackOrder error:', error);
+      return res.status(500).json(ApiResponse.error('Internal server error'));
     }
   });
 
-  // ========== Lấy danh sách đơn hàng (cho authenticated user) ==========
-  router.get('/my-orders', async (_req, res) => {
+  // ========== PUT /api/orders/:id/status (STAFF/ADMIN) ==========
+  router.put('/:id/status', authenticate, authorize('STAFF', 'ADMIN'), async (req, res) => {
     try {
-      // TODO: Implement GetOrdersByUserAsync
-      return res.status(200).json({ orders: [], message: 'Coming soon' });
-    } catch (error) {
-      return res.status(400).json({ message: error.message });
-    }
-  });
+      const { Status, Notes } = req.body;
+      const updatedBy = req.user.email || req.user.name || 'Staff';
 
-  // ========== Cập nhật trạng thái đơn hàng - CHỈ STAFF ==========
-  router.put('/:orderId/status', authenticate, authorize('STAFF'), async (req, res) => {
-    try {
-      const { orderId } = req.params;
-      const { Status, Note } = req.body;
+      const order = await orderService.updateStatus(req.params.id, Status, updatedBy, Notes);
 
-      // CHỈ STAFF được update status
-      const userRole = req.user?.role || 'MEMBER';
-      if (userRole !== 'STAFF') {
-        return res.status(403).json({
-          Success: false,
-          Message: 'Only STAFF can update order status. Admin cannot modify orders.',
-        });
-      }
-
-      const updatedBy = req.user?.name || 'Staff';
-      const order = await orderService.updateStatus(orderId, Status, updatedBy, Note);
+      // Gửi email thông báo (non-blocking)
+      emailService.sendOrderStatusUpdate(order.customerEmail, order).catch(() => { });
 
       return res.status(200).json(
-        ApiResponse.success(
-          {
-            id: order._id.toString(),
-            orderCode: order.orderCode,
-            status: order.status,
-            updatedAt: order.updatedAt,
-          },
-          `Order status updated to ${Status}`
-        )
+        ApiResponse.success({
+          OrderCode: order.orderCode,
+          Status: order.status,
+          Message: 'Cập nhật trạng thái đơn hàng thành công.',
+        })
       );
     } catch (error) {
+      console.error('UpdateStatus error:', error);
       return res.status(400).json(ApiResponse.error(error.message));
     }
   });
 
-  // ========== Validate Mix & Match Rules ==========
-  router.post('/validate-mixmatch/:customBoxId', async (req, res) => {
+  // ========== POST /api/orders/validate-mix-match ==========
+  router.post('/validate-mix-match', async (req, res) => {
     try {
-      const { customBoxId } = req.params;
+      const { customBoxId } = req.body;
+      if (!customBoxId) {
+        return res.status(400).json(ApiResponse.error('customBoxId is required'));
+      }
+
       const result = await orderService.validateMixMatchRules(customBoxId);
-
-      return res.status(200).json(
-        new ApiResponse(
-          result.IsValid,
-          result.IsValid ? 'Mix & Match validation passed' : 'Mix & Match validation failed',
-          result
-        )
-      );
+      return res.status(200).json(result);
     } catch (error) {
-      return res.status(400).json(ApiResponse.error(error.message));
+      console.error('ValidateMixMatch error:', error);
+      return res.status(500).json(ApiResponse.error('Internal server error'));
     }
   });
+
+  // ========== PUT /api/orders/deliveries/:deliveryId/status (STAFF) ==========
+  router.put(
+    '/deliveries/:deliveryId/status',
+    authenticate,
+    authorize('STAFF', 'ADMIN'),
+    async (req, res) => {
+      try {
+        const { Status, FailureReason } = req.body;
+        await orderService.updateDeliveryStatus(req.params.deliveryId, Status, FailureReason);
+
+        return res.status(200).json(
+          ApiResponse.success(null, 'Cập nhật trạng thái delivery thành công.')
+        );
+      } catch (error) {
+        console.error('UpdateDeliveryStatus error:', error);
+        return res.status(400).json(ApiResponse.error(error.message));
+      }
+    }
+  );
+
+  // ========== POST /api/orders/deliveries/:deliveryId/reship (STAFF) ==========
+  router.post(
+    '/deliveries/:deliveryId/reship',
+    authenticate,
+    authorize('STAFF', 'ADMIN'),
+    async (req, res) => {
+      try {
+        await orderService.reshipDelivery(req.params.deliveryId);
+
+        return res.status(200).json(
+          ApiResponse.success(null, 'Đã giao lại delivery thành công.')
+        );
+      } catch (error) {
+        console.error('ReshipDelivery error:', error);
+        return res.status(400).json(ApiResponse.error(error.message));
+      }
+    }
+  );
 
   return router;
 }

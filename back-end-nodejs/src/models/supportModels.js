@@ -95,7 +95,11 @@ const orderDeliverySchema = new mongoose.Schema(
   {
     orderId: { type: String, default: '' },
     addressId: { type: String, default: '' },
-    status: { type: String, default: 'PENDING' },
+    status: { type: String, default: 'PENDING' }, // PENDING, SHIPPING, DELIVERED, FAILED
+    retryCount: { type: Number, default: 0 },
+    maxRetries: { type: Number, default: 3 },
+    lastAttemptAt: { type: Date, default: null },
+    failureReason: { type: String, default: null },
   },
   { timestamps: true }
 );

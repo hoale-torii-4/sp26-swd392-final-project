@@ -44,6 +44,11 @@ export class OrderService {
       await this._applyInventoryOnPreparing(order, updatedBy);
     }
 
+    // Release reserved inventory when cancelling
+    if (status === OrderStatus.CANCELLED) {
+      await this.releaseInventoryReservation(order, updatedBy);
+    }
+
     order.status = status;
     order.statusHistory.push({
       status,
@@ -55,6 +60,95 @@ export class OrderService {
 
     await order.save();
     return order;
+  }
+
+  // ========== Get Order By Code ==========
+  async getOrderByCode(orderCode) {
+    return Order.findOne({ orderCode });
+  }
+
+  // ========== Confirm Payment (SePay Webhook) ==========
+  async confirmPayment(orderCode, amount) {
+    const order = await Order.findOne({ orderCode: orderCode.toUpperCase() });
+    if (!order) return false;
+
+    // Only confirm if order is in PAYMENT_CONFIRMING status
+    if (order.status !== OrderStatus.PAYMENT_CONFIRMING) return false;
+
+    // Check if amount matches
+    if (amount < order.totalAmount) return false;
+
+    // Reserve inventory
+    await this._reserveInventory(order);
+
+    // Update status to PREPARING
+    order.status = OrderStatus.PREPARING;
+    order.statusHistory.push({
+      status: OrderStatus.PREPARING,
+      timestamp: new Date(),
+      updatedBy: 'System-SePay',
+      notes: `Thanh toán xác nhận: ${amount.toLocaleString('vi-VN')} VNĐ`,
+    });
+    order.updatedAt = new Date();
+
+    await order.save();
+    return true;
+  }
+
+  // ========== Delivery Management ==========
+  async updateDeliveryStatus(deliveryId, status, failureReason = null) {
+    const delivery = await OrderDelivery.findById(deliveryId);
+    if (!delivery) throw new Error('Delivery not found');
+
+    delivery.status = status;
+    delivery.lastAttemptAt = new Date();
+
+    if (status === 'FAILED' && failureReason) {
+      delivery.failureReason = failureReason;
+    }
+
+    await delivery.save();
+
+    // Auto-aggregate order status from deliveries
+    await this._aggregateOrderStatusFromDeliveries(delivery.orderId);
+  }
+
+  async reshipDelivery(deliveryId) {
+    const delivery = await OrderDelivery.findById(deliveryId);
+    if (!delivery) throw new Error('Delivery not found');
+    if (delivery.status !== 'FAILED') throw new Error('Only failed deliveries can be reshipped');
+    if (delivery.retryCount >= delivery.maxRetries) throw new Error('Maximum retries reached');
+
+    delivery.status = 'SHIPPING';
+    delivery.retryCount += 1;
+    delivery.lastAttemptAt = new Date();
+    delivery.failureReason = null;
+    await delivery.save();
+
+    return true;
+  }
+
+  // ========== Release Inventory Reservation ==========
+  async releaseInventoryReservation(order, updatedBy = 'System') {
+    for (const orderItem of order.items) {
+      if (orderItem.snapshotItems && orderItem.snapshotItems.length > 0) {
+        for (const snapshot of orderItem.snapshotItems) {
+          const releaseQty = snapshot.quantity * orderItem.quantity;
+          if (releaseQty > 0) {
+            await Item.findByIdAndUpdate(snapshot.itemId, {
+              $inc: { reservedQuantity: -releaseQty },
+            });
+
+            await InventoryLog.create({
+              orderId: order._id.toString(),
+              itemId: snapshot.itemId,
+              quantity: releaseQty,
+              action: 'RELEASE',
+            });
+          }
+        }
+      }
+    }
   }
 
   // ========== Place B2C Order ==========
@@ -326,11 +420,14 @@ export class OrderService {
   }
 
   _isValidStatusTransition(current, next) {
-    return (
-      (current === OrderStatus.PAYMENT_CONFIRMING && next === OrderStatus.PREPARING) ||
-      (current === OrderStatus.PREPARING && next === OrderStatus.SHIPPING) ||
-      (current === OrderStatus.SHIPPING && next === OrderStatus.COMPLETED)
-    );
+    const validTransitions = {
+      [OrderStatus.PAYMENT_CONFIRMING]: [OrderStatus.PREPARING, OrderStatus.CANCELLED, OrderStatus.PAYMENT_EXPIRED_INTERNAL],
+      [OrderStatus.PREPARING]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED],
+      [OrderStatus.SHIPPING]: [OrderStatus.COMPLETED, OrderStatus.PARTIAL_DELIVERY, OrderStatus.DELIVERY_FAILED],
+      [OrderStatus.PARTIAL_DELIVERY]: [OrderStatus.COMPLETED, OrderStatus.SHIPPING],
+      [OrderStatus.DELIVERY_FAILED]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED],
+    };
+    return validTransitions[current]?.includes(next) || false;
   }
 
   async _tryReserveSlot(slotId) {
@@ -461,5 +558,61 @@ export class OrderService {
       quantity: -quantity, // Âm cho DEDUCT
       action: 'DEDUCT',
     });
+  }
+
+  async _reserveInventory(order) {
+    for (const orderItem of order.items) {
+      if (orderItem.snapshotItems && orderItem.snapshotItems.length > 0) {
+        for (const snapshot of orderItem.snapshotItems) {
+          const reserveQty = snapshot.quantity * orderItem.quantity;
+          if (reserveQty > 0) {
+            await Item.findByIdAndUpdate(snapshot.itemId, {
+              $inc: { reservedQuantity: reserveQty },
+            });
+
+            await InventoryLog.create({
+              orderId: order._id.toString(),
+              itemId: snapshot.itemId,
+              quantity: reserveQty,
+              action: 'RESERVE',
+            });
+          }
+        }
+      }
+    }
+  }
+
+  async _aggregateOrderStatusFromDeliveries(orderId) {
+    const deliveries = await OrderDelivery.find({ orderId });
+    if (deliveries.length === 0) return;
+
+    const allDelivered = deliveries.every((d) => d.status === 'DELIVERED');
+    const allFailed = deliveries.every((d) => d.status === 'FAILED');
+    const someDelivered = deliveries.some((d) => d.status === 'DELIVERED');
+    const someFailed = deliveries.some((d) => d.status === 'FAILED');
+
+    const order = await Order.findById(orderId);
+    if (!order) return;
+
+    let newStatus = null;
+    if (allDelivered) {
+      newStatus = OrderStatus.COMPLETED;
+    } else if (allFailed) {
+      newStatus = OrderStatus.DELIVERY_FAILED;
+    } else if (someDelivered && someFailed) {
+      newStatus = OrderStatus.PARTIAL_DELIVERY;
+    }
+
+    if (newStatus && order.status !== newStatus) {
+      order.status = newStatus;
+      order.statusHistory.push({
+        status: newStatus,
+        timestamp: new Date(),
+        updatedBy: 'System-DeliveryAggregation',
+        notes: `Auto-aggregated from delivery statuses`,
+      });
+      order.updatedAt = new Date();
+      await order.save();
+    }
   }
 }
