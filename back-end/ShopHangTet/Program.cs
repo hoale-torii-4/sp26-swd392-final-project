@@ -106,15 +106,15 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHostedService<OrderExpirationBackgroundService>();
 
 // Đăng ký AI Service
-var openRouterApiKey = Environment.GetEnvironmentVariable("OPENROUTER_API_KEY");
+var googleApiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
 
-if (string.IsNullOrWhiteSpace(openRouterApiKey))
+if (string.IsNullOrWhiteSpace(googleApiKey))
 {
-    throw new Exception("OPENROUTER_API_KEY not found. .env is not loading.");
+    throw new Exception("GOOGLE_API_KEY not found. .env is not loading.");
 }
 
 builder.Services.AddSingleton<AiService>(sp =>
-    new AiService(openRouterApiKey));
+    new AiService(googleApiKey)); // Đưa Key Google vào
 
 var app = builder.Build();
 
