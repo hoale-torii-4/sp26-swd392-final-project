@@ -67,8 +67,7 @@ namespace ShopHangTet.Services
                 {
                     Id = item.Id,
                     Type = item.Type,
-                    GiftBoxId = item.GiftBoxId,
-                    CustomBoxId = item.CustomBoxId,
+                    ProductId = item.GiftBoxId ?? item.CustomBoxId ?? string.Empty,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     Name = name
@@ -117,21 +116,37 @@ namespace ShopHangTet.Services
 
             decimal unitPrice = 0;
 
-            if (dto.Type == OrderItemType.READY_MADE && !string.IsNullOrEmpty(dto.GiftBoxId))
+#pragma warning disable CS0618
+            var targetId = dto.Id ?? dto.GiftBoxId ?? dto.CustomBoxId;
+#pragma warning restore CS0618
+            if (string.IsNullOrWhiteSpace(targetId))
+                return ApiResponse<CartDto>.ErrorResult("Item Id is required");
+
+            if (dto.Type == OrderItemType.READY_MADE)
             {
                 var giftBox = await _context.Set<GiftBox>()
-                    .FirstOrDefaultAsync(g => g.Id == dto.GiftBoxId);
+                    .FirstOrDefaultAsync(g => g.Id == targetId);
 
                 if (giftBox == null)
                     return ApiResponse<CartDto>.ErrorResult("Không tìm thấy hộp quà!");
 
                 unitPrice = giftBox.Price;
             }
+            else if (dto.Type == OrderItemType.MIX_MATCH)
+            {
+                var customBox = await _context.Set<CustomBox>()
+                    .FirstOrDefaultAsync(c => c.Id == targetId);
+
+                if (customBox == null)
+                    return ApiResponse<CartDto>.ErrorResult("Không tìm thấy custom box!");
+
+                unitPrice = customBox.TotalPrice;
+            }
 
             var existingItem = cart.Items.FirstOrDefault(i =>
                 i.Type == dto.Type &&
-                ((dto.Type == OrderItemType.READY_MADE && i.GiftBoxId == dto.GiftBoxId) ||
-                 (dto.Type == OrderItemType.MIX_MATCH && i.CustomBoxId == dto.CustomBoxId)));
+                ((dto.Type == OrderItemType.READY_MADE && i.GiftBoxId == targetId) ||
+                 (dto.Type == OrderItemType.MIX_MATCH && i.CustomBoxId == targetId)));
 
             if (existingItem != null)
             {
@@ -148,8 +163,8 @@ namespace ShopHangTet.Services
                     UserId = cart.UserId,
                     SessionId = cart.SessionId,
                     Type = dto.Type,
-                    GiftBoxId = dto.GiftBoxId,
-                    CustomBoxId = dto.CustomBoxId,
+                    GiftBoxId = dto.Type == OrderItemType.READY_MADE ? targetId : null,
+                    CustomBoxId = dto.Type == OrderItemType.MIX_MATCH ? targetId : null,
                     Quantity = dto.Quantity,
                     UnitPrice = unitPrice,
                     AddedAt = DateTime.UtcNow

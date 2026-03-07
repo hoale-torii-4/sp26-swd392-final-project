@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.Services;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
@@ -29,7 +29,6 @@ public class OrdersController : ControllerBase
         {
             _logger.LogInformation("Creating B2C order for email: {Email}", request.CustomerEmail);
 
-            // Validate order
             var validation = await _orderService.ValidateB2COrderAsync(request);
             if (!validation.IsValid)
             {
@@ -41,10 +40,8 @@ public class OrdersController : ControllerBase
                 });
             }
 
-            // Create order
             var order = await _orderService.PlaceB2COrderAsync(request);
 
-            // Send confirmation email
             try
             {
                 await _emailService.SendOrderConfirmationAsync(
@@ -58,17 +55,29 @@ public class OrdersController : ControllerBase
                 _logger.LogWarning(ex, "Email sending failed for order {OrderCode}", order.OrderCode);
             }
 
-            var response = new ApiResponse<object>
+            var response = new ApiResponse<CreateOrderResponseDto>
             {
                 Success = true,
                 Message = "B2C Order created successfully",
-                Data = new {
-                    orderId = order.Id.ToString(),
-                    orderCode = order.OrderCode,
-                    orderType = order.OrderType,
-                    status = order.Status,
-                    totalAmount = order.TotalAmount,
-                    createdAt = order.CreatedAt
+                Data = new CreateOrderResponseDto
+                {
+                    OrderId = order.Id.ToString(),
+                    OrderCode = order.OrderCode,
+                    OrderType = order.OrderType,
+                    Status = order.Status,
+                    SubTotal = order.SubTotal,
+                    ShippingFee = order.ShippingFee,
+                    TotalAmount = order.TotalAmount,
+                    CreatedAt = order.CreatedAt,
+                    Items = order.Items.Select(i => new OrderItemResponseDto
+                    {
+                        Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
+                        Type = i.Type,
+                        Name = i.ProductName,
+                        Quantity = i.Quantity,
+                        UnitPrice = i.UnitPrice,
+                        TotalPrice = i.TotalPrice
+                    }).ToList()
                 }
             };
 
@@ -87,14 +96,13 @@ public class OrdersController : ControllerBase
 
     /// Tạo đơn hàng B2B (Member - nhiều địa chỉ) - Compliant
     [HttpPost("b2b")]
-    [Authorize] // B2B BẮT BUỘC đăng nhập
+    [Authorize]
     public async Task<IActionResult> CreateB2BOrder([FromBody] CreateOrderB2BDto request)
     {
         try
         {
             _logger.LogInformation("Creating B2B order for user: {UserId}", request.UserId);
 
-            // Validate request
             var validation = await _orderService.ValidateB2BOrderAsync(request);
             if (!validation.IsValid)
             {
@@ -121,18 +129,29 @@ public class OrdersController : ControllerBase
                 _logger.LogWarning(ex, "Email sending failed for order {OrderCode}", order.OrderCode);
             }
 
-            var response = new ApiResponse<object>
+            var response = new ApiResponse<CreateOrderResponseDto>
             {
                 Success = true,
                 Message = "B2B Order created successfully",
-                Data = new {
-                    orderId = order.Id.ToString(),
-                    orderCode = order.OrderCode,
-                    orderType = order.OrderType,
-                    status = order.Status,
-                    totalAmount = order.TotalAmount,
-                    deliveryAddressCount = request.DeliveryAllocations.Count,
-                    createdAt = order.CreatedAt
+                Data = new CreateOrderResponseDto
+                {
+                    OrderId = order.Id.ToString(),
+                    OrderCode = order.OrderCode,
+                    OrderType = order.OrderType,
+                    Status = order.Status,
+                    SubTotal = order.SubTotal,
+                    ShippingFee = order.ShippingFee,
+                    TotalAmount = order.TotalAmount,
+                    CreatedAt = order.CreatedAt,
+                    Items = order.Items.Select(i => new OrderItemResponseDto
+                    {
+                        Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
+                        Type = i.Type,
+                        Name = i.ProductName,
+                        Quantity = i.Quantity,
+                        UnitPrice = i.UnitPrice,
+                        TotalPrice = i.TotalPrice
+                    }).ToList()
                 }
             };
 
@@ -149,7 +168,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    /// Track đơn hàng cho guest (không cần đăng nhập)
     [HttpGet("track")]
     public async Task<IActionResult> TrackOrder([FromQuery] string orderCode, [FromQuery] string email)
     {
@@ -169,15 +187,11 @@ public class OrdersController : ControllerBase
         }
     }
 
-    /// Lấy danh sách đơn hàng (cho authenticated user)
     [HttpGet("my-orders")]
-    // [Authorize] // Uncomment khi implement authentication
     public IActionResult GetMyOrders([FromQuery] int skip = 0, [FromQuery] int take = 20)
     {
         try
         {
-            // TODO: Implement GetOrdersByUserAsync in OrderService
-            // For now, return empty list
             return Ok(new { orders = new List<object>(), message = "Coming soon" });
         }
         catch (Exception ex)
@@ -186,14 +200,12 @@ public class OrdersController : ControllerBase
         }
     }
 
-    /// Cập nhật trạng thái đơn hàng - CHỈ STAFF
     [Authorize(Roles = "STAFF")]
     [HttpPut("{orderId}/status")]
     public async Task<IActionResult> UpdateOrderStatus(string orderId, [FromBody] UpdateOrderStatusDto request)
     {
         try
         {
-            //CHỈ STAFF được update status, Admin KHÔNG được
             var userRole = User.FindFirst("role")?.Value ?? "MEMBER";
             if (userRole != "STAFF")
             {
@@ -202,12 +214,13 @@ public class OrdersController : ControllerBase
 
             var updatedBy = User.FindFirst("name")?.Value ?? User.Identity?.Name ?? "Staff";
             var order = await _orderService.UpdateStatusAsync(orderId, request.Status, updatedBy, request.Note);
-            
+
             return Ok(new ApiResponse<object>
             {
                 Success = true,
                 Message = $"Order status updated to {request.Status}",
-                Data = new {
+                Data = new
+                {
                     id = order.Id.ToString(),
                     orderCode = order.OrderCode,
                     status = order.Status,
@@ -224,8 +237,7 @@ public class OrdersController : ControllerBase
             });
         }
     }
-    
-    /// Validate Mix & Match Rules - Public endpoint
+
     [HttpPost("validate-mixmatch/{customBoxId}")]
     public async Task<IActionResult> ValidateMixMatchRules(string customBoxId)
     {
@@ -249,9 +261,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // === DELIVERY MANAGEMENT ===
-
-    /// Cập nhật delivery status (STAFF) — tự aggregate order status
     [Authorize(Roles = "STAFF")]
     [HttpPut("deliveries/{deliveryId}/status")]
     public async Task<IActionResult> UpdateDeliveryStatus(string deliveryId, [FromBody] UpdateDeliveryStatusDto request)
@@ -275,7 +284,6 @@ public class OrdersController : ControllerBase
         }
     }
 
-    /// Reship delivery đã fail (STAFF)
     [Authorize(Roles = "STAFF")]
     [HttpPost("deliveries/{deliveryId}/reship")]
     public async Task<IActionResult> ReshipDelivery(string deliveryId)

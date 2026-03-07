@@ -2,6 +2,7 @@ using ShopHangTet.Models;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 
@@ -14,13 +15,16 @@ namespace ShopHangTet.Services
 
         private readonly ShopHangTetDbContext _context;
         private readonly ILogger<OrderService> _logger;
+        private readonly IMongoCollection<Item> _itemsCollection;
 
         public OrderService(
             ShopHangTetDbContext context,
-            ILogger<OrderService> logger)
+            ILogger<OrderService> logger,
+            IMongoDatabase mongoDatabase)
         {
             _context = context;
             _logger = logger;
+            _itemsCollection = mongoDatabase.GetCollection<Item>("Items");
         }
 
         /// Tra cứu đơn hàng (cho Guest)
@@ -119,6 +123,16 @@ namespace ShopHangTet.Services
 
             if (order.Status != OrderStatus.PAYMENT_CONFIRMING)
             {
+                // Idempotent webhook behavior: nếu đơn đã qua PAYMENT_CONFIRMING do webhook trước đó thì coi là thành công.
+                if (order.Status == OrderStatus.PREPARING
+                    || order.Status == OrderStatus.SHIPPING
+                    || order.Status == OrderStatus.COMPLETED)
+                {
+                    _logger.LogInformation("ConfirmPayment: Duplicate webhook ignored for {OrderCode}, current status {Status}",
+                        orderCode, order.Status);
+                    return true;
+                }
+
                 _logger.LogWarning("ConfirmPayment: Order {OrderCode} is not in PAYMENT_CONFIRMING status (current: {Status})",
                     orderCode, order.Status);
                 return false;
@@ -129,6 +143,17 @@ namespace ShopHangTet.Services
             {
                 _logger.LogWarning("ConfirmPayment: Order {OrderCode} exceeded payment window ({Minutes} minutes). CreatedAt={CreatedAt}",
                     orderCode, PaymentConfirmationWindow.TotalMinutes, order.CreatedAt);
+
+                order.Status = OrderStatus.PAYMENT_EXPIRED_INTERNAL;
+                order.StatusHistory.Add(new OrderStatusHistory
+                {
+                    Status = OrderStatus.PAYMENT_EXPIRED_INTERNAL,
+                    Timestamp = DateTime.UtcNow,
+                    UpdatedBy = "SePay-Webhook",
+                    Notes = $"Hết thời gian xác nhận thanh toán ({PaymentConfirmationWindow.TotalMinutes} phút)"
+                });
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
                 return false;
             }
 
@@ -437,16 +462,35 @@ namespace ShopHangTet.Services
         {
             if (quantity <= 0) return;
 
-            var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
-            if (item == null) return;
+            // Atomic reserve: chỉ tăng ReservedQuantity nếu AvailableQuantity đủ
+            if (!ObjectId.TryParse(itemId, out var objectId))
+                throw new InvalidOperationException("Invalid item id format");
 
-            if (item.AvailableQuantity < quantity)
+            var filter = new BsonDocument
             {
+                { "_id", objectId },
+                {
+                    "$expr",
+                    new BsonDocument("$gte", new BsonArray
+                    {
+                        new BsonDocument("$subtract", new BsonArray { "$stockQuantity", "$reservedQuantity" }),
+                        quantity
+                    })
+                }
+            };
+
+            var update = Builders<Item>.Update.Inc(x => x.ReservedQuantity, quantity);
+            var result = await _itemsCollection.UpdateOneAsync(filter, update);
+
+            if (result.ModifiedCount == 0)
+            {
+                var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
+                if (item == null)
+                    throw new InvalidOperationException("Item not found");
+
                 throw new InvalidOperationException(
                     $"Không đủ tồn kho cho sản phẩm '{item.Name}'. Cần: {quantity}, Có sẵn: {item.AvailableQuantity}");
             }
-
-            item.ReservedQuantity += quantity;
 
             _context.InventoryLogs.Add(new InventoryLog
             {
@@ -463,11 +507,21 @@ namespace ShopHangTet.Services
         {
             if (quantity <= 0) return;
 
-            var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
-            if (item == null) return;
+            // Atomic deduct: chỉ trừ khi đủ reserved và stock
+            var filter = Builders<Item>.Filter.And(
+                Builders<Item>.Filter.Eq(x => x.Id, itemId),
+                Builders<Item>.Filter.Gte(x => x.ReservedQuantity, quantity),
+                Builders<Item>.Filter.Gte(x => x.StockQuantity, quantity));
 
-            item.StockQuantity -= quantity;
-            item.ReservedQuantity = Math.Max(0, item.ReservedQuantity - quantity);
+            var update = Builders<Item>.Update
+                .Inc(x => x.StockQuantity, -quantity)
+                .Inc(x => x.ReservedQuantity, -quantity);
+
+            var result = await _itemsCollection.UpdateOneAsync(filter, update);
+            if (result.ModifiedCount == 0)
+            {
+                throw new InvalidOperationException($"Không thể trừ kho atomically cho item '{itemId}'");
+            }
 
             _context.InventoryLogs.Add(new InventoryLog
             {
@@ -484,10 +538,13 @@ namespace ShopHangTet.Services
         {
             if (quantity <= 0) return;
 
-            var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
-            if (item == null) return;
+            // Atomic release: không cho ReservedQuantity âm
+            var filter = Builders<Item>.Filter.And(
+                Builders<Item>.Filter.Eq(x => x.Id, itemId),
+                Builders<Item>.Filter.Gte(x => x.ReservedQuantity, quantity));
 
-            item.ReservedQuantity = Math.Max(0, item.ReservedQuantity - quantity);
+            var update = Builders<Item>.Update.Inc(x => x.ReservedQuantity, -quantity);
+            await _itemsCollection.UpdateOneAsync(filter, update);
 
             _context.InventoryLogs.Add(new InventoryLog
             {
@@ -504,10 +561,10 @@ namespace ShopHangTet.Services
         {
             if (quantity <= 0) return;
 
-            var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
-            if (item == null) return;
-
-            item.StockQuantity += quantity;
+            // Atomic restock
+            var filter = Builders<Item>.Filter.Eq(x => x.Id, itemId);
+            var update = Builders<Item>.Update.Inc(x => x.StockQuantity, quantity);
+            await _itemsCollection.UpdateOneAsync(filter, update);
 
             _context.InventoryLogs.Add(new InventoryLog
             {
@@ -833,12 +890,27 @@ namespace ShopHangTet.Services
             if (dto.Items.Count == 0)
                 result.Errors.Add("At least one item is required");
 
-            // Validate Mix & Match items
-            foreach (var item in dto.Items.Where(x => x.Type == OrderItemType.MIX_MATCH))
+            if (dto.DeliveryDate.Date < DateTime.UtcNow.Date)
+                result.Errors.Add("Delivery date cannot be in the past");
+
+            // Validate items
+            foreach (var item in dto.Items)
             {
-                if (!string.IsNullOrEmpty(item.CustomBoxId))
+                if (item.Quantity <= 0)
+                    result.Errors.Add("Quantity must be greater than 0");
+
+#pragma warning disable CS0618
+                var targetId = item.Id ?? item.GiftBoxId ?? item.CustomBoxId;
+#pragma warning restore CS0618
+                if (string.IsNullOrWhiteSpace(targetId))
                 {
-                    var validation = await ValidateMixMatchRulesAsync(item.CustomBoxId);
+                    result.Errors.Add("Item Id is required");
+                    continue;
+                }
+
+                if (item.Type == OrderItemType.MIX_MATCH)
+                {
+                    var validation = await ValidateMixMatchRulesAsync(targetId);
                     if (!validation.IsValid)
                     {
                         result.Errors.AddRange(validation.Errors);
@@ -860,12 +932,27 @@ namespace ShopHangTet.Services
             if (dto.DeliveryAllocations.Count == 0)
                 result.Errors.Add("At least one delivery address is required for B2B");
 
-            // Validate Mix & Match items
-            foreach (var item in dto.Items.Where(x => x.Type == OrderItemType.MIX_MATCH))
+            if (dto.DeliveryDate.Date < DateTime.UtcNow.Date)
+                result.Errors.Add("Delivery date cannot be in the past");
+
+            // Validate items
+            foreach (var item in dto.Items)
             {
-                if (!string.IsNullOrEmpty(item.CustomBoxId))
+                if (item.Quantity <= 0)
+                    result.Errors.Add("Quantity must be greater than 0");
+
+#pragma warning disable CS0618
+                var targetId = item.Id ?? item.GiftBoxId ?? item.CustomBoxId;
+#pragma warning restore CS0618
+                if (string.IsNullOrWhiteSpace(targetId))
                 {
-                    var validation = await ValidateMixMatchRulesAsync(item.CustomBoxId);
+                    result.Errors.Add("Item Id is required");
+                    continue;
+                }
+
+                if (item.Type == OrderItemType.MIX_MATCH)
+                {
+                    var validation = await ValidateMixMatchRulesAsync(targetId);
                     if (!validation.IsValid)
                     {
                         result.Errors.AddRange(validation.Errors);
@@ -884,10 +971,16 @@ namespace ShopHangTet.Services
 
             foreach (var dto in items)
             {
+#pragma warning disable CS0618
+                var targetId = dto.Id ?? dto.GiftBoxId ?? dto.CustomBoxId;
+#pragma warning restore CS0618
+                if (string.IsNullOrWhiteSpace(targetId))
+                    throw new InvalidOperationException("Item Id is required");
+
                 if (dto.Type == OrderItemType.READY_MADE)
                 {
                     // Handle GiftBox
-                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == dto.GiftBoxId);
+                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == targetId);
                     if (giftBox == null)
                         throw new InvalidOperationException("GiftBox not found");
 
@@ -895,7 +988,7 @@ namespace ShopHangTet.Services
                     {
                         Type = OrderItemType.READY_MADE,
                         ProductName = giftBox.Name,
-                        GiftBoxId = ObjectId.Parse(dto.GiftBoxId ?? ""),
+                        GiftBoxId = ObjectId.Parse(targetId),
                         Quantity = dto.Quantity,
                         UnitPrice = giftBox.Price,
                         TotalPrice = giftBox.Price * dto.Quantity,
@@ -905,12 +998,12 @@ namespace ShopHangTet.Services
                 else if (dto.Type == OrderItemType.MIX_MATCH)
                 {
                     // Handle CustomBox với validation
-                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == dto.CustomBoxId);
+                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == targetId);
                     if (customBox == null)
                         throw new InvalidOperationException("CustomBox not found");
 
                     //Validate Mix & Match rules
-                    var validation = await ValidateMixMatchRulesAsync(dto.CustomBoxId ?? "");
+                    var validation = await ValidateMixMatchRulesAsync(targetId);
                     if (!validation.IsValid)
                     {
                         throw new InvalidOperationException($"Mix & Match validation failed: {string.Join(", ", validation.Errors)}");
@@ -920,7 +1013,7 @@ namespace ShopHangTet.Services
                     {
                         Type = OrderItemType.MIX_MATCH,
                         ProductName = "Custom Mix & Match Box",
-                        CustomBoxId = ObjectId.Parse(dto.CustomBoxId ?? ""),
+                        CustomBoxId = ObjectId.Parse(targetId),
                         Quantity = dto.Quantity,
                         UnitPrice = customBox.TotalPrice,
                         TotalPrice = customBox.TotalPrice * dto.Quantity,

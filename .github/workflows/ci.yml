@@ -89,7 +89,7 @@ jobs:
   sync-fork:
     runs-on: ubuntu-latest
     needs: [build-backend, build-frontend, build-backend-nodejs]
-    if: github.event_name == 'push'
+    if: github.repository == 'hoale-torii-4/sp26-swd392-final-project' && github.event_name == 'push'
     steps:
       - name: Checkout repo chính
         uses: actions/checkout@v4
@@ -102,4 +102,11 @@ jobs:
           FORK_PAT: ${{ secrets.FORK_PAT }}
         run: |
           git remote add fork https://x-access-token:${FORK_PAT}@github.com/Yiunny/sp26-swd392-final-project.git
-          git push fork main --force
+          LOCAL_HEAD=$(git rev-parse HEAD)
+          FORK_HEAD=$(git ls-remote fork refs/heads/main | awk '{print $1}')
+          if [ "$LOCAL_HEAD" = "$FORK_HEAD" ]; then
+            echo "✅ Fork branch is already up to date with commit $LOCAL_HEAD. Skipping push."
+          else
+            echo "🔄 Pushing commit $LOCAL_HEAD to fork..."
+            git push fork main --force
+          fi

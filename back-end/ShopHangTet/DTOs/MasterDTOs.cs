@@ -305,16 +305,19 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public OrderItemType Type { get; set; }
-        
+
+        // Unified ID: Type=READY_MADE -> GiftBoxId, Type=MIX_MATCH -> CustomBoxId
+        public string? Id { get; set; }
+
+        // Backward-compat legacy fields for old clients
+        [Obsolete("Use Id instead")]
         public string? GiftBoxId { get; set; }
+        [Obsolete("Use Id instead")]
         public string? CustomBoxId { get; set; }
         
         [Required]
         [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
-        
-        public decimal Price { get; set; }
-        public string? Name { get; set; }
     }
 
     /// DTO cho đơn hàng B2C - 1 địa chỉ giao hàng
@@ -493,11 +496,23 @@ namespace ShopHangTet.DTOs
     {
         public string Id { get; set; } = string.Empty;
         public OrderItemType Type { get; set; }
-        public string? GiftBoxId { get; set; }
-        public string? CustomBoxId { get; set; }
+        public string Name { get; set; } = string.Empty;
         public int Quantity { get; set; }
-        public decimal Price { get; set; }
-        public string? Name { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal TotalPrice { get; set; }
+    }
+
+    public class CreateOrderResponseDto
+    {
+        public string OrderId { get; set; } = string.Empty;
+        public string OrderCode { get; set; } = string.Empty;
+        public OrderType OrderType { get; set; }
+        public OrderStatus Status { get; set; }
+        public decimal SubTotal { get; set; }
+        public decimal ShippingFee { get; set; }
+        public decimal TotalAmount { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public List<OrderItemResponseDto> Items { get; set; } = new();
     }
 
     public class DeliveryAddressResponseDto
@@ -534,8 +549,7 @@ namespace ShopHangTet.DTOs
     {
         public string Id { get; set; } = string.Empty;
         public OrderItemType Type { get; set; }
-        public string? GiftBoxId { get; set; }
-        public string? CustomBoxId { get; set; }
+        public string ProductId { get; set; } = string.Empty;
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public string? Name { get; set; }
@@ -545,8 +559,12 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public OrderItemType Type { get; set; }
-        
+
+        public string? Id { get; set; }
+
+        [Obsolete("Use Id instead")]
         public string? GiftBoxId { get; set; }
+        [Obsolete("Use Id instead")]
         public string? CustomBoxId { get; set; }
         
         [Required]
