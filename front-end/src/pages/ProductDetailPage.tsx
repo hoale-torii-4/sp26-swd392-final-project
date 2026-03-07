@@ -11,15 +11,6 @@ function formatPrice(v: number) {
     return v.toLocaleString("vi-VN") + "₫";
 }
 
-function getTagColor(type: string): string {
-    switch (type.toUpperCase()) {
-        case "CATEGORY": return "bg-teal-700";
-        case "OCCASION": return "bg-amber-600";
-        case "PRICE_RANGE": return "bg-blue-600";
-        default: return "bg-gray-600";
-    }
-}
-
 /* ═══════════════════ PAGE ═══════════════════ */
 
 export default function ProductDetailPage() {
@@ -172,7 +163,7 @@ export default function ProductDetailPage() {
                         {/* Collection tag */}
                         {product.Collection && (
                             <p className="text-xs font-semibold text-[#8B1A1A] uppercase tracking-wider mb-2">
-                                {product.Collection.Name}
+                                {product.Collection}
                             </p>
                         )}
 
@@ -184,12 +175,12 @@ export default function ProductDetailPage() {
                         {/* Tags */}
                         {product.Tags.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-5">
-                                {product.Tags.map((tag) => (
+                                {product.Tags.map((tag, idx) => (
                                     <span
-                                        key={tag.Id}
-                                        className={`px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-white rounded-md ${getTagColor(tag.Type)}`}
+                                        key={idx}
+                                        className="px-2.5 py-1 text-[10px] font-bold tracking-wider uppercase text-white rounded-md bg-amber-600"
                                     >
-                                        {tag.Name}
+                                        {tag}
                                     </span>
                                 ))}
                             </div>
@@ -308,7 +299,7 @@ export default function ProductDetailPage() {
                             <InfoRow label="Tên sản phẩm" value={product.Name} />
                             <InfoRow label="Giá niêm yết" value={formatPrice(product.Price)} />
                             {product.Collection && (
-                                <InfoRow label="Bộ sưu tập" value={product.Collection.Name} />
+                                <InfoRow label="Bộ sưu tập" value={product.Collection} />
                             )}
                             <InfoRow label="Số lượng sản phẩm" value={`${product.Items.length} món`} />
                             <InfoRow label="Tình trạng" value={product.IsActive ? "Còn hàng" : "Hết hàng"} />
@@ -328,8 +319,8 @@ export default function ProductDetailPage() {
                                 <div key={idx} className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
                                     {/* Item image */}
                                     <div className="w-12 h-12 rounded-lg overflow-hidden bg-white shrink-0 border border-gray-200">
-                                        {item.Images.length > 0 ? (
-                                            <img src={item.Images[0]} alt={item.Name} className="w-full h-full object-cover" />
+                                        {item.Image ? (
+                                            <img src={item.Image} alt={item.Name} className="w-full h-full object-cover" />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-gray-300">
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -341,7 +332,7 @@ export default function ProductDetailPage() {
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-gray-900 truncate">{item.Name}</p>
                                         <p className="text-xs text-gray-500">
-                                            SL: {item.Quantity} &middot; {formatPrice(item.PriceSnapshot)}
+                                            SL: {item.Quantity} &middot; {formatPrice(item.Price)}
                                         </p>
                                     </div>
                                 </div>

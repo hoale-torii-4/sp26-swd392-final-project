@@ -1,25 +1,13 @@
 import apiClient from "./apiClient";
 
-// ── Types matching backend DTOs ──
-
-export interface CollectionSummaryDto {
-    Id: string;
-    Name: string;
-    CoverImage: string | null;
-}
-
-export interface TagSummaryDto {
-    Id: string;
-    Name: string;
-    Type: string;
-}
+// ── Types matching backend API response ──
 
 export interface GiftBoxDetailItemDto {
-    ItemId: string;
+    Id: string;
     Name: string;
+    Price: number;
+    Image: string | null;
     Quantity: number;
-    PriceSnapshot: number;
-    Images: string[];
 }
 
 export interface GiftBoxDetailDto {
@@ -28,8 +16,9 @@ export interface GiftBoxDetailDto {
     Description: string;
     Price: number;
     Images: string[];
-    Collection: CollectionSummaryDto | null;
-    Tags: TagSummaryDto[];
+    Image: string | null;
+    Collection: string | null;
+    Tags: string[];
     Items: GiftBoxDetailItemDto[];
     IsActive: boolean;
     CreatedAt: string;
@@ -53,9 +42,10 @@ export const productService = {
     /**
      * GET /api/Products/gift-boxes
      */
-    getGiftBoxes: async (): Promise<GiftBoxListDto[]> => {
+    getGiftBoxes: async (name?: string): Promise<GiftBoxListDto[]> => {
         const response = await apiClient.get<GiftBoxListDto[]>(
             `${PRODUCTS_ENDPOINT}/gift-boxes`,
+            { params: name ? { name } : undefined },
         );
         return response.data;
     },
@@ -73,9 +63,10 @@ export const productService = {
     /**
      * GET /api/Products/collections
      */
-    getCollections: async () => {
+    getCollections: async (name?: string) => {
         const response = await apiClient.get(
             `${PRODUCTS_ENDPOINT}/collections`,
+            { params: name ? { name } : undefined },
         );
         return response.data;
     },
