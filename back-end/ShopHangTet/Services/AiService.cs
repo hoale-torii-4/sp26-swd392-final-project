@@ -12,8 +12,7 @@ namespace ShopHangTet.Services
         {
             _httpClient = new HttpClient
             {
-                // 1. Đổi BaseAddress sang cổng chuẩn OpenAI của Google!
-                BaseAddress = new Uri("https://generativelanguage.googleapis.com/v1beta/openai/")
+                BaseAddress = new Uri("https://api.groq.com/openai/v1/")
             };
 
             _httpClient.DefaultRequestHeaders.Authorization =
@@ -27,7 +26,7 @@ namespace ShopHangTet.Services
             var requestBody = new
             {
                 // 2. Điền chính xác tên model xịn nhất mà bạn vừa tìm được
-                model = "gemini-1.5-flash",
+                model = "llama-3.3-70b-versatile",
                 messages = new[]
                     {
             new { role = "user", content = message }

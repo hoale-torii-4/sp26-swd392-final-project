@@ -106,11 +106,11 @@ builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHostedService<OrderExpirationBackgroundService>();
 
 // Đăng ký AI Service
-var googleApiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
+var googleApiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
 
 if (string.IsNullOrWhiteSpace(googleApiKey))
 {
-    throw new Exception("GOOGLE_API_KEY not found. .env is not loading.");
+    throw new Exception("GROQ_API_KEY not found. .env is not loading.");
 }
 
 builder.Services.AddSingleton<AiService>(sp =>
