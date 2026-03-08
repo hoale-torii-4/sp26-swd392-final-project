@@ -25,6 +25,9 @@ var mongoDatabaseName = Environment.GetEnvironmentVariable("MONGODB_DATABASE")
     ?? builder.Configuration["Mongo:DatabaseName"]
     ?? "ShopHangTetDb";
 
+Console.WriteLine($"----> Using Mongo connection string: {mongoConnectionString}");
+Console.WriteLine($"----> Using Mongo database name: {mongoDatabaseName}");
+
 //Thêm Controllers
 builder.Services.AddControllers()
     .AddJsonOptions(options => {
@@ -104,6 +107,25 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<ICartService, CartService>();
 builder.Services.AddHostedService<OrderExpirationBackgroundService>();
+
+// Collection admin service
+builder.Services.AddScoped<ICollectionService, CollectionService>();
+builder.Services.AddScoped<IGiftBoxService, GiftBoxService>();
+builder.Services.AddScoped<IInventoryService, InventoryService>();
+// Internal user management
+builder.Services.AddScoped<InternalUserService>();
+// Mix & Match admin service
+builder.Services.AddScoped<IMixMatchService, MixMatchService>();
+// Review moderation service
+builder.Services.AddScoped<IReviewService, ReviewService>();
+
+// Mix & Match customer-facing service
+builder.Services.AddScoped<IMixMatchCustomerService, MixMatchCustomerService>();
+
+// Reports
+builder.Services.AddScoped<IReportService, ReportService>();
+// Dashboard
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Đăng ký AI Service
 var googleApiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");

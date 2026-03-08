@@ -160,6 +160,31 @@ namespace ShopHangTet.Models
         [BsonElement("action")]
         public string Action { get; set; } = "RESERVE"; // RESERVE, DEDUCT, RELEASE, RESTOCK
 
+        // Additional audit fields for admin adjustments and frontend-friendly logs
+        [BsonElement("itemName")]
+        public string? ItemName { get; set; }
+
+        [BsonElement("sku")]
+        public string? Sku { get; set; }
+
+        [BsonElement("changeType")]
+        public string? ChangeType { get; set; }
+
+        [BsonElement("quantityChange")]
+        public int? QuantityChange { get; set; }
+
+        [BsonElement("previousStock")]
+        public int? PreviousStock { get; set; }
+
+        [BsonElement("newStock")]
+        public int? NewStock { get; set; }
+
+        [BsonElement("source")]
+        public string? Source { get; set; }
+
+        [BsonElement("reason")]
+        public string? Reason { get; set; }
+
         [BsonElement("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     }

@@ -19,6 +19,7 @@
   <PackageReference Include="MongoDB.Bson" Version="3.6.0" />
   <PackageReference Include="MongoDB.Driver" Version="3.6.0" />
   <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+  <PackageReference Include="ClosedXML" Version="0.104.0" />
   <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.4.0" />
   <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.21.0" />
   <PackageReference Include="Scalar.AspNetCore" Version="2.12.11" />

@@ -172,6 +172,52 @@ namespace ShopHangTet.DTOs
         public DateTime CreatedAt { get; set; }
     }
 
+    // Admin-facing Collection DTOs
+    public class CollectionResponseDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public int DisplayOrder { get; set; }
+        public bool IsActive { get; set; }
+        public string StatusLabel { get; set; } = string.Empty; // "Published" | "Unpublished"
+        public int GiftBoxCount { get; set; }
+        public string? Thumbnail { get; set; }
+    }
+
+    public class CollectionCreateDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public int DisplayOrder { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+
+    public class CollectionUpdateDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public int DisplayOrder { get; set; }
+
+        public bool IsActive { get; set; }
+    }
+
+    public class CollectionReorderDTO
+    {
+        [Required]
+        public string Id { get; set; } = string.Empty;
+
+        [Required]
+        public int DisplayOrder { get; set; }
+    }
+
     // ========== GIFT BOX DTOs ==========
     public class GiftBoxDto
     {
@@ -241,6 +287,41 @@ namespace ShopHangTet.DTOs
         public bool HideInvoice { get; set; }
     }
 
+    // Customer-facing DTOs for Mix & Match custom box
+    public class CreateCustomBoxItemDTO
+    {
+        [Required]
+        public string ItemId { get; set; } = string.Empty;
+
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int Quantity { get; set; }
+    }
+
+    public class CreateCustomBoxDTO
+    {
+        [Required]
+        [MinLength(1)]
+        public List<CreateCustomBoxItemDTO> Items { get; set; } = new();
+    }
+
+    public class CustomBoxItemResponseDTO
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+        public decimal Subtotal { get; set; }
+    }
+
+    public class CustomBoxResponseDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public int TotalItems { get; set; }
+        public decimal TotalPrice { get; set; }
+        public List<CustomBoxItemResponseDTO> Items { get; set; } = new();
+    }
+
     /// Rule cho Mix & Match:
     /// - Tổng 4-6 món
     /// - Ít nhất 1 đồ uống (Trà hoặc Rượu)
@@ -256,6 +337,133 @@ namespace ShopHangTet.DTOs
         public int MaxSavoryItems { get; set; } = 2;
         public int MaxItemsWhenHasChivas12 { get; set; } = 5;
         public int MaxItemsWhenHasChivas21 { get; set; } = 4;
+    }
+
+    // ========== MIX & MATCH DTOs (Admin) ==========
+    public class MixMatchItemResponseDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Image { get; set; } = string.Empty;
+
+        public string Category { get; set; } = string.Empty;
+        public string CategoryLabel { get; set; } = string.Empty;
+
+        public decimal Price { get; set; }
+
+        public bool IsAlcohol { get; set; }
+
+        public int StockQuantity { get; set; }
+
+        public string StockStatus { get; set; } = string.Empty;
+        public string StockStatusLabel { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
+    }
+
+    public class MixMatchCreateDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public decimal Price { get; set; }
+
+        [Required]
+        public string Category { get; set; } = string.Empty;
+
+        public string? Image { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool IsAlcohol { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+
+    public class MixMatchUpdateDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public decimal Price { get; set; }
+
+        [Required]
+        public string Category { get; set; } = string.Empty;
+
+        public string? Image { get; set; }
+
+        public string? Description { get; set; }
+
+        public bool IsAlcohol { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+
+    public class MixMatchRuleDTO
+    {
+        public int MinItems { get; set; } = 4;
+        public int MaxItems { get; set; } = 6;
+        public int MinDrink { get; set; } = 1;
+        public int MinSnack { get; set; } = 2;
+        public int MaxSavory { get; set; } = 2;
+    }
+
+    // ========== INTERNAL USER (Admin) DTOs ==========
+    public class InternalUserResponseDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+
+        public string Role { get; set; } = string.Empty;
+        public string RoleLabel { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class InternalUserListResponseDTO
+    {
+        public List<InternalUserResponseDTO> Users { get; set; } = new();
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalItems { get; set; }
+    }
+
+    public class CreateInternalUserDTO
+    {
+        [Required]
+        public string FullName { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [MinLength(6)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string Role { get; set; } = string.Empty; // ADMIN | STAFF
+    }
+
+    public class UpdateInternalUserDTO
+    {
+        [Required]
+        public string FullName { get; set; } = string.Empty;
+
+        [Required]
+        public string Role { get; set; } = string.Empty;
+
+        public bool IsActive { get; set; } = true;
+    }
+
+    public class ToggleUserStatusDTO
+    {
+        public bool IsActive { get; set; }
     }
 
     public class ValidationResultDto
@@ -592,6 +800,75 @@ namespace ShopHangTet.DTOs
         public DateTime CreatedAt { get; set; }
     }
 
+    // ========== DASHBOARD DTOs ==========
+    public class DashboardSummaryDTO
+    {
+        public decimal TotalRevenue { get; set; }
+        public double RevenueGrowthPercent { get; set; }
+
+        public int TotalOrders { get; set; }
+        public double OrderGrowthPercent { get; set; }
+
+        public int OrdersToday { get; set; }
+
+        public double B2cPercent { get; set; }
+        public double B2bPercent { get; set; }
+
+        public DateTime LastUpdated { get; set; }
+    }
+
+    public class OrderStatusSummaryDTO
+    {
+        public int PendingPayment { get; set; }
+        public int Preparing { get; set; }
+        public int Shipping { get; set; }
+        public int DeliveryFailed { get; set; }
+        public int PartiallyDelivered { get; set; }
+        public int Completed { get; set; }
+        public int Cancelled { get; set; }
+    }
+
+    public class OrderTypeSummaryDTO
+    {
+        public int B2cOrders { get; set; }
+        public int B2bOrders { get; set; }
+
+        public decimal B2cRevenue { get; set; }
+        public decimal B2bRevenue { get; set; }
+
+        public double B2cPercent { get; set; }
+        public double B2bPercent { get; set; }
+    }
+
+    public class TopCollectionDTO
+    {
+        public string CollectionId { get; set; } = string.Empty;
+        public string CollectionName { get; set; } = string.Empty;
+        public string? Thumbnail { get; set; }
+        public int Orders { get; set; }
+        public decimal Revenue { get; set; }
+        public double Percent { get; set; }
+    }
+
+    public class TopGiftBoxDTO
+    {
+        public string GiftBoxId { get; set; } = string.Empty;
+        public string GiftBoxName { get; set; } = string.Empty;
+        public string? Image { get; set; }
+        public string CollectionName { get; set; } = string.Empty;
+        public int SoldQuantity { get; set; }
+        public decimal Revenue { get; set; }
+    }
+
+    public class InventoryAlertDTO
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public int StockQuantity { get; set; }
+        public int Threshold { get; set; }
+    }
+
     public class CreateReviewDto
     {
         [Required]
@@ -607,10 +884,109 @@ namespace ShopHangTet.DTOs
         public string Comment { get; set; } = string.Empty;
     }
 
+    // Customer-facing DTOs for Reviews
+    public class CreateReviewDTO
+    {
+        [Required]
+        public string OrderId { get; set; } = string.Empty;
+
+        [Required]
+        public string GiftBoxId { get; set; } = string.Empty;
+
+        [Required]
+        [Range(1, 5)]
+        public int Rating { get; set; }
+
+        public string Content { get; set; } = string.Empty;
+    }
+
+    public class GiftBoxReviewItemDTO
+    {
+        public string ReviewId { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class GiftBoxReviewsResponseDTO
+    {
+        public string GiftBoxId { get; set; } = string.Empty;
+        public double AverageRating { get; set; }
+        public int TotalReviews { get; set; }
+        public List<GiftBoxReviewItemDTO> Reviews { get; set; } = new();
+    }
+
+    public class UserReviewDTO
+    {
+        public string ReviewId { get; set; } = string.Empty;
+        public string GiftBoxId { get; set; } = string.Empty;
+        public string GiftBoxName { get; set; } = string.Empty;
+        public int Rating { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
     public class UpdateReviewStatusDto
     {
         [Required]
         public string Status { get; set; } = string.Empty; // APPROVED, HIDDEN
+    }
+
+    // ========== ADMIN REVIEW MODERATION DTOs ==========
+    public class ReviewListItemDTO
+    {
+        public string Id { get; set; } = string.Empty;
+
+        public string ReviewerName { get; set; } = string.Empty;
+        public string ReviewerEmail { get; set; } = string.Empty;
+        public string? ReviewerAvatar { get; set; }
+
+        public string GiftBoxId { get; set; } = string.Empty;
+        public string GiftBoxName { get; set; } = string.Empty;
+        public string? GiftBoxImage { get; set; }
+
+        public int Rating { get; set; }
+
+        public string Content { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+        public string StatusLabel { get; set; } = string.Empty;
+    }
+
+    public class ReviewDetailDTO
+    {
+        public string Id { get; set; } = string.Empty;
+
+        public string ReviewerName { get; set; } = string.Empty;
+        public string ReviewerEmail { get; set; } = string.Empty;
+        public string? ReviewerAvatar { get; set; }
+
+        public string? OrderCode { get; set; }
+
+        public string GiftBoxId { get; set; } = string.Empty;
+        public string GiftBoxName { get; set; } = string.Empty;
+        public string? GiftBoxImage { get; set; }
+
+        public int Rating { get; set; }
+
+        public string Content { get; set; } = string.Empty;
+
+        public DateTime CreatedAt { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+    }
+
+    public class ReviewListResponseDTO
+    {
+        public List<ReviewListItemDTO> Items { get; set; } = new();
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalItems { get; set; }
+        public int TotalPages { get; set; }
     }
 
     // ========== CHAT DTOs ==========
@@ -766,5 +1142,297 @@ namespace ShopHangTet.DTOs
         public string Status { get; set; } = string.Empty; // SHIPPING, DELIVERED, FAILED
 
         public string? FailureReason { get; set; }
+    }
+
+    // ========== PAGINATION HELPERS ==========
+    public class PagedResult<T>
+    {
+        public List<T> Data { get; set; } = new List<T>();
+        public int TotalItems { get; set; }
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalPages { get; set; }
+    }
+
+    // ========== GIFTBOX ADMIN DTOs ==========
+    public class GiftBoxListResponseDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public string CollectionId { get; set; } = string.Empty;
+        public string CollectionName { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+        public bool Status { get; set; }
+        public string StatusLabel { get; set; } = string.Empty; // "ĐANG BÁN" | "TẠM ẨN"
+        public string? Thumbnail { get; set; }
+        public List<string> TagNames { get; set; } = new();
+        public int ItemCount { get; set; }
+    }
+
+    public class GiftBoxDetailResponseDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public string CollectionId { get; set; } = string.Empty;
+        public string CollectionName { get; set; } = string.Empty;
+        public List<string> Images { get; set; } = new();
+        public List<TagReferenceDto> Tags { get; set; } = new();
+        public List<GiftBoxItemDetailDto> Items { get; set; } = new();
+        public bool IsActive { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
+    }
+
+    public class TagReferenceDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+    }
+
+    public class GiftBoxItemDetailDto
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public class GiftBoxCreateDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public decimal Price { get; set; }
+
+        [Required]
+        public string CollectionId { get; set; } = string.Empty;
+
+        public List<string> Images { get; set; } = new();
+
+        public List<string> TagIds { get; set; } = new();
+
+        [Required]
+        [MinLength(1)]
+        public List<CustomBoxItemDto> Items { get; set; } = new();
+
+        public bool IsActive { get; set; } = true;
+    }
+
+    public class GiftBoxUpdateDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        public decimal Price { get; set; }
+
+        [Required]
+        public string CollectionId { get; set; } = string.Empty;
+
+        public List<string>? Images { get; set; }
+
+        public List<string>? TagIds { get; set; }
+
+        public List<CustomBoxItemDto>? Items { get; set; }
+
+        public bool IsActive { get; set; }
+    }
+
+    public class GiftBoxStatusDTO
+    {
+        public bool IsActive { get; set; }
+    }
+
+    // Simple DTOs for dropdowns
+    public class SimpleCollectionDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+    }
+
+    public class SimpleItemDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+    }
+
+    public class SimpleTagDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Type { get; set; } = string.Empty;
+    }
+
+    // ========== INVENTORY DTOs ==========
+    public class InventoryItemResponseDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string CategoryLabel { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public string StockStatus { get; set; } = string.Empty; // IN_STOCK | LOW_STOCK | OUT_OF_STOCK
+        public string StockStatusLabel { get; set; } = string.Empty;
+        public bool IsAlcohol { get; set; }
+        public DateTime? LastUpdated { get; set; }
+    }
+
+    public class InventoryItemDetailDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
+        public string CategoryLabel { get; set; } = string.Empty;
+        public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
+        public string StockStatus { get; set; } = string.Empty;
+        public string StockStatusLabel { get; set; } = string.Empty;
+        public bool IsAlcohol { get; set; }
+        public List<InventoryLogDTO> RecentLogs { get; set; } = new();
+    }
+
+    public class InventoryLogDTO
+    {
+        public string Id { get; set; } = string.Empty;
+        public string ItemId { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public string Sku { get; set; } = string.Empty;
+        public string ChangeType { get; set; } = string.Empty;
+        public string ChangeTypeLabel { get; set; } = string.Empty;
+        public int QuantityChange { get; set; }
+        public int PreviousStock { get; set; }
+        public int NewStock { get; set; }
+        public string Source { get; set; } = string.Empty;
+        public string? Reason { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+
+    public class InventoryAdjustRequestDTO
+    {
+        [Required]
+        public string ItemId { get; set; } = string.Empty;
+
+        [Required]
+        public string AdjustType { get; set; } = string.Empty; // INCREASE | DECREASE
+
+        [Required]
+        [Range(1, int.MaxValue)]
+        public int Quantity { get; set; }
+
+        public string? Reason { get; set; }
+    }
+
+    public class InventorySummaryDTO
+    {
+        public int TotalItems { get; set; }
+        public int InStock { get; set; }
+        public int LowStock { get; set; }
+        public int OutOfStock { get; set; }
+    }
+
+    // ========== REPORT DTOs ==========
+    public class DashboardReportDTO
+    {
+        public decimal TotalRevenue { get; set; }
+        public double RevenueGrowthPercent { get; set; }
+
+        public int TotalOrders { get; set; }
+        public double OrderGrowthPercent { get; set; }
+
+        public double B2CPercent { get; set; }
+        public double B2BPercent { get; set; }
+
+        public ReportStatusSummaryDTO StatusSummary { get; set; } = new();
+    }
+
+    public class ReportStatusSummaryDTO
+    {
+        public int PendingPayment { get; set; }
+        public int Preparing { get; set; }
+        public int Shipping { get; set; }
+        public int Completed { get; set; }
+        public int Cancelled { get; set; }
+        public int DeliveryFailed { get; set; }
+    }
+
+    public class RevenueReportChartItemDTO
+    {
+        public string Date { get; set; } = string.Empty; // YYYY-MM-DD or YYYY-MM
+        public decimal Revenue { get; set; }
+        public decimal LastYearRevenue { get; set; }
+    }
+
+    public class RevenueReportDTO
+    {
+        public decimal TotalRevenue { get; set; }
+        public double GrowthPercent { get; set; }
+        public (string Date, decimal Revenue) BestDay { get; set; }
+        public double B2CPercent { get; set; }
+        public double B2BPercent { get; set; }
+        public List<RevenueReportChartItemDTO> Chart { get; set; } = new();
+    }
+
+    public class CollectionPerformanceItemDTO
+    {
+        public int Rank { get; set; }
+        public string CollectionId { get; set; } = string.Empty;
+        public string CollectionName { get; set; } = string.Empty;
+        public int Orders { get; set; }
+        public decimal Revenue { get; set; }
+        public double Percent { get; set; }
+        public string? Thumbnail { get; set; }
+    }
+
+    public class GiftBoxPerformanceItemDTO
+    {
+        public string GiftBoxId { get; set; } = string.Empty;
+        public string GiftBoxName { get; set; } = string.Empty;
+        public int SoldQuantity { get; set; }
+        public decimal Revenue { get; set; }
+        public double AvgRating { get; set; }
+        public string? Image { get; set; }
+        public string? TopProduct { get; set; }
+        public string? MarketingSuggestions { get; set; }
+    }
+
+    public class B2cB2bComparisonDTO
+    {
+        public decimal B2CRevenue { get; set; }
+        public int B2COrders { get; set; }
+        public decimal B2CAvgOrderValue { get; set; }
+
+        public decimal B2BRevenue { get; set; }
+        public int B2BOrders { get; set; }
+        public int TotalGiftBoxes { get; set; }
+
+        public List<B2cB2bMonthlyDTO> MonthlyOrdersChart { get; set; } = new();
+    }
+
+    public class B2cB2bMonthlyDTO
+    {
+        public string Month { get; set; } = string.Empty; // YYYY-MM
+        public int B2COrders { get; set; }
+        public int B2BOrders { get; set; }
+    }
+
+    public class InventoryAlertItemDTO
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public int Stock { get; set; }
+        public int Threshold { get; set; }
     }
 }
