@@ -18,7 +18,6 @@ public static class SeedData
         await SeedGiftBoxesAsync(context);
 
         await context.SaveChangesAsync();
-        Console.WriteLine("----> Seed completed");
     }
 
     private static async Task SeedItemsAsync(ShopHangTetDbContext context)
@@ -102,7 +101,6 @@ public static class SeedData
         }).ToList();
 
         await context.Items.AddRangeAsync(items);
-        Console.WriteLine($"----> Seeded {items.Count} Items with real images");
     }
 
     private static async Task SeedTagsAsync(ShopHangTetDbContext context)
@@ -185,7 +183,6 @@ public static class SeedData
         };
 
         await context.Collections.AddRangeAsync(collections);
-        Console.WriteLine($"----> Seeded {collections.Count} Collections");
     }
 
     private static async Task SeedGiftBoxesAsync(ShopHangTetDbContext context)
@@ -391,6 +388,5 @@ public static class SeedData
             "https://i.ibb.co/Fk0ft0d3/5-8.jpg"));
 
         await context.GiftBoxes.AddRangeAsync(boxes);
-        Console.WriteLine($"----> Seeded {boxes.Count} GiftBoxes with specific details");
     }
 }

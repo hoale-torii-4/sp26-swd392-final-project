@@ -42,7 +42,7 @@ namespace ShopHangTet.Controllers
                 return Ok(new
                 {
                     response = "Dạ chào anh/chị! Em là trợ lý AI của Shop Hàng Tết. Em có thể giúp gì cho mình hôm nay ạ? 😊",
-                    debug_keyword = (string)null
+                    debug_keyword = (string?)null
                 });
             }
 

@@ -75,9 +75,10 @@ namespace ShopHangTet.Services
             var g = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == id);
             if (g == null) return null;
 
-            var collection = await _context.Collections.FirstOrDefaultAsync(c => c.Id == g.CollectionId);
-            var tagEntities = (g.Tags ?? new List<string>()).Any()
-                ? await _context.Tags.Where(t => g.Tags.Contains(t.Id)).ToListAsync()
+            var collection = await _context.Collections.FirstOrDefaultAsync(c => c.Id == g!.CollectionId);
+            var tagIds = g.Tags ?? new List<string>();
+            var tagEntities = tagIds.Any()
+                ? await _context.Tags.Where(t => tagIds.Contains(t.Id)).ToListAsync()
                 : new List<Tag>();
 
             var itemIds = (g.Items ?? new List<GiftBoxItem>()).Select(i => i.ItemId).Distinct().ToList();
