@@ -54,6 +54,13 @@ export const authService = {
     },
 
     /**
+     * Clear guest cart session after logout to avoid reusing old guest cart.
+     */
+    clearGuestCartSession: () => {
+        localStorage.removeItem("cart_session_id");
+    },
+
+    /**
      * Get stored JWT token.
      */
     getToken: (): string | null => {

@@ -20,10 +20,18 @@ namespace ShopHangTet.Services
             if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(sessionId))
                 return null;
 
-            var cart = await _context.Set<Cart>()
-                .FirstOrDefaultAsync(c =>
-                    (!string.IsNullOrWhiteSpace(userId) && c.UserId == userId) ||
-                    (!string.IsNullOrWhiteSpace(sessionId) && c.SessionId == sessionId));
+            Cart? cart = null;
+
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                cart = await _context.Set<Cart>()
+                    .FirstOrDefaultAsync(c => c.UserId == userId);
+            }
+            else if (!string.IsNullOrWhiteSpace(sessionId))
+            {
+                cart = await _context.Set<Cart>()
+                    .FirstOrDefaultAsync(c => c.SessionId == sessionId);
+            }
 
             if (cart != null)
             {
