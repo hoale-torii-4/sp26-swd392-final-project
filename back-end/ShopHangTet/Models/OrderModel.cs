@@ -49,6 +49,9 @@ public class OrderModel
 
 public class OrderItem
 {
+    [Key]
+    public ObjectId Id { get; set; } = ObjectId.GenerateNewId();
+
     public string ProductName { get; set; } = string.Empty;
     public OrderItemType Type { get; set; } = OrderItemType.READY_MADE; // READY_MADE | MIX_MATCH
     public int Quantity { get; set; }

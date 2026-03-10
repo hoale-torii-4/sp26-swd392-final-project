@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartDto, type CartItemDto } from "../services/cartService";
@@ -21,23 +21,54 @@ function getTypeBadge(type: number) {
 
 export default function CheckoutPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [cart, setCart] = useState<CartDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deliveryMethod, setDeliveryMethod] = useState<"single" | "multi">("single");
     const isLoggedIn = authService.isAuthenticated();
 
+    const checkoutState = location.state as
+        | {
+            buyNow?: boolean;
+            items?: CartItemDto[];
+            totalItems?: number;
+            totalAmount?: number;
+            selectedItems?: CartItemDto[];
+        }
+        | undefined;
+
+    const isBuyNow = !!checkoutState?.buyNow && Array.isArray(checkoutState.items);
+    const isSelectedCheckout = !isBuyNow && Array.isArray(checkoutState?.selectedItems);
+
     useEffect(() => {
+        if (isBuyNow || isSelectedCheckout) {
+            setLoading(false);
+            return;
+        }
+
         cartService
             .getCart()
             .then(setCart)
             .catch(() => setError("Không thể tải giỏ hàng."))
             .finally(() => setLoading(false));
-    }, []);
+    }, [isBuyNow, isSelectedCheckout]);
 
-    const items = cart?.Items ?? [];
-    const totalAmount = cart?.TotalAmount ?? 0;
-    const totalItems = cart?.TotalItems ?? 0;
+    const items = isBuyNow
+        ? checkoutState?.items ?? []
+        : isSelectedCheckout
+            ? checkoutState?.selectedItems ?? []
+            : cart?.Items ?? [];
+    const totalAmount = isBuyNow
+        ? checkoutState?.totalAmount ?? 0
+        : isSelectedCheckout
+            ? items.reduce((sum, item) => sum + item.UnitPrice * item.Quantity, 0)
+            : cart?.TotalAmount ?? 0;
+    const totalItems = isBuyNow
+        ? checkoutState?.totalItems ?? 0
+        : isSelectedCheckout
+            ? items.reduce((sum, item) => sum + item.Quantity, 0)
+            : cart?.TotalItems ?? 0;
 
     /* ═══════════════════ LOADING ═══════════════════ */
     if (loading) {
@@ -93,7 +124,15 @@ export default function CheckoutPage() {
                 <ol className="flex items-center gap-2 text-xs text-gray-400">
                     <li><Link to="/" className="hover:text-[#8B1A1A] transition-colors">TRANG CHỦ</Link></li>
                     <li>/</li>
-                    <li><Link to="/cart" className="hover:text-[#8B1A1A] transition-colors">GIỎ HÀNG</Link></li>
+                    <li>
+                        {isBuyNow ? (
+                            <span className="text-gray-400">MUA NGAY</span>
+                        ) : isSelectedCheckout ? (
+                            <span className="text-gray-400">GIỎ HÀNG (ĐÃ CHỌN)</span>
+                        ) : (
+                            <Link to="/cart" className="hover:text-[#8B1A1A] transition-colors">GIỎ HÀNG</Link>
+                        )}
+                    </li>
                     <li>/</li>
                     <li className="text-[#8B1A1A] font-medium">XÁC NHẬN ĐƠN HÀNG</li>
                 </ol>
@@ -232,7 +271,15 @@ export default function CheckoutPage() {
                             {/* ── Action Buttons ── */}
                             <div className="mt-6 space-y-3">
                                 <button
-                                    onClick={() => navigate("/checkout/address")}
+                                    onClick={() => navigate("/checkout/payment", {
+                                        state: {
+                                            buyNow: isBuyNow ? true : undefined,
+                                            items: isBuyNow ? items : undefined,
+                                            totalItems: isBuyNow ? totalItems : undefined,
+                                            totalAmount: isBuyNow ? totalAmount : undefined,
+                                            selectedItems: isSelectedCheckout ? items : undefined,
+                                        },
+                                    })}
                                     className="w-full py-3.5 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     Tiếp tục
@@ -241,12 +288,14 @@ export default function CheckoutPage() {
                                     </svg>
                                 </button>
 
-                                <Link
-                                    to="/cart"
-                                    className="block w-full text-center text-sm text-gray-500 hover:text-[#8B1A1A] transition-colors py-2"
-                                >
-                                    Quay lại giỏ hàng
-                                </Link>
+                                {!isBuyNow && !isSelectedCheckout && (
+                                    <Link
+                                        to="/cart"
+                                        className="block w-full text-center text-sm text-gray-500 hover:text-[#8B1A1A] transition-colors py-2"
+                                    >
+                                        Quay lại giỏ hàng
+                                    </Link>
+                                )}
                             </div>
                         </div>
 

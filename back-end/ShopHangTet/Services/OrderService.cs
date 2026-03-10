@@ -194,7 +194,7 @@ namespace ShopHangTet.Services
         private string GenerateOrderCode()
         {
             var timestamp = DateTime.UtcNow.ToString("yyMMdd");
-            var random = new Random().Next(1000, 9999);
+            var random = Random.Shared.Next(1000, 9999);
             return $"SHT{timestamp}{random}";
         }
 
@@ -657,10 +657,13 @@ namespace ShopHangTet.Services
                 Notes = "Đơn hàng được tạo - Đang xác nhận thanh toán"
             });
 
-            // Reserve inventory khi tạo đơn để tránh oversell
-            await ReserveInventoryAsync(order, "System-PlaceOrder");
-
+            // Persist order first to ensure we have a stable order Id before reserving inventory.
             _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            // Reserve inventory after the order is saved to avoid ghost reservations if saving fails.
+            await ReserveInventoryAsync(order, "System-PlaceOrder");
+            // Persist inventory log entries added by ReserveInventoryAsync
             await _context.SaveChangesAsync();
 
             _logger.LogInformation($"B2C Order created: {order.OrderCode}");
@@ -722,10 +725,12 @@ namespace ShopHangTet.Services
                 Notes = "Đơn hàng B2B được tạo - Đang xác nhận thanh toán"
             });
 
-            // Reserve inventory khi tạo đơn để tránh oversell
-            await ReserveInventoryAsync(order, "System-PlaceOrder");
-
+            // Persist order first to ensure stable Id for reservations
             _context.Orders.Add(order);
+            await _context.SaveChangesAsync();
+
+            // Reserve inventory after order persisted to avoid ghost reservations
+            await ReserveInventoryAsync(order, "System-PlaceOrder");
             await _context.SaveChangesAsync();
 
             // B2B: Tạo OrderDelivery và OrderDeliveryItem
@@ -751,7 +756,7 @@ namespace ShopHangTet.Services
                     }
 
                     var orderItem = orderItems[itemAllocation.OrderItemIndex];
-                    var orderItemId = orderItem.GiftBoxId?.ToString() ?? orderItem.CustomBoxId?.ToString() ?? "";
+                    var orderItemId = orderItem.Id.ToString();
 
                     var orderDeliveryItem = new OrderDeliveryItem
                     {
@@ -879,6 +884,7 @@ namespace ShopHangTet.Services
         public async Task<OrderValidationResult> ValidateB2COrderAsync(CreateOrderB2CDto dto)
         {
             var result = new OrderValidationResult { IsValid = true };
+            _logger.LogInformation("ValidateB2COrderAsync Items.Count={Count}", dto.Items?.Count ?? 0);
 
             // Validate basic fields
             if (string.IsNullOrEmpty(dto.CustomerName))
@@ -887,14 +893,14 @@ namespace ShopHangTet.Services
             if (!IsValidEmail(dto.CustomerEmail))
                 result.Errors.Add("Valid email is required");
 
-            if (dto.Items.Count == 0)
+            if (dto.Items == null || !dto.Items.Any())
                 result.Errors.Add("At least one item is required");
 
             if (dto.DeliveryDate.Date < DateTime.UtcNow.Date)
                 result.Errors.Add("Delivery date cannot be in the past");
 
             // Validate items
-            foreach (var item in dto.Items)
+            foreach (var item in dto.Items ?? new List<OrderItemDto>())
             {
                 if (item.Quantity <= 0)
                     result.Errors.Add("Quantity must be greater than 0");
@@ -925,9 +931,13 @@ namespace ShopHangTet.Services
         public async Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto)
         {
             var result = new OrderValidationResult { IsValid = true };
+            _logger.LogInformation("ValidateB2BOrderAsync Items.Count={Count}", dto.Items?.Count ?? 0);
 
             if (string.IsNullOrEmpty(dto.UserId))
                 result.Errors.Add("B2B requires login - UserId is required");
+
+            if (dto.Items == null || !dto.Items.Any())
+                result.Errors.Add("At least one item is required");
 
             if (dto.DeliveryAllocations.Count == 0)
                 result.Errors.Add("At least one delivery address is required for B2B");
@@ -936,7 +946,7 @@ namespace ShopHangTet.Services
                 result.Errors.Add("Delivery date cannot be in the past");
 
             // Validate items
-            foreach (var item in dto.Items)
+            foreach (var item in dto.Items ?? new List<OrderItemDto>())
             {
                 if (item.Quantity <= 0)
                     result.Errors.Add("Quantity must be greater than 0");
@@ -967,6 +977,10 @@ namespace ShopHangTet.Services
         // Helper methods for new DTOs
         private async Task<List<OrderItem>> BuildOrderItemsFromB2CAsync(List<OrderItemDto> items)
         {
+            if (items == null || !items.Any())
+                throw new InvalidOperationException("At least one item is required");
+
+            _logger.LogInformation("BuildOrderItemsFromB2CAsync Items.Count={Count}", items.Count);
             var result = new List<OrderItem>();
 
             foreach (var dto in items)
@@ -986,6 +1000,7 @@ namespace ShopHangTet.Services
 
                     result.Add(new OrderItem
                     {
+                        Id = ObjectId.GenerateNewId(),
                         Type = OrderItemType.READY_MADE,
                         ProductName = giftBox.Name,
                         GiftBoxId = ObjectId.Parse(targetId),
@@ -1011,6 +1026,7 @@ namespace ShopHangTet.Services
 
                     result.Add(new OrderItem
                     {
+                        Id = ObjectId.GenerateNewId(),
                         Type = OrderItemType.MIX_MATCH,
                         ProductName = "Custom Mix & Match Box",
                         CustomBoxId = ObjectId.Parse(targetId),
@@ -1051,19 +1067,23 @@ namespace ShopHangTet.Services
         {
             var snapshotItems = new List<OrderItemSnapshotItem>();
 
+            var itemIds = giftBox.Items.Select(i => i.ItemId).ToList();
+            if (!itemIds.Any()) return snapshotItems;
+
+            var items = await _context.Items.Where(x => itemIds.Contains(x.Id)).ToListAsync();
+            var itemMap = items.ToDictionary(x => x.Id, x => x);
+
             foreach (var item in giftBox.Items)
             {
-                var itemDetail = await _context.Items.FirstOrDefaultAsync(x => x.Id == item.ItemId);
-                if (itemDetail != null)
+                if (!itemMap.TryGetValue(item.ItemId, out var itemDetail)) continue;
+
+                snapshotItems.Add(new OrderItemSnapshotItem
                 {
-                    snapshotItems.Add(new OrderItemSnapshotItem
-                    {
-                        ItemId = item.ItemId,
-                        ItemName = itemDetail.Name,
-                        Quantity = item.Quantity,
-                        UnitPrice = item.ItemPriceSnapshot > 0 ? item.ItemPriceSnapshot : itemDetail.Price
-                    });
-                }
+                    ItemId = item.ItemId,
+                    ItemName = itemDetail.Name,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.ItemPriceSnapshot > 0 ? item.ItemPriceSnapshot : itemDetail.Price
+                });
             }
 
             return snapshotItems;
@@ -1073,19 +1093,23 @@ namespace ShopHangTet.Services
         {
             var snapshotItems = new List<OrderItemSnapshotItem>();
 
+            var itemIds = customBox.Items.Select(i => i.ItemId).ToList();
+            if (!itemIds.Any()) return snapshotItems;
+
+            var items = await _context.Items.Where(x => itemIds.Contains(x.Id)).ToListAsync();
+            var itemMap = items.ToDictionary(x => x.Id, x => x);
+
             foreach (var item in customBox.Items)
             {
-                var itemDetail = await _context.Items.FirstOrDefaultAsync(x => x.Id == item.ItemId);
-                if (itemDetail != null)
+                if (!itemMap.TryGetValue(item.ItemId, out var itemDetail)) continue;
+
+                snapshotItems.Add(new OrderItemSnapshotItem
                 {
-                    snapshotItems.Add(new OrderItemSnapshotItem
-                    {
-                        ItemId = item.ItemId,
-                        ItemName = itemDetail.Name,
-                        Quantity = item.Quantity,
-                        UnitPrice = itemDetail.Price
-                    });
-                }
+                    ItemId = item.ItemId,
+                    ItemName = itemDetail.Name,
+                    Quantity = item.Quantity,
+                    UnitPrice = itemDetail.Price
+                });
             }
 
             return snapshotItems;

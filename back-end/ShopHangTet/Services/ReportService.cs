@@ -133,9 +133,10 @@ public class ReportService : IReportService
             foreach (var item in order.Items)
             {
                 if (item.GiftBoxId == null) continue;
-                var gid = item.GiftBoxId.ToString();
+                var gid = item.GiftBoxId?.ToString();
+                if (string.IsNullOrEmpty(gid)) continue;
                 if (!giftBoxes.TryGetValue(gid, out var gb)) continue;
-                var cid = gb.CollectionId;
+                var cid = gb!.CollectionId;
                 if (!seenCollections.Contains(cid))
                 {
                     seenCollections.Add(cid);
@@ -169,13 +170,13 @@ public class ReportService : IReportService
         var dict = new Dictionary<string, (string name, string? image, int sold, decimal revenue, List<int> ratings)>();
         foreach (var g in giftBoxes) dict[g.Id] = (g.Name, (g.Images != null && g.Images.Any()) ? g.Images.FirstOrDefault() : null, 0, 0m, new List<int>());
 
-        foreach (var o in orders)
+            foreach (var o in orders)
         {
             foreach (var it in o.Items)
             {
                 if (it.GiftBoxId == null) continue;
-                var gid = it.GiftBoxId.ToString();
-                if (!dict.ContainsKey(gid)) continue;
+                var gid = it.GiftBoxId?.ToString();
+                if (string.IsNullOrEmpty(gid) || !dict.ContainsKey(gid)) continue;
                 var entry = dict[gid];
                 entry.sold += it.Quantity;
                 entry.revenue += it.TotalPrice;

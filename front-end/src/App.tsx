@@ -13,6 +13,8 @@ import GiftBoxesPage from './pages/GiftBoxesPage'
 import ProductDetailPage from './pages/ProductDetailPage'
 import CartPage from './pages/CartPage'
 import CheckoutPage from './pages/CheckoutPage'
+import CheckoutPaymentPage from './pages/CheckoutPaymentPage'
+import OrderSuccessPage from './pages/OrderSuccessPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import AIChatBox from './components/AIChatBox'
 import { GoogleOAuthProvider } from '@react-oauth/google'
@@ -39,6 +41,8 @@ function App() {
           <Route path="/gift-boxes/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout" element={<CheckoutPage />} />
+          <Route path="/checkout/payment" element={<CheckoutPaymentPage />} />
+          <Route path="/order-success" element={<OrderSuccessPage />} />
         </Routes>
         <AIChatBox />
       </BrowserRouter>

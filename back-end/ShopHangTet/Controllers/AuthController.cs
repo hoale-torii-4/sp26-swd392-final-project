@@ -92,14 +92,14 @@ namespace ShopHangTet.Controllers
             }
 
             user.IsEmailVerified = true;
-            user.OtpCode = null;   
-            user.OtpExpiry = null; 
+            user.OtpCode = default;
+            user.OtpExpiry = default; 
             user.Status = UserStatus.ACTIVE;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
-            return Ok(ApiResponse<object>.SuccessResult(null, "Xác thực email thành công! Bạn đã có thể đăng nhập."));
+            return Ok(ApiResponse<object>.SuccessResult(null!, "Xác thực email thành công! Bạn đã có thể đăng nhập."));
         }
         // ===========================
         // 1.7. RESEND REGISTER OTP (When there is a user's email exist in db didn't receive the otp and need to resend during registration)
@@ -143,7 +143,7 @@ namespace ShopHangTet.Controllers
                 return StatusCode(500, ApiResponse<object>.ErrorResult("Tạo mã thành công nhưng hệ thống gửi mail đang gặp sự cố. Vui lòng thử lại sau."));
             }
 
-            return Ok(ApiResponse<object>.SuccessResult(null, "Đã gửi lại mã xác nhận OTP. Vui lòng kiểm tra cả hòm thư Spam (Thư rác)."));
+            return Ok(ApiResponse<object>.SuccessResult(null!, "Đã gửi lại mã xác nhận OTP. Vui lòng kiểm tra cả hòm thư Spam (Thư rác)."));
         }
         // ===========================
         // 2. LOGIN
@@ -279,7 +279,7 @@ namespace ShopHangTet.Controllers
 
             if (user == null)
             {
-                return Ok(ApiResponse<object>.SuccessResult(null, "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi."));
+                return Ok(ApiResponse<object>.SuccessResult(null!, "Nếu email tồn tại trong hệ thống, mã OTP đã được gửi."));
             }
 
             // If otpexpiry > 4 minutes, it means user just requested OTP and need to wait until 5 minutes to request again. This is to prevent spamming OTP request.
@@ -303,7 +303,7 @@ namespace ShopHangTet.Controllers
                 return StatusCode(500, ApiResponse<object>.ErrorResult("Lỗi cấu hình gửi email. Vui lòng kiểm tra lại tài khoản SMTP."));
             }
 
-            return Ok(ApiResponse<object>.SuccessResult(null, "Đã gửi mã xác nhận đến email của bạn."));
+            return Ok(ApiResponse<object>.SuccessResult(null!, "Đã gửi mã xác nhận đến email của bạn."));
         }
         // 5. RESET PASSWORD
         // ===========================
@@ -322,13 +322,13 @@ namespace ShopHangTet.Controllers
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
 
             // Clear OTP fields after successful password reset
-            user.OtpCode = null;
-            user.OtpExpiry = null;
+            user.OtpCode = default;
+            user.OtpExpiry = default;
             user.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
-            return Ok(ApiResponse<object>.SuccessResult(null, "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới."));
+            return Ok(ApiResponse<object>.SuccessResult(null!, "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới."));
         }
         // ===========================
         // 6. CHANGE PASSWORD
@@ -368,7 +368,7 @@ namespace ShopHangTet.Controllers
 
             await _context.SaveChangesAsync();
 
-            return Ok(ApiResponse<object>.SuccessResult(null, "Đổi mật khẩu thành công!"));
+            return Ok(ApiResponse<object>.SuccessResult(null!, "Đổi mật khẩu thành công!"));
         }
     }
 }

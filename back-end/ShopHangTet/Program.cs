@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using DotNetEnv;
 using MongoDB.Driver;
 using ShopHangTet.Data;
 using ShopHangTet.Repositories;
@@ -11,22 +10,10 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var envFilePath = Path.Combine(builder.Environment.ContentRootPath, ".env");
-if (File.Exists(envFilePath))
-{
-    Env.Load(envFilePath);
-}
-
-var mongoConnectionString = Environment.GetEnvironmentVariable("MONGODB_CONNECTION_STRING")
-    ?? builder.Configuration.GetConnectionString("MongoConnection")
-    ?? builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? throw new InvalidOperationException("MongoDB connection string is required. Set MONGODB_CONNECTION_STRING or ConnectionStrings:MongoConnection/DefaultConnection.");
-var mongoDatabaseName = Environment.GetEnvironmentVariable("MONGODB_DATABASE")
-    ?? builder.Configuration["Mongo:DatabaseName"]
-    ?? "ShopHangTetDb";
-
-Console.WriteLine($"----> Using Mongo connection string: {mongoConnectionString}");
-Console.WriteLine($"----> Using Mongo database name: {mongoDatabaseName}");
+// Lấy Connection String
+var mongoConnectionString = builder.Configuration.GetConnectionString("MongoConnection")
+    ?? throw new InvalidOperationException("MongoDB connection string is required. Set ConnectionStrings:MongoConnection in appsettings.json.");
+var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"] ?? "ShopHangTetDb";
 
 //Thêm Controllers
 builder.Services.AddControllers()
@@ -88,10 +75,12 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddAuthorization();
 
 //Cấu hình CORS (Cho phép Vue.js truy cập API)
+// Lấy chuỗi CORS
+var origins = builder.Configuration["Cors:Origins"]?.Split(',') ?? new[] { "http://localhost:5173", "http://localhost:3000" };
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVueApp",
-        policy => policy.WithOrigins("http://localhost:5173", "http://localhost:3000", "https://shophangtet-web.onrender.com") // Port Vue.js và React, thêm cái web render nữa
+        policy => policy.WithOrigins(origins)
                         .AllowAnyMethod()
                         .AllowAnyHeader()
                         .AllowCredentials());
@@ -128,15 +117,11 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Đăng ký AI Service
-var googleApiKey = Environment.GetEnvironmentVariable("GROQ_API_KEY");
-
-if (string.IsNullOrWhiteSpace(googleApiKey))
-{
-    throw new Exception("GROQ_API_KEY not found. .env is not loading.");
-}
+var groqApiKey = builder.Configuration["Groq:ApiKey"]
+    ?? throw new InvalidOperationException("Groq ApiKey is required. Please configure Groq:ApiKey in appsettings.json.");
 
 builder.Services.AddSingleton<AiService>(sp =>
-    new AiService(googleApiKey)); // Đưa Key Google vào
+    new AiService(groqApiKey)); // Đưa Groq Key vào
 
 var app = builder.Build();
 
@@ -172,15 +157,9 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Seed data
-var seedEnabledConfig = builder.Configuration.GetValue<bool?>("Seed:Enabled");
-var seedEnabled = seedEnabledConfig;
+var seedEnabled = builder.Configuration.GetValue<bool>("Seed:Enabled");
 
-if (seedEnabled is null && bool.TryParse(Environment.GetEnvironmentVariable("SEED_ENABLED"), out var seedEnabledFromEnv))
-{
-    seedEnabled = seedEnabledFromEnv;
-}
-
-if (seedEnabled ?? true)
+if (seedEnabled)
 {
     await SeedData.InitializeAsync(app);
 }

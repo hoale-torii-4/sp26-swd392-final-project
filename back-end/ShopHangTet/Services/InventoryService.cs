@@ -70,7 +70,7 @@ namespace ShopHangTet.Services
                     IsAlcohol = i.IsAlcohol,
                     LastUpdated = lastLogs.ContainsKey(i.Id) ? lastLogs[i.Id] : (DateTime?)null
                 };
-            }).Where(x => x != null).ToList()!;
+            }).OfType<InventoryItemResponseDTO>().ToList();
 
             var totalPages = (int)Math.Ceiling(total / (double)pageSize);
 
@@ -134,10 +134,10 @@ namespace ShopHangTet.Services
             var query = _context.InventoryLogs.AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(l => l.ItemName.Contains(search) || (l.Sku ?? string.Empty).Contains(search));
+                query = query.Where(l => (l.ItemName ?? string.Empty).Contains(search) || (l.Sku ?? string.Empty).Contains(search));
 
             if (!string.IsNullOrWhiteSpace(changeType))
-                query = query.Where(l => (l.ChangeType ?? l.Action) == changeType);
+                query = query.Where(l => (l.ChangeType ?? l.Action ?? string.Empty) == changeType);
 
             if (!string.IsNullOrWhiteSpace(source))
                 query = query.Where(l => l.Source == source);

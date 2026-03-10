@@ -125,7 +125,8 @@ public class DashboardService : IDashboardService
             foreach (var item in order.Items)
             {
                 if (item.GiftBoxId == null) continue;
-                var gbId = item.GiftBoxId.ToString();
+                var gbId = item.GiftBoxId?.ToString();
+                if (string.IsNullOrEmpty(gbId)) continue;
                 var gb = giftBoxes.FirstOrDefault(g => g.Id == gbId);
                 if (gb == null) continue;
                 var cid = gb.CollectionId ?? string.Empty;
@@ -166,7 +167,8 @@ public class DashboardService : IDashboardService
             foreach (var item in order.Items)
             {
                 if (item.GiftBoxId == null) continue;
-                var gbId = item.GiftBoxId.ToString();
+                var gbId = item.GiftBoxId?.ToString();
+                if (string.IsNullOrEmpty(gbId)) continue;
                 if (!map.ContainsKey(gbId)) map[gbId] = (0, 0m);
                 var entry = map[gbId];
                 entry.qty += item.Quantity;

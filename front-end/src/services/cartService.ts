@@ -8,8 +8,7 @@ import type { ApiResponse } from "../types/auth";
 export interface CartItemDto {
     Id: string;
     Type: number;            // 0 = READY_MADE, 1 = MIX_MATCH
-    GiftBoxId: string | null;
-    CustomBoxId: string | null;
+    ProductId: string;
     Quantity: number;
     UnitPrice: number;
     Name: string | null;
@@ -48,6 +47,10 @@ function getHeaders() {
     return { "X-Session-Id": getSessionId() };
 }
 
+export function clearGuestSession() {
+    localStorage.removeItem(SESSION_KEY);
+}
+
 // ─── Cart API Service ───
 
 export const cartService = {
@@ -70,6 +73,10 @@ export const cartService = {
         });
         window.dispatchEvent(new Event("cart-updated"));
         return res.data.Data;
+    },
+
+    notifyCartUpdated: () => {
+        window.dispatchEvent(new Event("cart-updated"));
     },
 
     /**

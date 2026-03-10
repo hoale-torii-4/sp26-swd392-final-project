@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { authService } from "../services/authService";
+import { cartService } from "../services/cartService";
 
 const navLinks = [
     { label: "TRANG CHỦ", to: "/" },
@@ -15,6 +16,7 @@ export default function Header() {
     const navigate = useNavigate();
     const [mobileOpen, setMobileOpen] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    const [cartCount, setCartCount] = useState(0);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
     // Check auth state
@@ -38,8 +40,30 @@ export default function Header() {
         setDropdownOpen(false);
     }, [location.pathname]);
 
+    const loadCartCount = async () => {
+        try {
+            const data = await cartService.getCart();
+            setCartCount(data?.TotalItems ?? 0);
+        } catch {
+            setCartCount(0);
+        }
+    };
+
+    useEffect(() => {
+        loadCartCount();
+
+        const handleCartUpdated = () => {
+            loadCartCount();
+        };
+
+        window.addEventListener("cart-updated", handleCartUpdated);
+        return () => window.removeEventListener("cart-updated", handleCartUpdated);
+    }, [location.pathname, isLoggedIn]);
+
     const handleLogout = () => {
         authService.logout();
+        authService.clearGuestCartSession();
+        cartService.notifyCartUpdated();
         setDropdownOpen(false);
         navigate("/login");
     };
@@ -93,9 +117,9 @@ export default function Header() {
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
                         </svg>
-                        {isLoggedIn && (
-                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#8B1A1A] rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                                2
+                        {cartCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-[#8B1A1A] rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                                {cartCount}
                             </span>
                         )}
                     </Link>
