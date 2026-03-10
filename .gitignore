@@ -137,6 +137,8 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+# Docker compose config (local only)
+docker-compose.yml
 # ==========================================
 # ASP.NET Core / C# (Backend)
 # ==========================================
