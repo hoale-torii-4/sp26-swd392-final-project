@@ -25,6 +25,11 @@ namespace ShopHangTet.Controllers
 
             var sessionId = Request.Headers["X-Session-Id"].FirstOrDefault();
 
+            if (!string.IsNullOrWhiteSpace(userId))
+            {
+                sessionId = null;
+            }
+
             return (userId, sessionId);
         }
 

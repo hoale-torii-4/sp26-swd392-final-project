@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { productService, type GiftBoxDetailDto } from "../services/productService";
@@ -15,6 +15,7 @@ function formatPrice(v: number) {
 
 export default function ProductDetailPage() {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
     const [product, setProduct] = useState<GiftBoxDetailDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -23,6 +24,7 @@ export default function ProductDetailPage() {
     const [addingToCart, setAddingToCart] = useState(false);
     const [cartMsg, setCartMsg] = useState<string | null>(null);
     const [cartMsgSuccess, setCartMsgSuccess] = useState(false);
+    const [buyNowError, setBuyNowError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!id) return;
@@ -41,6 +43,7 @@ export default function ProductDetailPage() {
         if (!product || addingToCart) return;
         setAddingToCart(true);
         setCartMsg(null);
+        setBuyNowError(null);
         try {
             await cartService.addToCart({
                 Type: 0, // READY_MADE
@@ -53,6 +56,37 @@ export default function ProductDetailPage() {
         } catch {
             setCartMsgSuccess(false);
             setCartMsg("Không thể thêm vào giỏ. Vui lòng thử lại.");
+        } finally {
+            setAddingToCart(false);
+        }
+    };
+
+    const handleBuyNow = async () => {
+        if (!product || addingToCart) return;
+        setAddingToCart(true);
+        setCartMsg(null);
+        setBuyNowError(null);
+
+        try {
+            const buyNowItem = {
+                Id: `buynow-${product.Id}`,
+                Type: 0, // READY_MADE
+                ProductId: product.Id,
+                Quantity: quantity,
+                UnitPrice: product.Price,
+                Name: product.Name,
+            };
+
+            navigate("/checkout", {
+                state: {
+                    buyNow: true,
+                    items: [buyNowItem],
+                    totalItems: quantity,
+                    totalAmount: product.Price * quantity,
+                },
+            });
+        } catch {
+            setBuyNowError("Không thể xử lý mua ngay. Vui lòng thử lại.");
         } finally {
             setAddingToCart(false);
         }
@@ -252,15 +286,17 @@ export default function ProductDetailPage() {
                                     </>
                                 )}
                             </button>
-                            <Link
-                                to="/custom"
-                                className="flex-1 py-3.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/5 transition-colors text-center flex items-center justify-center gap-2"
+                            <button
+                                onClick={handleBuyNow}
+                                disabled={addingToCart}
+                                className="flex-1 py-3.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/5 transition-colors text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 22.5a10.5 10.5 0 100-21 10.5 10.5 0 000 21z" />
                                 </svg>
-                                Tự tạo hộp quà
-                            </Link>
+                                Mua ngay
+                            </button>
                         </div>
 
                         {/* Cart success/error message */}
@@ -270,6 +306,12 @@ export default function ProductDetailPage() {
                                 : "bg-red-50 border border-red-200 text-red-700"
                                 }`}>
                                 {cartMsg}
+                            </div>
+                        )}
+
+                        {buyNowError && (
+                            <div className="rounded-lg px-4 py-3 text-sm flex items-center gap-2 bg-red-50 border border-red-200 text-red-700">
+                                {buyNowError}
                             </div>
                         )}
 

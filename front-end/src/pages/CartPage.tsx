@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartItemDto, type CartDto } from "../services/cartService";
@@ -21,9 +21,11 @@ function getTypeColor(type: number): string {
 /* ═══════════════════ COMPONENT ═══════════════════ */
 
 export default function CartPage() {
+    const navigate = useNavigate();
     const [cart, setCart] = useState<CartDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const fetchCart = async () => {
         try {
@@ -43,8 +45,34 @@ export default function CartPage() {
     }, []);
 
     const items = cart?.Items ?? [];
-    const totalAmount = cart?.TotalAmount ?? 0;
-    const totalItems = cart?.TotalItems ?? 0;
+
+    useEffect(() => {
+        if (!items.length) {
+            setSelectedIds(new Set());
+            return;
+        }
+
+        setSelectedIds((prev) => {
+            const next = new Set<string>();
+            items.forEach((item) => {
+                if (prev.has(item.Id)) {
+                    next.add(item.Id);
+                }
+            });
+            return next;
+        });
+    }, [items]);
+
+    const { selectedItems, selectedTotals } = useMemo(() => {
+        const filtered = items.filter((item) => selectedIds.has(item.Id));
+        const totalItems = filtered.reduce((sum, item) => sum + item.Quantity, 0);
+        const totalAmount = filtered.reduce((sum, item) => sum + item.Quantity * item.UnitPrice, 0);
+        return { selectedItems: filtered, selectedTotals: { totalItems, totalAmount } };
+    }, [items, selectedIds]);
+
+    const allSelected = items.length > 0 && selectedIds.size === items.length;
+    const totalAmount = selectedTotals.totalAmount;
+    const totalItems = selectedTotals.totalItems;
 
     const handleQuantityChange = async (itemId: string, currentQty: number, delta: number) => {
         const newQty = currentQty + delta;
@@ -60,10 +88,46 @@ export default function CartPage() {
     const handleRemove = async (itemId: string) => {
         try {
             await cartService.removeItem(itemId);
+            setSelectedIds((prev) => {
+                const next = new Set(prev);
+                next.delete(itemId);
+                return next;
+            });
             await fetchCart(); // reload after remove
         } catch {
             // silently fail
         }
+    };
+
+    const toggleSelectItem = (itemId: string) => {
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(itemId)) {
+                next.delete(itemId);
+            } else {
+                next.add(itemId);
+            }
+            return next;
+        });
+    };
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setSelectedIds(new Set());
+            return;
+        }
+        setSelectedIds(new Set(items.map((item) => item.Id)));
+    };
+
+    const handleCheckoutSelected = () => {
+        if (!selectedItems.length) return;
+        navigate("/checkout", {
+            state: {
+                selectedItems,
+                totalItems,
+                totalAmount,
+            },
+        });
     };
 
     /* ═══════════════════ RENDER ═══════════════════ */
@@ -139,10 +203,27 @@ export default function CartPage() {
                     <div className="flex flex-col lg:flex-row gap-8">
                         {/* ──────── CART ITEMS LIST ──────── */}
                         <div className="flex-1 min-w-0 space-y-4">
+                            <div className="bg-white rounded-2xl p-4 shadow-sm flex items-center justify-between">
+                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                                    <input
+                                        type="checkbox"
+                                        checked={allSelected}
+                                        onChange={toggleSelectAll}
+                                        className="w-4 h-4 accent-[#8B1A1A]"
+                                    />
+                                    Chọn tất cả
+                                </label>
+                                <span className="text-xs text-gray-400">
+                                    Đã chọn {selectedItems.length}/{items.length} sản phẩm
+                                </span>
+                            </div>
+
                             {items.map((item) => (
                                 <CartItemCard
                                     key={item.Id}
                                     item={item}
+                                    selected={selectedIds.has(item.Id)}
+                                    onSelect={toggleSelectItem}
                                     onQuantityChange={handleQuantityChange}
                                     onRemove={handleRemove}
                                 />
@@ -183,12 +264,16 @@ export default function CartPage() {
                                 </div>
 
                                 {/* Checkout button */}
-                                <Link to="/checkout" className="w-full mt-5 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2">
-                                    Thanh toán
+                                <button
+                                    onClick={handleCheckoutSelected}
+                                    disabled={selectedItems.length === 0}
+                                    className="w-full mt-5 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Thanh toán ({selectedItems.length})
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                     </svg>
-                                </Link>
+                                </button>
 
                                 {/* Helper note */}
                                 <p className="mt-4 text-xs text-gray-400 flex items-start gap-1.5">
@@ -230,14 +315,24 @@ export default function CartPage() {
 
 interface CartItemCardProps {
     item: CartItemDto;
+    selected: boolean;
+    onSelect: (id: string) => void;
     onQuantityChange: (id: string, currentQty: number, delta: number) => void;
     onRemove: (id: string) => void;
 }
 
-function CartItemCard({ item, onQuantityChange, onRemove }: CartItemCardProps) {
+function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: CartItemCardProps) {
     return (
-        <div className="bg-white rounded-2xl p-5 shadow-sm">
+        <div className={`bg-white rounded-2xl p-5 shadow-sm border-2 ${selected ? "border-[#8B1A1A]" : "border-transparent"}`}>
             <div className="flex gap-5">
+                <div className="pt-1">
+                    <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => onSelect(item.Id)}
+                        className="w-4 h-4 accent-[#8B1A1A]"
+                    />
+                </div>
                 {/* Product placeholder image */}
                 <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300">
                     <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
