@@ -1,41 +1,65 @@
 services:
-  # ==========================================
-  # 1. BACK-END API (shophangtet-api)
-  # ==========================================
+  # 1. BACKEND API (.NET)
   - type: web
     name: shophangtet-api
     env: dotnet
     rootDir: back-end/ShopHangTet
-    buildCommand: dotnet publish -c Release -o out
-    startCommand: dotnet out/ShopHangTet.dll
+    buildCommand: dotnet publish -c Release -o ./publish
+    startCommand: dotnet ./publish/ShopHangTet.dll
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
-      # A zai lưu ý tự điền env lên render nhá
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: DOTNET_EnableDiagnostics
+        value: false
+      
+      # Database & Auth
+      - key: ConnectionStrings__MongoConnection
+        sync: false
+      - key: Jwt__SecretKey
+        sync: false
+      
+      # Email Services
       - key: Brevo__ApiKey
         sync: false
       - key: Brevo__SenderEmail
         sync: false
       - key: Brevo__SenderName
         sync: false
-      - key: ConnectionStrings__MongoConnection
+
+      # SePay Configuration
+      - key: SePay__WebhookToken
         sync: false
-      - key: GoogleAuth__ClientId
+      - key: SePay__BankAccountNumber
         sync: false
-      - key: Jwt__SecretKey
-        sync: false
-      - key: OPENROUTER_API_KEY
+      - key: SePay__BankName
         sync: false
 
-  # ==========================================
-  # 2. FRONT-END WEB (shophangtet-web)
-  # ==========================================
+      # Code expects these envs at startup; add fallbacks used by code
+      - key: MONGODB_CONNECTION_STRING
+        sync: false
+
+      - key: GROQ_API_KEY
+        sync: false
+
+      # NodeJS/legacy fallback names (uppercase single-underscore)
+      - key: SEPAY_WEBHOOK_TOKEN
+        sync: false
+      - key: SEPAY_BANK_ACCOUNT_NUMBER
+        sync: false
+
+      - key: OpenRouter__ApiKey
+        sync: false
+
+  # 2. FRONTEND WEB (Vue.js)
   - type: static
     name: shophangtet-web
     env: node
-    rootDir: front-end                
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist           
+    nodeVersion: 20
+    rootDir: front-end
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
     envVars:
       - key: VITE_API_BASE_URL
         sync: false
