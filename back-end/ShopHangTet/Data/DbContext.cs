@@ -60,7 +60,7 @@ namespace ShopHangTet.Data
         modelBuilder.Entity<CustomBox>();
 
         modelBuilder.Entity<OrderModel>();
-        modelBuilder.Entity<OrderItem>();
+        modelBuilder.Entity<OrderItem>().HasKey(x => x.Id);
         modelBuilder.Entity<OrderDelivery>();
         modelBuilder.Entity<OrderDeliveryItem>();
 
@@ -74,6 +74,7 @@ namespace ShopHangTet.Data
         // Owned collections for embedded items
         modelBuilder.Entity<GiftBox>().OwnsMany(x => x.Items);
         modelBuilder.Entity<CustomBox>().OwnsMany(x => x.Items);
+
     }
 }
 }
