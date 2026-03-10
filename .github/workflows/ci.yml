@@ -29,6 +29,7 @@ jobs:
         dotnet-version: '9.0.x'
 
     - name: Tải các thư viện (Restore) - target project
+      # Restore specific project to avoid accidental restore of other/old solutions
       working-directory: ./
       run: dotnet restore back-end/ShopHangTet/ShopHangTet.csproj
 
@@ -105,8 +106,8 @@ jobs:
           LOCAL_HEAD=$(git rev-parse HEAD)
           FORK_HEAD=$(git ls-remote fork refs/heads/main | awk '{print $1}')
           if [ "$LOCAL_HEAD" = "$FORK_HEAD" ]; then
-            echo "✅ Fork branch is already up to date with commit $LOCAL_HEAD. Skipping push."
+            echo "Fork branch is already up to date with commit $LOCAL_HEAD. Skipping push."
           else
-            echo "🔄 Pushing commit $LOCAL_HEAD to fork..."
+            echo "Pushing commit $LOCAL_HEAD to fork..."
             git push fork main --force
           fi
