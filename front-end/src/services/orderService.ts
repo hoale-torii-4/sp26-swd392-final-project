@@ -84,12 +84,22 @@ export interface OrderItemAllocationDto {
 export interface OrderCreatedResponse {
     orderId: string;
     orderCode: string;
-    orderType: string;
-    status: string;
+    orderType: string | number;
+    status: string | number;
     totalAmount: number;
     createdAt: string;
     deliveryAddressCount?: number; // B2B only
 }
+
+type OrderCreatedApiResponse = {
+    OrderId: string;
+    OrderCode: string;
+    OrderType: string | number;
+    Status: string | number;
+    TotalAmount: number;
+    CreatedAt: string;
+    DeliveryAddressCount?: number;
+};
 
 export interface OrderItemResponseDto {
     Id: string;
@@ -161,11 +171,20 @@ export const orderService = {
      * Create a B2C order (single address). Works for guests and members.
      */
     createB2COrder: async (data: CreateOrderB2CDto): Promise<OrderCreatedResponse> => {
-        const res = await apiClient.post<ApiResponse<OrderCreatedResponse>>(
+        const res = await apiClient.post<ApiResponse<OrderCreatedApiResponse>>(
             `${ORDERS}/b2c`,
             data,
         );
-        return res.data.Data;
+        const payload = res.data.Data;
+        return {
+            orderId: payload.OrderId,
+            orderCode: payload.OrderCode,
+            orderType: payload.OrderType,
+            status: payload.Status,
+            totalAmount: payload.TotalAmount,
+            createdAt: payload.CreatedAt,
+            deliveryAddressCount: payload.DeliveryAddressCount,
+        };
     },
 
     /**
@@ -173,11 +192,20 @@ export const orderService = {
      * Create a B2B order (multi-address). Requires authentication.
      */
     createB2BOrder: async (data: CreateOrderB2BDto): Promise<OrderCreatedResponse> => {
-        const res = await apiClient.post<ApiResponse<OrderCreatedResponse>>(
+        const res = await apiClient.post<ApiResponse<OrderCreatedApiResponse>>(
             `${ORDERS}/b2b`,
             data,
         );
-        return res.data.Data;
+        const payload = res.data.Data;
+        return {
+            orderId: payload.OrderId,
+            orderCode: payload.OrderCode,
+            orderType: payload.OrderType,
+            status: payload.Status,
+            totalAmount: payload.TotalAmount,
+            createdAt: payload.CreatedAt,
+            deliveryAddressCount: payload.DeliveryAddressCount,
+        };
     },
 
     /**

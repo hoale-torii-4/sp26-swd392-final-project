@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { paymentService } from "../services/paymentService";
@@ -50,11 +50,31 @@ const TIMELINE_STEPS = [
 /* ═══════════════════ PAGE ═══════════════════ */
 
 export default function OrderSuccessPage() {
+    const navigate = useNavigate();
     const [searchParams] = useSearchParams();
-    const orderCode = (searchParams.get("code") ?? "").toUpperCase();
-    const [copied, setCopied] = useState(false);
+    const storedCode = sessionStorage.getItem("last_order_code") ?? "";
+    const orderCode = (searchParams.get("code") ?? storedCode).toUpperCase();
     const [isPaid, setIsPaid] = useState(false);
     const [totalAmount, setTotalAmount] = useState(0);
+
+    useEffect(() => {
+        if (!orderCode) {
+            navigate("/checkout", { replace: true });
+            return;
+        }
+
+        const fetchInitial = async () => {
+            try {
+                const status = await paymentService.checkPaymentStatus(orderCode);
+                setTotalAmount(status.TotalAmount);
+                setIsPaid(status.IsPaid);
+            } catch {
+                // ignore
+            }
+        };
+
+        fetchInitial();
+    }, [orderCode, navigate]);
 
     // Poll payment status
     useEffect(() => {
@@ -70,12 +90,6 @@ export default function OrderSuccessPage() {
         const interval = setInterval(poll, 5000);
         return () => clearInterval(interval);
     }, [orderCode, isPaid]);
-
-    const handleCopy = async (text: string) => {
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
 
     const activeStep = isPaid ? 1 : 0; // 0 = waiting for payment, 1 = preparing
 
@@ -125,20 +139,6 @@ export default function OrderSuccessPage() {
                     </p>
                 </div>
 
-                {!orderCode && (
-                    <div className="bg-white rounded-2xl p-6 shadow-sm mb-5 text-center">
-                        <p className="text-sm text-gray-600">
-                            Không tìm thấy mã đơn hàng. Vui lòng quay lại trang thanh toán để tạo đơn.
-                        </p>
-                        <Link
-                            to="/checkout"
-                            className="inline-block mt-4 px-5 py-2.5 bg-[#8B1A1A] text-white text-xs font-semibold rounded-lg hover:bg-[#701515] transition-colors"
-                        >
-                            Quay lại thanh toán
-                        </Link>
-                    </div>
-                )}
-
                 {orderCode && (
                     <>
                         {/* ════════ ORDER INFO CARD ════════ */}
@@ -183,83 +183,6 @@ export default function OrderSuccessPage() {
                             </Link>
                         </div>
 
-                        {/* ════════ PAYMENT QR INFO ════════ */}
-                        {!isPaid && (
-                            <div className="bg-white rounded-2xl p-6 shadow-sm mb-5">
-                                <h3 className="text-sm font-bold text-gray-900 text-center mb-5">
-                                    Thông tin thanh toán QR
-                                </h3>
-
-                                {/* Bank info row */}
-                                <div className="grid grid-cols-2 gap-4 mb-5">
-                                    <div className="bg-gray-50 rounded-xl p-4">
-                                        <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Ngân hàng</p>
-                                        <p className="text-sm font-bold text-gray-900">Vietcombank</p>
-                                    </div>
-                                    <div className="bg-gray-50 rounded-xl p-4">
-                                        <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Chủ tài khoản</p>
-                                        <p className="text-sm font-bold text-gray-900">LỘC XUÂN</p>
-                                    </div>
-                                </div>
-
-                                {/* QR code placeholder */}
-                                <div className="flex justify-center mb-5">
-                                    <div className="w-48 h-48 rounded-xl border-2 border-dashed border-gray-200 flex items-center justify-center bg-gray-50">
-                                        <div className="text-center">
-                                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75H16.5v-.75z" />
-                                            </svg>
-                                            <p className="text-[11px] text-gray-400">QR thanh toán</p>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Transfer content */}
-                                <div className="bg-[#FFF8F0] border border-orange-200 rounded-xl p-4 mb-4">
-                                    <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">
-                                        Nội dung chuyển khoản
-                                    </p>
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-lg font-bold text-[#8B1A1A] tracking-wide">{orderCode}</p>
-                                        <button
-                                            onClick={() => handleCopy(orderCode)}
-                                            className="p-2 hover:bg-orange-100 rounded-lg transition-colors cursor-pointer"
-                                            title="Sao chép"
-                                        >
-                                            {copied ? (
-                                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.5 12.75l6 6 9-13.5" />
-                                                </svg>
-                                            ) : (
-                                                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.666 3.888A2.25 2.25 0 0013.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 01-.75.75H9.75a.75.75 0 01-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 011.927-.184" />
-                                                </svg>
-                                            )}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Notice texts */}
-                                <div className="space-y-2 text-xs text-gray-400 text-center">
-                                    <p>Vui lòng chuyển khoản đúng nội dung để hệ thống đối soát tự động.</p>
-                                    <p className="italic">
-                                        Lưu ý: Nếu quý khách đã thực hiện chuyển khoản, vui lòng chờ trong ít phút
-                                        để hệ thống cập nhật trạng thái đơn hàng. Chúng tôi sẽ xử lý đơn ngay khi
-                                        nhận được thanh toán.
-                                    </p>
-                                </div>
-
-                                {/* Polling indicator */}
-                                <div className="flex items-center justify-center gap-2 text-xs text-orange-500 mt-4 animate-pulse">
-                                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                    </svg>
-                                    Đang chờ xác nhận thanh toán...
-                                </div>
-                            </div>
-                        )}
 
                         {/* ════════ ORDER JOURNEY TIMELINE ════════ */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm mb-5">

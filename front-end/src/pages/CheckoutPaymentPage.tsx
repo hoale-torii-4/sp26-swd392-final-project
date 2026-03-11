@@ -4,7 +4,6 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartDto, type CartItemDto } from "../services/cartService";
 import { orderService, type CreateOrderB2CDto, OrderItemType } from "../services/orderService";
-import { paymentService } from "../services/paymentService";
 import { authService } from "../services/authService";
 
 /* ═══════════════════ HELPERS ═══════════════════ */
@@ -52,7 +51,6 @@ export default function CheckoutPaymentPage() {
     const isSelectedCheckout = !isBuyNow && Array.isArray(checkoutState?.selectedItems);
 
     const [orderCode, setOrderCode] = useState<string | null>(null);
-    const [isPaid, setIsPaid] = useState(false);
 
     useEffect(() => {
         if (isBuyNow || isSelectedCheckout) {
@@ -67,21 +65,6 @@ export default function CheckoutPaymentPage() {
             .finally(() => setLoading(false));
     }, [isBuyNow, isSelectedCheckout]);
 
-    // ── Payment status polling ──
-    useEffect(() => {
-        if (!orderCode || isPaid) return;
-        const interval = setInterval(async () => {
-            try {
-                const status = await paymentService.checkPaymentStatus(orderCode);
-                if (status.IsPaid) {
-                    setIsPaid(true);
-                    clearInterval(interval);
-                    navigate(`/order-success?code=${orderCode}`);
-                }
-            } catch { /* ignore polling errors */ }
-        }, 3000);
-        return () => clearInterval(interval);
-    }, [orderCode, isPaid, navigate]);
 
     const items = isBuyNow
         ? checkoutState?.items ?? []
@@ -131,18 +114,12 @@ export default function CheckoutPaymentPage() {
 
             const result = await orderService.createB2COrder(orderData);
             setOrderCode(result.orderCode);
+            sessionStorage.setItem("last_order_code", result.orderCode);
 
             if (!isBuyNow && !isSelectedCheckout) {
                 await cartService.clearCart();
             } else if (isSelectedCheckout) {
                 await Promise.all(items.map((item) => cartService.removeItem(item.Id)));
-            }
-
-            // Generate QR code
-            try {
-                await paymentService.createQr(result.orderCode);
-            } catch {
-                // QR generation failed but order was created
             }
 
             navigate(`/order-success?code=${result.orderCode}`);
