@@ -68,6 +68,8 @@ export default function AccountPage() {
     const [email] = useState(user?.email ?? "");
     const [phone, setPhone] = useState(user?.phone ?? "");
     const [profileMsg, setProfileMsg] = useState("");
+    const [profileError, setProfileError] = useState("");
+    const [profileLoading, setProfileLoading] = useState(false);
 
     /* ── Password form — Formik + Yup ── */
     const [pwServerMsg, setPwServerMsg] = useState("");
@@ -121,11 +123,34 @@ export default function AccountPage() {
         navigate("/login", { state: { message: "Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại." } });
     };
 
-    const handleProfileSubmit = (e: React.FormEvent) => {
+    const handleProfileSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // TODO: profile update API
-        setProfileMsg("Thông tin đã được cập nhật thành công!");
-        setTimeout(() => setProfileMsg(""), 3000);
+        setProfileMsg("");
+        setProfileError("");
+        if (!fullName.trim()) {
+            setProfileError("Họ và tên không được để trống.");
+            return;
+        }
+
+        setProfileLoading(true);
+        try {
+            const res = await authService.updateProfile({ fullName, phone });
+            if (res.Success) {
+                setProfileMsg("Thông tin đã được cập nhật thành công!");
+                // Trigger storage event so Header re-renders if name changed
+                window.dispatchEvent(new Event("storage"));
+            } else {
+                setProfileError(res.Message || "Cập nhật thất bại.");
+            }
+        } catch (err: any) {
+            setProfileError(err.response?.data?.Message || "Có lỗi xảy ra, vui lòng thử lại.");
+        } finally {
+            setProfileLoading(false);
+            setTimeout(() => {
+                setProfileMsg("");
+                setProfileError("");
+            }, 3000);
+        }
     };
 
     const handleLogout = () => {
@@ -245,12 +270,22 @@ export default function AccountPage() {
                             {profileMsg && (
                                 <p className="mt-4 text-sm text-green-600 font-medium">{profileMsg}</p>
                             )}
+                            {profileError && (
+                                <p className="mt-4 text-sm text-red-600 font-medium">{profileError}</p>
+                            )}
 
                             <button
                                 type="submit"
-                                className="mt-6 px-6 py-2.5 bg-[#8B1A1A] text-white text-xs font-bold tracking-[0.15em] uppercase rounded-lg hover:bg-[#7A1717] transition-colors cursor-pointer"
+                                disabled={profileLoading}
+                                className="mt-6 px-6 py-2.5 bg-[#8B1A1A] text-white text-xs font-bold tracking-[0.15em] uppercase rounded-lg hover:bg-[#7A1717] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
                             >
-                                Cập nhật thông tin
+                                {profileLoading && (
+                                    <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                )}
+                                {profileLoading ? "Đang lưu..." : "Cập nhật thông tin"}
                             </button>
                         </form>
 

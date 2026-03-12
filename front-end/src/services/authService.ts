@@ -195,4 +195,29 @@ export const authService = {
         );
         return response.data;
     },
+
+    /**
+     * PUT /api/Auth/profile
+     * Updates user's name and phone number.
+     */
+    updateProfile: async (data: { fullName: string; phone: string | null }) => {
+        const response = await apiClient.put<ApiResponse>(
+            `${AUTH_ENDPOINT}/profile`,
+            data,
+        );
+        const result = response.data;
+        if (result.Success && result.Data) {
+            // Update stored user
+            const currentToken = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+            const store = localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage;
+            
+            const loginRes = {
+                Token: currentToken,
+                User: result.Data,
+                ExpiresAt: new Date().toISOString()
+            };
+            store.setItem(USER_KEY, JSON.stringify(loginRes.User));
+        }
+        return result;
+    },
 };
