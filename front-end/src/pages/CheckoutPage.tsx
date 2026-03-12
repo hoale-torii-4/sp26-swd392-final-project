@@ -271,15 +271,29 @@ export default function CheckoutPage() {
                             {/* ── Action Buttons ── */}
                             <div className="mt-6 space-y-3">
                                 <button
-                                    onClick={() => navigate("/checkout/payment", {
-                                        state: {
-                                            buyNow: isBuyNow ? true : undefined,
-                                            items: isBuyNow ? items : undefined,
-                                            totalItems: isBuyNow ? totalItems : undefined,
-                                            totalAmount: isBuyNow ? totalAmount : undefined,
-                                            selectedItems: isSelectedCheckout ? items : undefined,
-                                        },
-                                    })}
+                                    onClick={() => {
+                                        if (deliveryMethod === "multi") {
+                                            navigate("/checkout/b2b", {
+                                                state: {
+                                                    buyNow: isBuyNow ? true : undefined,
+                                                    items: isBuyNow ? items : undefined,
+                                                    totalItems: isBuyNow ? totalItems : undefined,
+                                                    totalAmount: isBuyNow ? totalAmount : undefined,
+                                                    selectedItems: isSelectedCheckout ? items : undefined,
+                                                },
+                                            });
+                                        } else {
+                                            navigate("/checkout/payment", {
+                                                state: {
+                                                    buyNow: isBuyNow ? true : undefined,
+                                                    items: isBuyNow ? items : undefined,
+                                                    totalItems: isBuyNow ? totalItems : undefined,
+                                                    totalAmount: isBuyNow ? totalAmount : undefined,
+                                                    selectedItems: isSelectedCheckout ? items : undefined,
+                                                },
+                                            });
+                                        }
+                                    }}
                                     className="w-full py-3.5 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2"
                                 >
                                     Tiếp tục
