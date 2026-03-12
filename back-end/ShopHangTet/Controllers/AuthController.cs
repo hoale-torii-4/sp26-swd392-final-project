@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ShopHangTet.Data;
 using ShopHangTet.Models;
@@ -153,7 +153,29 @@ namespace ShopHangTet.Controllers
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
-            if (user == null || string.IsNullOrEmpty(user.PasswordHash) || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            if (user == null || string.IsNullOrEmpty(user.PasswordHash))
+            {
+                return Unauthorized(ApiResponse<object>.ErrorResult("Email hoặc mật khẩu không đúng."));
+            }
+
+            bool isPasswordValid = false;
+            try
+            {
+                if (user.PasswordHash.StartsWith("$2")) // BCrypt format
+                {
+                    isPasswordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+                }
+                else if (user.PasswordHash.Contains(".")) // PBKDF2 format from InternalUserService
+                {
+                    isPasswordValid = VerifyPbkdf2(request.Password, user.PasswordHash);
+                }
+            }
+            catch
+            {
+                isPasswordValid = false;
+            }
+
+            if (!isPasswordValid)
             {
                 return Unauthorized(ApiResponse<object>.ErrorResult("Email hoặc mật khẩu không đúng."));
             }
@@ -357,7 +379,21 @@ namespace ShopHangTet.Controllers
             }
 
             // Check old password
-            if (!BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash))
+            bool isOldPasswordValid = false;
+            try
+            {
+                if (user.PasswordHash.StartsWith("$2"))
+                {
+                    isOldPasswordValid = BCrypt.Net.BCrypt.Verify(request.OldPassword, user.PasswordHash);
+                }
+                else if (user.PasswordHash.Contains("."))
+                {
+                    isOldPasswordValid = VerifyPbkdf2(request.OldPassword, user.PasswordHash);
+                }
+            }
+            catch { isOldPasswordValid = false; }
+
+            if (!isOldPasswordValid)
             {
                 return BadRequest(ApiResponse<object>.ErrorResult("Mật khẩu hiện tại không chính xác."));
             }
@@ -369,6 +405,21 @@ namespace ShopHangTet.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(ApiResponse<object>.SuccessResult(null!, "Đổi mật khẩu thành công!"));
+        }
+
+        private static bool VerifyPbkdf2(string password, string storedHash)
+        {
+            var parts = storedHash.Split('.');
+            if (parts.Length != 3) return false;
+            
+            var iterations = int.Parse(parts[0]);
+            var salt = Convert.FromBase64String(parts[1]);
+            var hash = Convert.FromBase64String(parts[2]);
+            
+            using var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes(password, salt, iterations, System.Security.Cryptography.HashAlgorithmName.SHA256);
+            var computedHash = pbkdf2.GetBytes(32);
+            
+            return System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(hash, computedHash);
         }
     }
 }

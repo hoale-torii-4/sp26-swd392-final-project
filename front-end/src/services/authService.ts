@@ -14,6 +14,14 @@ const AUTH_ENDPOINT = "/Auth";
 const TOKEN_KEY = "token";
 const USER_KEY = "user";
 
+export interface DecodedToken {
+    email: string;
+    exp: number;
+    iat: number;
+    nameid: string; // User ID mapping from back-end
+    role: string;
+}
+
 export const authService = {
     /**
      * POST /api/Auth/register
@@ -85,6 +93,25 @@ export const authService = {
      */
     isAuthenticated: (): boolean => {
         return !!localStorage.getItem(TOKEN_KEY);
+    },
+
+    /**
+     * Check if user is an ADMIN or STAFF
+     */
+    isAdmin: () => {
+        if (!authService.isAuthenticated()) return false;
+        try {
+            const user = authService.getUser();
+            if (user && (user.Role === 1 || user.Role === 2)) return true;
+
+            const token = localStorage.getItem(TOKEN_KEY);
+            if (!token) return false;
+            const payload = token.split(".")[1];
+            const decoded = JSON.parse(atob(payload)) as DecodedToken;
+            return decoded.role === "ADMIN" || decoded.role === "STAFF" || decoded.role === "1" || decoded.role === "2";
+        } catch {
+            return false;
+        }
     },
 
     /**

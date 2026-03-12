@@ -19,6 +19,20 @@ import VerifyEmailPage from './pages/VerifyEmailPage'
 import AIChatBox from './components/AIChatBox'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 
+// Admin imports
+import AdminRoute from './components/AdminRoute'
+import AdminLayout from './components/AdminLayout'
+import AdminLoginPage from './pages/admin/AdminLoginPage'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import AdminOrdersPage from './pages/admin/AdminOrdersPage'
+import AdminUsersPage from './pages/admin/AdminUsersPage'
+import AdminCollectionsPage from './pages/admin/AdminCollectionsPage'
+import AdminGiftBoxesPage from './pages/admin/AdminGiftBoxesPage'
+import AdminInventoryPage from './pages/admin/AdminInventoryPage'
+import AdminMixMatchPage from './pages/admin/AdminMixMatchPage'
+import AdminReviewsPage from './pages/admin/AdminReviewsPage'
+import AdminReportsPage from './pages/admin/AdminReportsPage'
+
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
 function App() {
@@ -43,6 +57,23 @@ function App() {
           <Route path="/checkout" element={<CheckoutPage />} />
           <Route path="/checkout/payment" element={<CheckoutPaymentPage />} />
           <Route path="/order-success" element={<OrderSuccessPage />} />
+
+          {/* Admin panel routes */}
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+          
+          <Route path="/admin" element={<AdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="orders" element={<AdminOrdersPage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="collections" element={<AdminCollectionsPage />} />
+              <Route path="giftboxes" element={<AdminGiftBoxesPage />} />
+              <Route path="inventory" element={<AdminInventoryPage />} />
+              <Route path="mix-match" element={<AdminMixMatchPage />} />
+              <Route path="reviews" element={<AdminReviewsPage />} />
+              <Route path="reports" element={<AdminReportsPage />} />
+            </Route>
+          </Route>
         </Routes>
         <AIChatBox />
       </BrowserRouter>
