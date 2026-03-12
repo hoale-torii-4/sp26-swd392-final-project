@@ -34,6 +34,7 @@ import AdminInventoryPage from './pages/admin/AdminInventoryPage'
 import AdminMixMatchPage from './pages/admin/AdminMixMatchPage'
 import AdminReviewsPage from './pages/admin/AdminReviewsPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
+import AddressesPage from './pages/AddressesPage'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
@@ -53,6 +54,7 @@ function App() {
           <Route path="/guide" element={<GuidePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/account" element={<AccountPage />} />
+          <Route path="/addresses" element={<AddressesPage />} />
           <Route path="/gift-boxes" element={<GiftBoxesPage />} />
           <Route path="/gift-boxes/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
@@ -64,7 +66,7 @@ function App() {
 
           {/* Admin panel routes */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
-          
+
           <Route path="/admin" element={<AdminRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<AdminDashboardPage />} />

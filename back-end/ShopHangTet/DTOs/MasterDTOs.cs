@@ -71,6 +71,15 @@ namespace ShopHangTet.DTOs
         public string? Phone { get; set; }
     }
 
+    public class UpdateProfileDto
+    {
+        [Required]
+        public string FullName { get; set; } = string.Empty;
+
+        [Phone]
+        public string? Phone { get; set; }
+    }
+
     public class GoogleLoginDto
     {
         [Required]

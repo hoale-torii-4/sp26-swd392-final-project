@@ -291,6 +291,46 @@ namespace ShopHangTet.Controllers
                 ExpiresAt = DateTime.UtcNow.AddDays(7) // Match the JWT expiration in JwtService
             };
         }
+
+        // ===========================
+        // UPDATE PROFILE (Name, Phone only)
+        // ===========================
+        [Authorize]
+        [HttpPut("profile")]
+        public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto request)
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+            }
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Không tìm thấy người dùng."));
+            }
+
+            user.FullName = request.FullName;
+            user.Phone = request.Phone;
+
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            var updatedUserDto = new UserResponseDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                FullName = user.FullName,
+                Phone = user.Phone,
+                Role = user.Role,
+                Status = user.Status,
+                CreatedAt = user.CreatedAt
+            };
+
+            return Ok(ApiResponse<UserResponseDto>.SuccessResult(updatedUserDto, "Cập nhật thông tin thành công!"));
+        }
+
         // ===========================
         // 4. FORGOT PASSWORD (OTP)
         // ===========================
