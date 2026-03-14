@@ -147,6 +147,9 @@ namespace ShopHangTet.Models
         [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
 
+        [BsonElement("userId")]
+        public string UserId { get; set; } = string.Empty;
+
         [BsonElement("items")]
         public List<CustomBoxItem> Items { get; set; } = new();
 
@@ -155,6 +158,9 @@ namespace ShopHangTet.Models
 
         [BsonElement("createdAt")]
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        [BsonElement("updatedAt")]
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
     }
 
     public class CustomBoxItem

@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import NotificationModal from "../components/NotificationModal";
 import { authService } from "../services/authService";
+import { mixMatchService } from "../services/mixMatchService";
 
 /* ───── Sidebar Links ───── */
 const sidebarLinks = [
@@ -60,7 +61,29 @@ export default function AccountPage() {
 
     // Redirect if not logged in
     useEffect(() => {
-        if (!authService.isAuthenticated()) navigate("/login");
+        if (!authService.isAuthenticated()) {
+            navigate("/login");
+            return;
+        }
+
+        const loadCustomBox = async () => {
+            setCustomBoxError(null);
+            setCustomBoxLoading(true);
+            try {
+                const res = await mixMatchService.getMyCustomBox();
+                setCustomBox(res?.Data ?? res?.data ?? res ?? null);
+            } catch (err: any) {
+                if (err?.status === 404) {
+                    setCustomBox(null);
+                } else {
+                    setCustomBoxError(err?.message ?? "Không thể tải giỏ quà custom.");
+                }
+            } finally {
+                setCustomBoxLoading(false);
+            }
+        };
+
+        loadCustomBox();
     }, [navigate]);
 
     /* ── Profile form state ── */
@@ -70,6 +93,10 @@ export default function AccountPage() {
     const [profileMsg, setProfileMsg] = useState("");
     const [profileError, setProfileError] = useState("");
     const [profileLoading, setProfileLoading] = useState(false);
+
+    const [customBox, setCustomBox] = useState<any | null>(null);
+    const [customBoxError, setCustomBoxError] = useState<string | null>(null);
+    const [customBoxLoading, setCustomBoxLoading] = useState(false);
 
     /* ── Password form — Formik + Yup ── */
     const [pwServerMsg, setPwServerMsg] = useState("");
@@ -373,6 +400,46 @@ export default function AccountPage() {
                                 {pwLoading ? "Đang xử lý..." : "Đổi mật khẩu"}
                             </button>
                         </form>
+
+                        {/* ── Custom Box ── */}
+                        <div className="bg-white rounded-2xl p-6 lg:p-8 shadow-sm">
+                            <h2 className="text-lg font-serif font-bold text-gray-900 mb-4">
+                                Giỏ quà custom của bạn
+                            </h2>
+                            {customBoxLoading ? (
+                                <p className="text-sm text-gray-500">Đang tải giỏ quà...</p>
+                            ) : customBoxError ? (
+                                <p className="text-sm text-red-600">{customBoxError}</p>
+                            ) : !customBox ? (
+                                <p className="text-sm text-gray-500">Bạn chưa tạo giỏ quà custom nào.</p>
+                            ) : (
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                                        <span className="px-3 py-1 rounded-full bg-[#8B1A1A]/10 text-[#8B1A1A] font-semibold">
+                                            {customBox.TotalItems ?? customBox.totalItems ?? 0} sản phẩm
+                                        </span>
+                                        <span className="font-semibold text-gray-800">
+                                            Tổng tiền: {(customBox.TotalPrice ?? customBox.totalPrice)?.toLocaleString("vi-VN")}₫
+                                        </span>
+                                        <span className="text-xs text-gray-400">
+                                            Tạo lúc: {customBox.CreatedAt ? new Date(customBox.CreatedAt).toLocaleDateString("vi-VN") : "--"}
+                                        </span>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {(customBox.Items ?? customBox.items ?? []).map((item: any) => (
+                                            <div key={item.ItemId ?? item.itemId} className="border border-gray-100 rounded-xl p-4 bg-gray-50">
+                                                <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name ?? item.name}</p>
+                                                <p className="text-xs text-gray-500">SL: {item.Quantity ?? item.quantity}</p>
+                                                <p className="text-xs text-gray-500">Đơn giá: {(item.Price ?? item.price)?.toLocaleString("vi-VN")}₫</p>
+                                                <p className="text-sm font-semibold text-[#8B1A1A] mt-2">
+                                                    {(item.Subtotal ?? item.subtotal)?.toLocaleString("vi-VN")}₫
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         {/* ── Account Metadata ── */}
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-400 px-1">

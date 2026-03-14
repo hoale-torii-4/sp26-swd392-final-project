@@ -1,6 +1,8 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.DTOs;
 using ShopHangTet.Services;
+using System.Security.Claims;
 
 namespace ShopHangTet.Controllers
 {
@@ -88,7 +90,9 @@ namespace ShopHangTet.Controllers
         [Route("/api/mix-match/custom-box")]
         public async Task<ActionResult<string>> CreateCustomBox([FromBody] CreateCustomBoxDTO dto)
         {
-            var id = await _customerService.CreateCustomBoxAsync(dto);
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+            var id = await _customerService.CreateCustomBoxAsync(userId, dto);
             return CreatedAtAction(nameof(GetCustomBox), new { id }, id);
         }
 
@@ -97,6 +101,18 @@ namespace ShopHangTet.Controllers
         public async Task<ActionResult<CustomBoxResponseDTO>> GetCustomBox(string id)
         {
             var res = await _customerService.GetCustomBoxAsync(id);
+            if (res == null) return NotFound();
+            return Ok(res);
+        }
+
+        [HttpGet]
+        [Authorize]
+        [Route("/api/mix-match/custom-box/me")]
+        public async Task<ActionResult<CustomBoxResponseDTO>> GetMyCustomBox()
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+            var res = await _customerService.GetCustomBoxByUserAsync(userId);
             if (res == null) return NotFound();
             return Ok(res);
         }

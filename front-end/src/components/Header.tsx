@@ -6,7 +6,7 @@ import { cartService } from "../services/cartService";
 const navLinks = [
     { label: "TRANG CHỦ", to: "/" },
     { label: "GIỎ QUÀ TẾT", to: "/gift-boxes" },
-    { label: "TỰ TẠO GIỎ QUÀ", to: "/custom" },
+    { label: "TỰ TẠO GIỎ QUÀ", to: "/mix-match" },
     { label: "VỀ CHÚNG TÔI", to: "/about" },
     { label: "HƯỚNG DẪN MUA", to: "/guide" },
 ];
