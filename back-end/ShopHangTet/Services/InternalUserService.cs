@@ -80,7 +80,7 @@ public class InternalUserService
         if (!string.IsNullOrWhiteSpace(status))
         {
             if (status.Equals("active", StringComparison.OrdinalIgnoreCase))
-                query = query.Where(u => u.IsEmailVerified == u.IsEmailVerified || u.Status == UserStatus.ACTIVE);
+                query = query.Where(u => u.Status == UserStatus.ACTIVE);
             else if (status.Equals("inactive", StringComparison.OrdinalIgnoreCase))
                 query = query.Where(u => u.Status != UserStatus.ACTIVE);
         }
