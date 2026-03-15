@@ -130,4 +130,16 @@ export const cartService = {
         });
         window.dispatchEvent(new Event("cart-updated"));
     },
+
+    // ─── Custom Box APIs directly within cartService for convenience ───
+
+    updateCustomBox: async (boxId: string, items: { ItemId: string, Quantity: number }[]) => {
+        const payload = { Items: items };
+        const res = await apiClient.put(`/api/mix-match/custom-box/${boxId}`, payload);
+        return res.data;
+    },
+
+    deleteCustomBox: async (boxId: string) => {
+        await apiClient.delete(`/api/mix-match/custom-box/${boxId}`);
+    }
 };

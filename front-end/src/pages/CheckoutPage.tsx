@@ -4,7 +4,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartDto, type CartItemDto } from "../services/cartService";
 import { authService } from "../services/authService";
-import mixMatchDefault from "../assets/mix-match-default.jpg";
+import mixMatchDefault from "../assets/mix-match-default.svg";
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 
