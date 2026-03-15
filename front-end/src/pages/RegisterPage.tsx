@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useFormik } from "formik";
+import { toast } from "react-toastify";
 import * as Yup from "yup";
 import { GoogleLogin } from "@react-oauth/google";
 import registerBg from "../assets/register-bg.png";
@@ -52,11 +53,13 @@ export default function RegisterPage() {
                     fullName: values.fullname,
                     phone: values.phone || null,
                 });
+                toast.success("Đăng ký thành công!");
                 navigate("/verify-email", {
                     state: { email: values.email },
                 });
             } catch (error) {
                 const apiError = error as ApiError;
+                toast.error(apiError.message || "Đăng ký thất bại. Vui lòng thử lại.");
                 setServerError(apiError.message || "Đăng ký thất bại. Vui lòng thử lại.");
             } finally {
                 setIsLoading(false);

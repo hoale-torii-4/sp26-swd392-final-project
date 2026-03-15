@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { authService } from "../services/authService";
 import { cartService } from "../services/cartService";
 
@@ -66,6 +67,7 @@ export default function Header() {
         authService.clearGuestCartSession();
         cartService.notifyCartUpdated();
         setDropdownOpen(false);
+        toast.success("Đăng xuất thành công", { autoClose: 1500 });
         navigate("/login");
     };
 
@@ -108,12 +110,6 @@ export default function Header() {
 
                 {/* Right Icons */}
                 <div className="flex items-center gap-4">
-                    {/* Search */}
-                    <button className="text-gray-600 hover:text-[#8B1A1A] transition-colors">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                        </svg>
-                    </button>
 
                     {/* Track Order */}
                     <Link

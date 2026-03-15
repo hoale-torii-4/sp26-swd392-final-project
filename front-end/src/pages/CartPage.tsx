@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartItemDto, type CartDto } from "../services/cartService";
@@ -81,7 +82,7 @@ export default function CartPage() {
             const updated = await cartService.updateQuantity(itemId, newQty);
             setCart(updated);
         } catch {
-            // silently fail, could add toast
+            toast.error("Không thể cập nhật giỏ hàng. Vui lòng thử lại.");
         }
     };
 
@@ -94,8 +95,9 @@ export default function CartPage() {
                 return next;
             });
             await fetchCart(); // reload after remove
+            toast.success("Đã xoá sản phẩm khỏi giỏ hàng");
         } catch {
-            // silently fail
+            toast.error("Không thể xóa sản phẩm. Vui lòng thử lại.");
         }
     };
 

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
@@ -128,7 +129,7 @@ export default function AddressesPage() {
             setDeletingId(null);
             fetchAddresses();
         } catch {
-            alert("Không thể xoá địa chỉ. Vui lòng thử lại.");
+            toast.error("Không thể xoá địa chỉ. Vui lòng thử lại.");
         } finally {
             setDeleting(false);
         }
@@ -140,7 +141,7 @@ export default function AddressesPage() {
             await apiClient.patch(`/Address/${id}/set-default`);
             fetchAddresses();
         } catch {
-            alert("Không thể đặt mặc định. Vui lòng thử lại.");
+            toast.error("Không thể đặt mặc định. Vui lòng thử lại.");
         }
     };
 

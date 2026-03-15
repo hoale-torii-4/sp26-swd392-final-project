@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { mixMatchService, type MixMatchItem } from "../services/mixMatchService";
@@ -27,8 +28,6 @@ export default function MixMatchPage() {
     const [selectedCategory, setSelectedCategory] = useState("all");
     const [slots, setSlots] = useState<Array<string | null>>(EMPTY_SLOTS);
     const [dragSource, setDragSource] = useState<DragSource | null>(null);
-    const [message, setMessage] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const load = async () => {
@@ -40,7 +39,8 @@ export default function MixMatchPage() {
                 setItems(toArray(itemsRes));
                 setCategories(toArray(categoriesRes));
             } catch (err: unknown) {
-                setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tải dữ liệu Mix & Match.");
+                const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tải dữ liệu Mix & Match.";
+                toast.error(errMsg);
             }
         };
         load();
@@ -88,8 +88,6 @@ export default function MixMatchPage() {
     };
 
     const handleCreateCustomBox = async () => {
-        setMessage(null);
-        setError(null);
         const payload = slots
             .filter(Boolean)
             .reduce<Record<string, number>>((acc, id) => {
@@ -100,9 +98,10 @@ export default function MixMatchPage() {
         const itemsPayload = Object.entries(payload).map(([ItemId, Quantity]) => ({ ItemId, Quantity }));
         try {
             const id = await mixMatchService.createCustomBox(itemsPayload);
-            setMessage(`Đã tạo giỏ quà custom (#${id}).`);
+            toast.success(`Đã tạo giỏ quà custom`);
         } catch (err: unknown) {
-            setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.");
+            const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.";
+            toast.error(errMsg);
         }
     };
 
@@ -122,17 +121,6 @@ export default function MixMatchPage() {
             </section>
 
             <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pb-14">
-                {error && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-4 mb-6">
-                        {error}
-                    </div>
-                )}
-                {message && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl p-4 mb-6">
-                        {message}
-                    </div>
-                )}
-
                 <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8">
                     <div>
                         <div className="bg-white rounded-2xl p-4 shadow-sm mb-6 flex flex-wrap gap-3">

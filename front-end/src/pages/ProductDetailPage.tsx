@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { productService, type GiftBoxDetailDto } from "../services/productService";
@@ -52,10 +53,12 @@ export default function ProductDetailPage() {
             });
             setCartMsgSuccess(true);
             setCartMsg("Đã thêm vào giỏ hàng!");
+            toast.success("Đã thêm vào giỏ hàng!");
             setTimeout(() => setCartMsg(null), 3000);
         } catch {
             setCartMsgSuccess(false);
             setCartMsg("Không thể thêm vào giỏ. Vui lòng thử lại.");
+            toast.error("Không thể thêm vào giỏ. Vui lòng thử lại.");
         } finally {
             setAddingToCart(false);
         }
@@ -87,6 +90,7 @@ export default function ProductDetailPage() {
             });
         } catch {
             setBuyNowError("Không thể xử lý mua ngay. Vui lòng thử lại.");
+            toast.error("Không thể xử lý mua ngay. Vui lòng thử lại.");
         } finally {
             setAddingToCart(false);
         }

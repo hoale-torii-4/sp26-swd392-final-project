@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useFormik } from "formik";
+import { toast } from "react-toastify";
 import * as Yup from "yup";
 import { GoogleLogin } from "@react-oauth/google";
 import loginBg from "../assets/login-bg.png";
@@ -38,12 +39,15 @@ export default function LoginPage() {
                 });
                 if (response.Success) {
                     // Token & user data are already saved by authService.login()
+                    toast.success("Đăng nhập thành công!");
                     navigate("/");
                 } else {
+                    toast.error(response.Message || "Đăng nhập thất bại.");
                     setServerError(response.Message || "Đăng nhập thất bại.");
                 }
             } catch (error) {
                 const apiError = error as ApiError;
+                toast.error(apiError.message || "Đăng nhập thất bại. Vui lòng thử lại.");
                 setServerError(apiError.message || "Đăng nhập thất bại. Vui lòng thử lại.");
             } finally {
                 setIsLoading(false);

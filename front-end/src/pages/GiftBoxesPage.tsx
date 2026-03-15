@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { productService, type GiftBoxListDto } from "../services/productService";
@@ -44,6 +45,7 @@ export default function GiftBoxesPage() {
 
     const [collections, setCollections] = useState<any[]>([]);
     const [selectedCollectionId, setSelectedCollectionId] = useState<string>("all");
+    const [selectedCollectionName, setSelectedCollectionName] = useState<string>("");
 
     const [selectedPriceRanges, setSelectedPriceRanges] = useState<number[]>([]);
     const [sortBy, setSortBy] = useState("popular");
@@ -67,7 +69,16 @@ export default function GiftBoxesPage() {
                 setCollections(Array.isArray(finalCols) ? finalCols : []);
             } catch (err: any) {
                 console.error("GiftBoxes fetch error:", err);
-                setError(err?.message || "Không thể tải danh sách giỏ quà. Vui lòng thử lại.");
+                const message = err?.message || "Không thể tải danh sách giỏ quà. Vui lòng thử lại.";
+                setError(message);
+                toast.error(message, {
+                    position: "top-center",
+                    autoClose: 3000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                });
             } finally {
                 setLoading(false);
             }
@@ -76,11 +87,22 @@ export default function GiftBoxesPage() {
 
     useEffect(() => {
         if (collectionIdParam) {
-            setSelectedCollectionId(collectionIdParam);
+            const match = collections.find((col: any) => {
+                const id = col?.Id || col?.id;
+                return id === collectionIdParam;
+            });
+            if (match) {
+                setSelectedCollectionId(collectionIdParam);
+                setSelectedCollectionName(match?.Name || match?.name || "");
+            } else {
+                setSelectedCollectionId("all");
+                setSelectedCollectionName("");
+            }
         } else {
             setSelectedCollectionId("all");
+            setSelectedCollectionName("");
         }
-    }, [collectionIdParam]);
+    }, [collectionIdParam, collections]);
 
     /* ── filter + sort ── */
     const filtered = useMemo(() => {
@@ -88,7 +110,14 @@ export default function GiftBoxesPage() {
 
         // Collection filter
         if (selectedCollectionId !== "all") {
-            items = items.filter((gb) => (gb.CollectionId || (gb as any).collectionId) === selectedCollectionId);
+            items = items.filter((gb) => {
+                const gbColId = gb.CollectionId || (gb as any).collectionId;
+                const gbColName = (gb as any).Collection || (gb as any).CollectionName;
+                
+                if (gbColId && gbColId === selectedCollectionId) return true;
+                if (gbColName && selectedCollectionName && gbColName === selectedCollectionName) return true;
+                return false;
+            });
         }
 
         // Price filter
@@ -115,7 +144,7 @@ export default function GiftBoxesPage() {
         }
 
         return items;
-    }, [giftBoxes, selectedCollectionId, selectedPriceRanges, sortBy]);
+    }, [giftBoxes, selectedCollectionId, selectedCollectionName, selectedPriceRanges, sortBy]);
 
     /* ── pagination ── */
     const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -140,13 +169,14 @@ export default function GiftBoxesPage() {
         setSortBy("popular");
     };
 
-    const onSelectCollection = (id: string) => {
+    const onSelectCollection = (id: string, name?: string) => {
         if (id === "all") {
             searchParams.delete("collectionId");
         } else {
             searchParams.set("collectionId", id);
         }
         setSearchParams(searchParams);
+        // Note: the useEffect will auto-sync `selectedCollectionName` when `collections` and `collectionIdParam` change.
     };
 
     /* ═══════════════════ RENDER ═══════════════════ */
@@ -244,13 +274,14 @@ export default function GiftBoxesPage() {
                             </button>
                             {collections.map((col: any) => {
                                 const id = col?.Id || col?.id;
+                                const name = col?.Name || col?.name || "Collection";
                                 return (
                                     <button
-                                        key={id}
-                                        onClick={() => onSelectCollection(id)}
+                                        key={id || name}
+                                        onClick={() => onSelectCollection(id, name)}
                                         className={`shrink-0 px-5 py-2 rounded-full border text-sm font-medium transition-colors ${selectedCollectionId === id ? "bg-[#8B1A1A] border-[#8B1A1A] text-white" : "border-gray-300 text-gray-600 bg-white hover:border-[#8B1A1A]"}`}
                                     >
-                                        {col?.Name || col?.name || "Collection"}
+                                        {name}
                                     </button>
                                 );
                             })}

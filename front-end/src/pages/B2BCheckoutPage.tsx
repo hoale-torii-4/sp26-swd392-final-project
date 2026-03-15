@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
@@ -156,7 +157,7 @@ export default function B2BCheckoutPage() {
             setShowAddAddr(false);
             setNewAddr({ ReceiverName: "", ReceiverPhone: "", FullAddress: "" });
         } catch {
-            alert("Không thể thêm địa chỉ. Vui lòng thử lại.");
+            toast.error("Không thể thêm địa chỉ. Vui lòng thử lại.");
         } finally {
             setAddingAddr(false);
         }

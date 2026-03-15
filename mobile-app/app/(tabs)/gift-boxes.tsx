@@ -47,6 +47,7 @@ export default function GiftBoxesScreen() {
 
     const [selectedPriceRanges, setSelectedPriceRanges] = useState<number[]>([]);
     const [selectedCollectionId, setSelectedCollectionId] = useState<string>('all');
+    const [selectedCollectionName, setSelectedCollectionName] = useState<string>('');
     const [sortBy, setSortBy] = useState('popular');
     const [filterModalVisible, setFilterModalVisible] = useState(false);
     const [sortModalVisible, setSortModalVisible] = useState(false);
@@ -70,8 +71,8 @@ export default function GiftBoxesScreen() {
 
     useEffect(() => { fetchData(); }, []);
 
-    const scrollToSelected = useCallback((id: string) => {
-        const pos = tabPositions.current[id];
+    const scrollToSelected = useCallback((key: string) => {
+        const pos = tabPositions.current[key];
         if (!pos) {
             tabsScrollRef.current?.scrollTo({ x: 0, animated: false });
             return;
@@ -88,17 +89,26 @@ export default function GiftBoxesScreen() {
             });
             if (match) {
                 setSelectedCollectionId(collectionIdParam);
+                setSelectedCollectionName(match?.Name || match?.name || '');
             } else {
                 setSelectedCollectionId('all');
+                setSelectedCollectionName('');
             }
         } else {
             setSelectedCollectionId('all');
+            setSelectedCollectionName('');
         }
     }, [collectionIdParam, collections]);
 
     useEffect(() => {
-        scrollToSelected(selectedCollectionId);
-    }, [selectedCollectionId, collections.length, scrollToSelected]);
+        if (selectedCollectionId !== 'all') {
+            scrollToSelected(selectedCollectionId);
+        } else if (selectedCollectionName) {
+            scrollToSelected(selectedCollectionName);
+        } else {
+            scrollToSelected('all');
+        }
+    }, [selectedCollectionId, selectedCollectionName, collections.length, scrollToSelected]);
 
     const onRefresh = useCallback(() => {
         setRefreshing(true);
@@ -107,9 +117,20 @@ export default function GiftBoxesScreen() {
 
     const filtered = useMemo(() => {
         let items = [...giftBoxes];
+        const normalizedName = selectedCollectionName.trim().toLowerCase();
 
         if (selectedCollectionId !== 'all') {
-            items = items.filter((gb) => gb.CollectionId === selectedCollectionId);
+            items = items.filter((gb) => {
+                if (gb.CollectionId === selectedCollectionId) return true;
+                if (!normalizedName) return false;
+                const name = (gb.CollectionName || (gb as any).Collection || '').toLowerCase();
+                return name === normalizedName;
+            });
+        } else if (normalizedName) {
+            items = items.filter((gb) => {
+                const name = (gb.CollectionName || (gb as any).Collection || '').toLowerCase();
+                return name === normalizedName;
+            });
         }
 
         if (selectedPriceRanges.length > 0) {
@@ -126,7 +147,7 @@ export default function GiftBoxesScreen() {
             case 'price-desc': items.sort((a, b) => b.Price - a.Price); break;
         }
         return items;
-    }, [giftBoxes, selectedCollectionId, selectedPriceRanges, sortBy]);
+    }, [giftBoxes, selectedCollectionId, selectedCollectionName, selectedPriceRanges, sortBy]);
 
     const togglePriceRange = (idx: number) => {
         setSelectedPriceRanges((prev) =>
@@ -134,8 +155,9 @@ export default function GiftBoxesScreen() {
         );
     };
 
-    const onSelectCollection = useCallback((id: string) => {
+    const onSelectCollection = useCallback((id: string, name?: string) => {
         setSelectedCollectionId(id);
+        setSelectedCollectionName(name || '');
     }, []);
 
     const getBadge = (price: number) => {
@@ -200,7 +222,7 @@ export default function GiftBoxesScreen() {
                 >
                     <TouchableOpacity
                         style={[styles.collectionTab, selectedCollectionId === 'all' && styles.collectionTabActive]}
-                        onPress={() => onSelectCollection('all')}
+                        onPress={() => onSelectCollection('all', '')}
                         onLayout={(e) => {
                             tabPositions.current['all'] = {
                                 x: e.nativeEvent.layout.x,
@@ -216,14 +238,15 @@ export default function GiftBoxesScreen() {
                     </TouchableOpacity>
                     {collections.map((col: any) => {
                         const id = col?.Id || col?.id;
+                        const name = col?.Name || col?.name || 'Collection';
                         return (
                             <TouchableOpacity
-                                key={id}
+                                key={id || name}
                                 style={[styles.collectionTab, selectedCollectionId === id && styles.collectionTabActive]}
-                                onPress={() => onSelectCollection(id)}
+                                onPress={() => onSelectCollection(id, name)}
                                 onLayout={(e) => {
-                                    if (!id) return;
-                                    tabPositions.current[id] = {
+                                    const key = id || name;
+                                    tabPositions.current[key] = {
                                         x: e.nativeEvent.layout.x,
                                         width: e.nativeEvent.layout.width,
                                     };
@@ -232,7 +255,7 @@ export default function GiftBoxesScreen() {
                                 <Text
                                     style={[styles.collectionTabText, selectedCollectionId === id && styles.collectionTabTextActive]}
                                 >
-                                    {col?.Name || col?.name || 'Collection'}
+                                    {name}
                                 </Text>
                             </TouchableOpacity>
                         );

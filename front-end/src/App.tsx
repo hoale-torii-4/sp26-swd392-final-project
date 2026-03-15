@@ -22,6 +22,8 @@ import MixMatchPage from './pages/MixMatchPage'
 import OrdersPage from './pages/OrdersPage'
 import AIChatBox from './components/AIChatBox'
 import { GoogleOAuthProvider } from '@react-oauth/google'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
 
 // Admin imports
 import AdminRoute from './components/AdminRoute'
@@ -88,6 +90,16 @@ function App() {
           </Route>
         </Routes>
         <AIChatBox />
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+        />
       </BrowserRouter>
     </GoogleOAuthProvider>
   )
