@@ -36,4 +36,8 @@ export const mixMatchService = {
         const res = await apiClient.get("/mix-match/custom-box/me");
         return res.data;
     },
+    getMyCustomBoxes: async () => {
+        const res = await apiClient.get("/mix-match/custom-box/me/all");
+        return res.data;
+    },
 };

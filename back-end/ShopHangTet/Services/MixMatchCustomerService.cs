@@ -28,10 +28,13 @@ public class MixMatchCustomerService : IMixMatchCustomerService
         if (itemsDict.Count != itemIds.Count)
             throw new InvalidOperationException("One or more selected items were not found.");
 
-        var existing = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.UserId == userId);
-
-        var customBox = existing ?? new CustomBox { UserId = userId };
-        customBox.Items = dto.Items.Select(i => new CustomBoxItem { ItemId = i.ItemId, Quantity = i.Quantity }).ToList();
+        var customBox = new CustomBox
+        {
+            UserId = userId,
+            Items = dto.Items.Select(i => new CustomBoxItem { ItemId = i.ItemId, Quantity = i.Quantity }).ToList(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
 
         decimal totalPrice = 0m;
         foreach (var it in customBox.Items)
@@ -41,17 +44,8 @@ public class MixMatchCustomerService : IMixMatchCustomerService
         }
 
         customBox.TotalPrice = totalPrice;
-        customBox.UpdatedAt = DateTime.UtcNow;
 
-        if (existing == null)
-        {
-            await _context.CustomBoxes.AddAsync(customBox);
-        }
-        else
-        {
-            _context.CustomBoxes.Update(customBox);
-        }
-
+        await _context.CustomBoxes.AddAsync(customBox);
         await _context.SaveChangesAsync();
 
         return customBox.Id;
@@ -60,9 +54,32 @@ public class MixMatchCustomerService : IMixMatchCustomerService
     public async Task<CustomBoxResponseDTO?> GetCustomBoxByUserAsync(string userId)
     {
         if (string.IsNullOrWhiteSpace(userId)) return null;
-        var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.UserId == userId);
+        var box = await _context.CustomBoxes
+            .Where(cb => cb.UserId == userId)
+            .OrderByDescending(cb => cb.CreatedAt)
+            .FirstOrDefaultAsync();
         if (box == null) return null;
         return await MapCustomBoxAsync(box);
+    }
+
+    public async Task<List<CustomBoxResponseDTO>> GetCustomBoxesByUserAsync(string userId)
+    {
+        if (string.IsNullOrWhiteSpace(userId)) return new List<CustomBoxResponseDTO>();
+
+        var boxes = await _context.CustomBoxes
+            .Where(cb => cb.UserId == userId)
+            .OrderByDescending(cb => cb.CreatedAt)
+            .ToListAsync();
+
+        if (!boxes.Any()) return new List<CustomBoxResponseDTO>();
+
+        var results = new List<CustomBoxResponseDTO>();
+        foreach (var box in boxes)
+        {
+            results.Add(await MapCustomBoxAsync(box));
+        }
+
+        return results;
     }
 
     public async Task<CustomBoxResponseDTO?> GetCustomBoxAsync(string id)

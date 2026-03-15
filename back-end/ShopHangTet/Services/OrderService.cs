@@ -56,6 +56,38 @@ namespace ShopHangTet.Services
             };
         }
 
+        /// Lấy đơn hàng của user (profile)
+        public async Task<List<MyOrderResponseDto>> GetMyOrdersAsync(string userId, int skip, int take)
+        {
+            var userObjectId = ObjectId.Parse(userId);
+            var orders = await _context.Orders
+                .Where(o => o.UserId == userObjectId)
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip(skip)
+                .Take(take)
+                .ToListAsync();
+
+            return orders.Select(o => new MyOrderResponseDto
+            {
+                Id = o.Id.ToString(),
+                OrderCode = o.OrderCode,
+                OrderType = o.OrderType,
+                Status = o.Status,
+                TotalAmount = o.TotalAmount,
+                CreatedAt = o.CreatedAt,
+                DeliveryDate = o.DeliveryDate,
+                TotalItems = o.Items.Sum(i => i.Quantity),
+                Items = o.Items.Select(i => new MyOrderItemDto
+                {
+                    Name = i.ProductName,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice,
+                    TotalPrice = i.TotalPrice,
+                    Type = i.Type
+                }).ToList()
+            }).ToList();
+        }
+
         /// Cập nhật trạng thái đơn hàng và trừ kho khi chuyển sang PREPARING
         public async Task<OrderModel> UpdateStatusAsync(string orderId, Models.OrderStatus status, string updatedBy, string? notes = null)
         {

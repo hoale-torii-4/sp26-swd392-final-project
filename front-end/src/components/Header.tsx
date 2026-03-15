@@ -40,6 +40,7 @@ export default function Header() {
         setDropdownOpen(false);
     }, [location.pathname]);
 
+
     const loadCartCount = async () => {
         try {
             const data = await cartService.getCart();
@@ -193,6 +194,18 @@ export default function Header() {
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                                         </svg>
                                         Sổ địa chỉ
+                                    </Link>
+
+                                    <Link
+                                        to="/custom-box"
+                                        className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                    >
+                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3.75l8.25 4.5v7.5L12 20.25l-8.25-4.5v-7.5L12 3.75z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3.75v16.5" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 8.25l8.25 4.5 8.25-4.5" />
+                                        </svg>
+                                        Giỏ quà custom
                                     </Link>
 
                                     {/* Separator */}

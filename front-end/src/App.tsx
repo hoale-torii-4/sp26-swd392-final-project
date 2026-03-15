@@ -19,6 +19,7 @@ import OrderSuccessPage from './pages/OrderSuccessPage'
 import VerifyEmailPage from './pages/VerifyEmailPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
 import MixMatchPage from './pages/MixMatchPage'
+import OrdersPage from './pages/OrdersPage'
 import AIChatBox from './components/AIChatBox'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 
@@ -36,6 +37,7 @@ import AdminMixMatchPage from './pages/admin/AdminMixMatchPage'
 import AdminReviewsPage from './pages/admin/AdminReviewsPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
 import AddressesPage from './pages/AddressesPage'
+import CustomBoxPage from './pages/CustomBoxPage'
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
@@ -56,6 +58,7 @@ function App() {
           <Route path="/about" element={<AboutPage />} />
           <Route path="/account" element={<AccountPage />} />
           <Route path="/addresses" element={<AddressesPage />} />
+          <Route path="/custom-box" element={<CustomBoxPage />} />
           <Route path="/gift-boxes" element={<GiftBoxesPage />} />
           <Route path="/gift-boxes/:id" element={<ProductDetailPage />} />
           <Route path="/cart" element={<CartPage />} />
@@ -64,6 +67,7 @@ function App() {
           <Route path="/checkout/payment" element={<CheckoutPaymentPage />} />
           <Route path="/order-success" element={<OrderSuccessPage />} />
           <Route path="/order-tracking" element={<OrderTrackingPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
           <Route path="/mix-match" element={<MixMatchPage />} />
 
           {/* Admin panel routes */}

@@ -116,5 +116,16 @@ namespace ShopHangTet.Controllers
             if (res == null) return NotFound();
             return Ok(res);
         }
+
+        [HttpGet]
+        [Authorize]
+        [Route("/api/mix-match/custom-box/me/all")]
+        public async Task<ActionResult<List<CustomBoxResponseDTO>>> GetMyCustomBoxes()
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+            var res = await _customerService.GetCustomBoxesByUserAsync(userId);
+            return Ok(res);
+        }
     }
 }

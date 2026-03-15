@@ -1,8 +1,9 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.Services;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace ShopHangTet.Controllers;
 
@@ -187,16 +188,25 @@ public class OrdersController : ControllerBase
         }
     }
 
+    [Authorize]
     [HttpGet("my-orders")]
-    public IActionResult GetMyOrders([FromQuery] int skip = 0, [FromQuery] int take = 20)
+    public async Task<IActionResult> GetMyOrders([FromQuery] int skip = 0, [FromQuery] int take = 20)
     {
         try
         {
-            return Ok(new { orders = new List<object>(), message = "Coming soon" });
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+            }
+
+            var orders = await _orderService.GetMyOrdersAsync(userId, skip, take);
+
+            return Ok(ApiResponse<List<MyOrderResponseDto>>.SuccessResult(orders, "Lấy đơn hàng thành công"));
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
         }
     }
 

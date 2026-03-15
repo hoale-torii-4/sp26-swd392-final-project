@@ -20,6 +20,9 @@ namespace ShopHangTet.Services
         // === Order Tracking ===
         Task<OrderTrackingResult?> TrackOrderAsync(string orderCode, string email);
 
+        // === My Orders ===
+        Task<List<MyOrderResponseDto>> GetMyOrdersAsync(string userId, int skip, int take);
+
         // === Status & Inventory ===
         Task<OrderModel> UpdateStatusAsync(string orderId, OrderStatus status, string updatedBy, string? notes = null);
 
