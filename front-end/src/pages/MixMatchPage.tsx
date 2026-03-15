@@ -94,78 +94,78 @@ export default function MixMatchPage() {
     };
 
     const buildItemsPayload = () => {
-        const handleCreateCustomBox = async () => {
-            const payload = slots
-                .filter(Boolean)
-                .reduce<Record<string, number>>((acc, id) => {
-                    if (!id) return acc;
-                    acc[id] = (acc[id] ?? 0) + 1;
-                    return acc;
-                }, {});
-            return Object.entries(payload).map(([ItemId, Quantity]) => ({ ItemId, Quantity }));
-        };
+        const payload = slots
+            .filter(Boolean)
+            .reduce<Record<string, number>>((acc, id) => {
+                if (!id) return acc;
+                acc[id] = (acc[id] ?? 0) + 1;
+                return acc;
+            }, {});
+        return Object.entries(payload).map(([ItemId, Quantity]) => ({ ItemId, Quantity }));
+    };
 
-        const handleCreateCustomBox = async () => {
-            setMessage(null);
-            setError(null);
-            setIsSubmitting(true);
-            const itemsPayload = buildItemsPayload();
-            try {
-                const id = await mixMatchService.createCustomBox(itemsPayload);
-                toast.success(`Đã tạo giỏ quà custom`);
-            } catch (err: unknown) {
-                setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.");
-            } finally {
-                setIsSubmitting(false);
-            }
-        };
+    const handleCreateCustomBox = async () => {
+        setMessage(null);
+        setError(null);
+        setIsSubmitting(true);
+        const itemsPayload = buildItemsPayload();
+        try {
+            const id = await mixMatchService.createCustomBox(itemsPayload);
+            toast.success("Đã tạo giỏ quà custom");
+        } catch (err: unknown) {
+            const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.";
+            toast.error(errMsg);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
-        const handleAddToCart = async () => {
-            setMessage(null);
-            setError(null);
-            setIsSubmitting(true);
-            const itemsPayload = buildItemsPayload();
-            try {
-                const id = await mixMatchService.createCustomBox(itemsPayload);
-                await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
-                setMessage("Đã thêm giỏ quà vào giỏ hàng.");
-            } catch (err: unknown) {
-                setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể thêm vào giỏ hàng.");
-            } finally {
-                setIsSubmitting(false);
-            }
-        };
+    const handleAddToCart = async () => {
+        setMessage(null);
+        setError(null);
+        setIsSubmitting(true);
+        const itemsPayload = buildItemsPayload();
+        try {
+            const id = await mixMatchService.createCustomBox(itemsPayload);
+            await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
+            toast.success("Đã thêm giỏ quà vào giỏ hàng.");
+        } catch (err: unknown) {
+            const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể thêm vào giỏ hàng.";
+            toast.error(errMsg);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
         const handleBuyNow = async () => {
-            setMessage(null);
-            setError(null);
-            setIsSubmitting(true);
-            const itemsPayload = buildItemsPayload();
-            try {
-                const id = await mixMatchService.createCustomBox(itemsPayload);
-                const cart = await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
-                const addedItem = cart.Items.find((entry) => entry.ProductId === id);
-                if (addedItem) {
-                    navigate("/checkout", {
-                        state: {
-                            selectedItems: [addedItem],
-                            totalItems: addedItem.Quantity,
-                            totalAmount: addedItem.Quantity * addedItem.UnitPrice,
-                        },
-                    });
-                } else {
-                    navigate("/cart");
-                }
-            } catch (err: unknown) {
-                setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể mua ngay.");
-            } finally {
-                setIsSubmitting(false);
-                const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.";
-                toast.error(errMsg);
+        setMessage(null);
+        setError(null);
+        setIsSubmitting(true);
+        const itemsPayload = buildItemsPayload();
+        try {
+            const id = await mixMatchService.createCustomBox(itemsPayload);
+            const cart = await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
+            const addedItem = cart.Items.find((entry) => entry.ProductId === id);
+            if (addedItem) {
+                navigate("/checkout", {
+                    state: {
+                        selectedItems: [addedItem],
+                        totalItems: addedItem.Quantity,
+                        totalAmount: addedItem.Quantity * addedItem.UnitPrice,
+                    },
+                });
+            } else {
+                navigate("/cart");
             }
-        };
+        } catch (err: unknown) {
+            const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể mua ngay.";
+            toast.error(errMsg);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
-        return (
+    return (
             <div className="font-sans bg-[#F5F5F0] min-h-screen flex flex-col">
                 <Header />
 
