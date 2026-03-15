@@ -169,7 +169,7 @@ export default function GiftBoxesPage() {
         setSortBy("popular");
     };
 
-    const onSelectCollection = (id: string, name?: string) => {
+    const onSelectCollection = (id: string) => {
         if (id === "all") {
             searchParams.delete("collectionId");
         } else {
@@ -278,7 +278,7 @@ export default function GiftBoxesPage() {
                                 return (
                                     <button
                                         key={id || name}
-                                        onClick={() => onSelectCollection(id, name)}
+                                        onClick={() => onSelectCollection(id)}
                                         className={`shrink-0 px-5 py-2 rounded-full border text-sm font-medium transition-colors ${selectedCollectionId === id ? "bg-[#8B1A1A] border-[#8B1A1A] text-white" : "border-gray-300 text-gray-600 bg-white hover:border-[#8B1A1A]"}`}
                                     >
                                         {name}

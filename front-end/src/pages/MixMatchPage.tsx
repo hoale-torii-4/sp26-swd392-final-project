@@ -31,8 +31,6 @@ export default function MixMatchPage() {
     const [selectedCategory, setSelectedCategory] = useState("all");
     const [slots, setSlots] = useState<Array<string | null>>(EMPTY_SLOTS);
     const [dragSource, setDragSource] = useState<DragSource | null>(null);
-    const [message, setMessage] = useState<string | null>(null);
-    const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
@@ -105,12 +103,10 @@ export default function MixMatchPage() {
     };
 
     const handleCreateCustomBox = async () => {
-        setMessage(null);
-        setError(null);
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
-            const id = await mixMatchService.createCustomBox(itemsPayload);
+            await mixMatchService.createCustomBox(itemsPayload);
             toast.success("Đã tạo giỏ quà custom");
         } catch (err: unknown) {
             const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.";
@@ -121,8 +117,6 @@ export default function MixMatchPage() {
     };
 
     const handleAddToCart = async () => {
-        setMessage(null);
-        setError(null);
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
@@ -137,9 +131,7 @@ export default function MixMatchPage() {
         }
     };
 
-        const handleBuyNow = async () => {
-        setMessage(null);
-        setError(null);
+    const handleBuyNow = async () => {
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
