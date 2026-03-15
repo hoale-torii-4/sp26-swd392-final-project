@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { mixMatchService, type MixMatchItem } from "../services/mixMatchService";
+import { cartService } from "../services/cartService";
 
 const formatPrice = (value: number) => value.toLocaleString("vi-VN") + "₫";
 
@@ -22,6 +24,7 @@ type DragSource = {
 };
 
 export default function MixMatchPage() {
+    const navigate = useNavigate();
     const [items, setItems] = useState<MixMatchItem[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("all");
@@ -29,6 +32,7 @@ export default function MixMatchPage() {
     const [dragSource, setDragSource] = useState<DragSource | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         const load = async () => {
@@ -87,9 +91,7 @@ export default function MixMatchPage() {
         });
     };
 
-    const handleCreateCustomBox = async () => {
-        setMessage(null);
-        setError(null);
+    const buildItemsPayload = () => {
         const payload = slots
             .filter(Boolean)
             .reduce<Record<string, number>>((acc, id) => {
@@ -97,12 +99,64 @@ export default function MixMatchPage() {
                 acc[id] = (acc[id] ?? 0) + 1;
                 return acc;
             }, {});
-        const itemsPayload = Object.entries(payload).map(([ItemId, Quantity]) => ({ ItemId, Quantity }));
+        return Object.entries(payload).map(([ItemId, Quantity]) => ({ ItemId, Quantity }));
+    };
+
+    const handleCreateCustomBox = async () => {
+        setMessage(null);
+        setError(null);
+        setIsSubmitting(true);
+        const itemsPayload = buildItemsPayload();
         try {
             const id = await mixMatchService.createCustomBox(itemsPayload);
             setMessage(`Đã tạo giỏ quà custom (#${id}).`);
         } catch (err: unknown) {
             setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleAddToCart = async () => {
+        setMessage(null);
+        setError(null);
+        setIsSubmitting(true);
+        const itemsPayload = buildItemsPayload();
+        try {
+            const id = await mixMatchService.createCustomBox(itemsPayload);
+            await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
+            setMessage("Đã thêm giỏ quà vào giỏ hàng.");
+        } catch (err: unknown) {
+            setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể thêm vào giỏ hàng.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleBuyNow = async () => {
+        setMessage(null);
+        setError(null);
+        setIsSubmitting(true);
+        const itemsPayload = buildItemsPayload();
+        try {
+            const id = await mixMatchService.createCustomBox(itemsPayload);
+            const cart = await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
+            const addedItem = cart.Items.find((entry) => entry.ProductId === id);
+            if (addedItem) {
+                navigate("/checkout", {
+                    state: {
+                        selectedItems: [addedItem],
+                        totalItems: addedItem.Quantity,
+                        totalAmount: addedItem.Quantity * addedItem.UnitPrice,
+                    },
+                });
+            } else {
+                navigate("/cart");
+            }
+        } catch (err: unknown) {
+            setError(err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể mua ngay.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -182,7 +236,7 @@ export default function MixMatchPage() {
                     </div>
 
                     <div>
-                        <div className="bg-white rounded-2xl p-6 shadow-sm lg:sticky lg:top-6">
+                        <div className="bg-white rounded-2xl p-6 shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto">
                             <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 mb-4">Hộp quà của bạn</h3>
                             <p className="text-xs text-gray-500 mb-5">Kéo thả để lấp đầy từng ngăn hoặc đổi vị trí.</p>
 
@@ -236,13 +290,29 @@ export default function MixMatchPage() {
                                 </div>
                             </div>
 
-                            <button
-                                className="mt-5 w-full py-3 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors disabled:bg-gray-400"
-                                disabled={totals.totalItems < 4 || totals.totalItems > 6}
-                                onClick={handleCreateCustomBox}
-                            >
-                                Tạo giỏ quà Mix & Match
-                            </button>
+                            <div className="mt-5 space-y-3">
+                                <button
+                                    className="w-full py-3 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors disabled:bg-gray-400"
+                                    disabled={totals.totalItems < 4 || totals.totalItems > 6 || isSubmitting}
+                                    onClick={handleCreateCustomBox}
+                                >
+                                    {isSubmitting ? "Đang xử lý..." : "Tạo giỏ quà Mix & Match"}
+                                </button>
+                                <button
+                                    className="w-full py-3 border border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/10 transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
+                                    disabled={totals.totalItems < 4 || totals.totalItems > 6 || isSubmitting}
+                                    onClick={handleAddToCart}
+                                >
+                                    Thêm vào giỏ hàng
+                                </button>
+                                <button
+                                    className="w-full py-3 bg-[#1B3022] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#142318] transition-colors disabled:bg-gray-400"
+                                    disabled={totals.totalItems < 4 || totals.totalItems > 6 || isSubmitting}
+                                    onClick={handleBuyNow}
+                                >
+                                    Mua ngay
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

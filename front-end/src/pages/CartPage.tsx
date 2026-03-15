@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartItemDto, type CartDto } from "../services/cartService";
+import mixMatchDefault from "../assets/mix-match-default.svg";
 
 /* ═══════════════════ HELPER ═══════════════════ */
 
@@ -339,6 +340,12 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                         <img
                             src={item.ImageUrl}
                             alt={item.Name ?? "Giỏ quà"}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : item.Type === 1 ? (
+                        <img
+                            src={mixMatchDefault}
+                            alt="Giỏ quà Mix & Match"
                             className="w-full h-full object-cover"
                         />
                     ) : (
