@@ -300,7 +300,7 @@ export default function CheckoutPaymentPage() {
                                     to={`/order-success?code=${orderCode}`}
                                     className="text-xs text-gray-400 hover:text-gray-600 hover:underline cursor-pointer text-center"
                                 >
-                                    Thanh toán sau (COD)
+                                    Thanh toán sau
                                 </Link>
                             </>
                         )}
