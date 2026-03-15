@@ -366,6 +366,24 @@ export default function B2BCheckoutPage() {
                     {/* ─── LEFT COLUMN ─── */}
                     <div className="flex-1 min-w-0 space-y-6">
 
+                        {/* Instructions / Validation Rules Note */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 shadow-sm flex items-start gap-4">
+                            <div className="shrink-0 pt-0.5">
+                                <svg className="w-6 h-6 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-sm font-bold text-blue-900 mb-2 uppercase tracking-wider">Lưu ý khi đặt hàng B2B</h3>
+                                <ul className="text-sm text-blue-800 space-y-1.5 list-disc pl-4 marker:text-blue-400">
+                                    <li>Cần chọn <strong>ít nhất 1 địa chỉ giao hàng</strong> và phân bổ số lượng sản phẩm phù hợp.</li>
+                                    <li>Tổng số lượng sản phẩm phân bổ phải <strong>khớp chính xác</strong> với số lượng trong giỏ hàng.</li>
+                                    <li>Phí giao hàng được tính theo từng địa chỉ: <strong>25,000₫ / địa chỉ</strong>.</li>
+                                    <li>Bạn có thể viết một lời chúc chung gửi kèm đơn hàng trên tất cả địa chỉ.</li>
+                                </ul>
+                            </div>
+                        </div>
+
                         {/* Customer Info */}
                         <div className="bg-white rounded-2xl p-6 shadow-sm">
                             <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4">Thông tin người đặt</h2>
@@ -467,22 +485,47 @@ export default function B2BCheckoutPage() {
                                                 {selected && (
                                                     <div className="px-4 pb-4 border-t border-gray-100 pt-3">
                                                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Phân bổ sản phẩm cho địa chỉ này</p>
-                                                        <div className="space-y-2">
+                                                        <div className="space-y-4">
                                                             {items.map((item, idx) => {
-                                                                const allocated = allocatedPerItem(idx);
+                                                                const totalOtherAddresses = selectedAddresses
+                                                                    .filter(a => a !== addr.Id)
+                                                                    .reduce((s, a) => s + (allocations[a]?.[idx] ?? 0), 0);
+                                                                const maxAllowed = item.Quantity - totalOtherAddresses;
                                                                 const current = allocations[addr.Id]?.[idx] ?? 0;
+                                                                const totalAllocated = totalOtherAddresses + current;
+
                                                                 return (
-                                                                    <div key={idx} className="flex items-center gap-3">
-                                                                        <p className="text-xs text-gray-700 flex-1 truncate">{item.Name ?? `Sản phẩm ${idx + 1}`}</p>
-                                                                        <p className={`text-[11px] shrink-0 ${allocated > item.Quantity ? "text-red-500" : allocated === item.Quantity ? "text-green-600" : "text-gray-400"}`}>
-                                                                            {allocated}/{item.Quantity}
-                                                                        </p>
-                                                                        <div className="flex items-center gap-1 shrink-0">
-                                                                            <button onClick={() => setQty(addr.Id, idx, current - 1)}
-                                                                                className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm flex items-center justify-center cursor-pointer">−</button>
-                                                                            <span className="w-8 text-center text-sm font-medium">{current}</span>
-                                                                            <button onClick={() => setQty(addr.Id, idx, current + 1)}
-                                                                                className="w-6 h-6 rounded border border-gray-300 text-gray-600 hover:bg-gray-100 text-sm flex items-center justify-center cursor-pointer">+</button>
+                                                                    <div key={idx} className="bg-white rounded-lg p-3 border border-gray-100">
+                                                                        <div className="flex items-center justify-between mb-2">
+                                                                            <p className="text-xs font-bold text-gray-800 flex-1 truncate">{item.Name ?? `Sản phẩm ${idx + 1}`}</p>
+                                                                            <p className={`text-[11px] font-semibold shrink-0 ${totalAllocated > item.Quantity ? "text-red-500" : totalAllocated === item.Quantity ? "text-green-600" : "text-gray-500"}`}>
+                                                                                {totalAllocated}/{item.Quantity} đã chia
+                                                                            </p>
+                                                                        </div>
+                                                                        
+                                                                        <div className="flex items-center gap-3">
+                                                                            {/* Range Slider */}
+                                                                            <div className="flex-1 flex items-center gap-2">
+                                                                                 <span className="text-xs text-gray-400 w-4 text-center">0</span>
+                                                                                 <input 
+                                                                                    type="range" 
+                                                                                    min="0" 
+                                                                                    max={maxAllowed} 
+                                                                                    value={current}
+                                                                                    onChange={(e) => setQty(addr.Id, idx, parseInt(e.target.value) || 0)}
+                                                                                    className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-[#8B1A1A]"
+                                                                                 />
+                                                                                 <span className="text-xs text-[#8B1A1A] font-bold w-6 text-center">{current}</span>
+                                                                            </div>
+
+                                                                            {/* Quick Fill Button */}
+                                                                            <button 
+                                                                                onClick={() => setQty(addr.Id, idx, maxAllowed)}
+                                                                                disabled={current === maxAllowed || maxAllowed === 0}
+                                                                                className="shrink-0 px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold uppercase rounded border border-green-200 hover:bg-green-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                                            >
+                                                                                Tối đa
+                                                                            </button>
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -545,24 +588,36 @@ export default function B2BCheckoutPage() {
                             </div>
                         )}
 
+                        {/* Total Status Box */}
+                        <div className="bg-white rounded-2xl p-6 shadow-sm border-2 border-dashed border-[#8B1A1A]/30 mb-6">
+                             <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">Trạng thái phân chia</h3>
+                             {allAllocationsValid ? (
+                                <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-xl border border-green-200">
+                                     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                     <p className="text-sm font-bold">Đã phân bổ khớp 100% giỏ hàng. Tuyệt vời!</p>
+                                </div>
+                             ) : (
+                                <div className="flex items-start gap-2 text-orange-600 bg-orange-50 p-3 rounded-xl border border-orange-200">
+                                     <svg className="w-5 h-5 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                                     <div className="flex-1 text-sm leading-relaxed">
+                                        <span className="font-bold block mb-1">Cần phân chia đủ số lượng.</span>
+                                        Bạn có thể phân bổ bằng cách kéo thanh gạt hoặc nhấn <span className="inline-block px-1.5 py-0.5 bg-green-50 text-green-600 text-[9px] font-bold uppercase rounded border border-green-200">Tối đa</span> cho từng địa chỉ.
+                                     </div>
+                                </div>
+                             )}
+                        </div>
+
                         {/* Error */}
                         {error && (
-                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">{error}</div>
-                        )}
-
-                        {/* Validation hint */}
-                        {!allAllocationsValid && items.length > 0 && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-                                ⚠️ Vui lòng phân bổ đủ số lượng cho mỗi sản phẩm trước khi đặt hàng.
-                            </div>
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 mb-4">{error}</div>
                         )}
 
                         {/* Submit */}
                         <button onClick={handleSubmit}
                             disabled={submitting || !allAllocationsValid || selectedAddresses.length === 0}
                             className={`w-full py-3.5 text-white text-sm font-bold uppercase tracking-wider rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer ${submitting || !allAllocationsValid || selectedAddresses.length === 0
-                                ? "bg-gray-400 cursor-not-allowed"
-                                : "bg-[#8B1A1A] hover:bg-[#701515]"}`}>
+                                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                : "bg-[#8B1A1A] hover:bg-[#701515] filter drop-shadow-md"}`}>
                             {submitting ? (
                                 <>
                                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
