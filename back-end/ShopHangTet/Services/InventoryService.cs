@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
+using System.Globalization;
+using System.Text;
 
 namespace ShopHangTet.Services
 {
@@ -21,23 +23,46 @@ namespace ShopHangTet.Services
             return ("OUT_OF_STOCK", "Out of stock");
         }
 
+        private static string NormalizeSearch(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            var normalized = value.Normalize(NormalizationForm.FormD);
+            var builder = new StringBuilder();
+            foreach (var ch in normalized)
+            {
+                var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+                if (category != UnicodeCategory.NonSpacingMark)
+                {
+                    builder.Append(ch == 'đ' ? 'd' : ch == 'Đ' ? 'D' : ch);
+                }
+            }
+            return builder.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+        }
+
         public async Task<PagedResult<InventoryItemResponseDTO>> GetInventoryAsync(string? search, string? category, string? stockStatus, int page, int pageSize)
         {
             var query = _context.Items.AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(i => i.Name.Contains(search));
+            var normalizedSearch = NormalizeSearch(search ?? string.Empty);
 
             if (!string.IsNullOrWhiteSpace(category))
                 query = query.Where(i => i.Category.ToString() == category);
 
-            var total = await query.CountAsync();
-
             var items = await query
                 .OrderBy(i => i.Name)
+                .ToListAsync();
+
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                items = items.Where(i => NormalizeSearch(i.Name).Contains(normalizedSearch)).ToList();
+            }
+
+            var total = items.Count;
+
+            items = items
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToList();
 
             // Load last updated times. Mongo EF provider can't translate GroupBy+Max; fetch and group in-memory.
             var itemIds = items.Select(i => i.Id).ToList();
@@ -133,8 +158,7 @@ namespace ShopHangTet.Services
         {
             var query = _context.InventoryLogs.AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(search))
-                query = query.Where(l => (l.ItemName ?? string.Empty).Contains(search) || (l.Sku ?? string.Empty).Contains(search));
+            var normalizedSearch = NormalizeSearch(search ?? string.Empty);
 
             if (!string.IsNullOrWhiteSpace(changeType))
                 query = query.Where(l => (l.ChangeType ?? l.Action ?? string.Empty) == changeType);
@@ -149,13 +173,23 @@ namespace ShopHangTet.Services
                 query = query.Where(l => l.CreatedAt >= from && l.CreatedAt < to);
             }
 
-            var total = await query.CountAsync();
-
             var logs = await query
                 .OrderByDescending(l => l.CreatedAt)
+                .ToListAsync();
+
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                logs = logs.Where(l => NormalizeSearch(l.ItemName ?? string.Empty).Contains(normalizedSearch)
+                    || NormalizeSearch(l.Sku ?? string.Empty).Contains(normalizedSearch))
+                    .ToList();
+            }
+
+            var total = logs.Count;
+
+            logs = logs
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToList();
 
             // Load item names for any logs missing itemName
             var itemIds = logs.Select(l => l.ItemId).Distinct().ToList();

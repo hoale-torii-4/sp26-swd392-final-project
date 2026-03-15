@@ -47,6 +47,7 @@ export default function CartPage() {
     }, []);
 
     const items = useMemo(() => cart?.Items ?? [], [cart]);
+    const activeItems = useMemo(() => items.filter(i => i.IsActive !== false), [items]);
 
     useEffect(() => {
         if (!cart) return;
@@ -59,7 +60,7 @@ export default function CartPage() {
         setSelectedIds((prev) => {
             const next = new Set<string>();
             items.forEach((item) => {
-                if (prev.has(item.Id)) {
+                if (prev.has(item.Id) && item.IsActive !== false) {
                     next.add(item.Id);
                 }
             });
@@ -71,13 +72,13 @@ export default function CartPage() {
     }, [cart, items]);
 
     const { selectedItems, selectedTotals } = useMemo(() => {
-        const filtered = items.filter((item) => selectedIds.has(item.Id));
+        const filtered = items.filter((item) => selectedIds.has(item.Id) && item.IsActive !== false);
         const totalItems = filtered.reduce((sum, item) => sum + item.Quantity, 0);
         const totalAmount = filtered.reduce((sum, item) => sum + item.Quantity * item.UnitPrice, 0);
         return { selectedItems: filtered, selectedTotals: { totalItems, totalAmount } };
     }, [items, selectedIds]);
 
-    const allSelected = items.length > 0 && selectedIds.size === items.length;
+    const allSelected = activeItems.length > 0 && selectedIds.size === activeItems.length;
     const totalAmount = selectedTotals.totalAmount;
     const totalItems = selectedTotals.totalItems;
 
@@ -108,6 +109,9 @@ export default function CartPage() {
     };
 
     const toggleSelectItem = (itemId: string) => {
+        const item = items.find(i => i.Id === itemId);
+        if (item?.IsActive === false) return;
+
         setSelectedIds((prev) => {
             const next = new Set(prev);
             if (next.has(itemId)) {
@@ -124,7 +128,7 @@ export default function CartPage() {
             setSelectedIds(new Set());
             return;
         }
-        setSelectedIds(new Set(items.map((item) => item.Id)));
+        setSelectedIds(new Set(activeItems.map((item) => item.Id)));
     };
 
     const handleCheckoutSelected = () => {
@@ -217,12 +221,13 @@ export default function CartPage() {
                                         type="checkbox"
                                         checked={allSelected}
                                         onChange={toggleSelectAll}
-                                        className="w-4 h-4 accent-[#8B1A1A]"
+                                        disabled={activeItems.length === 0}
+                                        className="w-4 h-4 accent-[#8B1A1A] disabled:opacity-50 disabled:cursor-not-allowed"
                                     />
                                     Chọn tất cả
                                 </label>
                                 <span className="text-xs text-gray-400">
-                                    Đã chọn {selectedItems.length}/{items.length} sản phẩm
+                                    Đã chọn {selectedItems.length}/{activeItems.length} sản phẩm
                                 </span>
                             </div>
 
@@ -330,19 +335,22 @@ interface CartItemCardProps {
 }
 
 function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: CartItemCardProps) {
+    const isInactive = item.IsActive === false;
+
     return (
-        <div className={`bg-white rounded-2xl p-5 shadow-sm border-2 ${selected ? "border-[#8B1A1A]" : "border-transparent"}`}>
-            <div className="flex gap-5">
+        <div className={`bg-white rounded-2xl p-5 shadow-sm border-2 transition-colors ${selected ? "border-[#8B1A1A]" : "border-transparent"} ${isInactive ? "opacity-60 bg-gray-50" : ""}`}>
+            <div className="flex gap-4 sm:gap-5">
                 <div className="pt-1">
                     <input
                         type="checkbox"
                         checked={selected}
                         onChange={() => onSelect(item.Id)}
-                        className="w-4 h-4 accent-[#8B1A1A]"
+                        disabled={isInactive}
+                        className="w-4 h-4 accent-[#8B1A1A] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     />
                 </div>
                 {/* Product placeholder image */}
-                <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300">
+                <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 ${isInactive ? "grayscale" : ""}`}>
                     {item.ImageUrl ? (
                         <img
                             src={item.ImageUrl}
@@ -374,6 +382,11 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                                 <span className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-white rounded ${getTypeColor(item.Type)}`}>
                                     {getTypeLabel(item.Type)}
                                 </span>
+                                {isInactive && item.StatusLabel && (
+                                    <span className="px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-white rounded bg-red-600">
+                                        {item.StatusLabel}
+                                    </span>
+                                )}
                             </div>
                         </div>
 
@@ -400,19 +413,20 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                         <div className="flex items-center border border-gray-200 rounded-lg">
                             <button
                                 onClick={() => onQuantityChange(item.Id, item.Quantity, -1)}
-                                disabled={item.Quantity <= 1}
+                                disabled={item.Quantity <= 1 || isInactive}
                                 className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                                 </svg>
                             </button>
-                            <span className="w-8 text-center text-sm font-medium text-gray-900">
+                            <span className={`w-8 text-center text-sm font-medium ${isInactive ? "text-gray-400" : "text-gray-900"}`}>
                                 {item.Quantity}
                             </span>
                             <button
                                 onClick={() => onQuantityChange(item.Id, item.Quantity, 1)}
-                                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer transition-colors"
+                                disabled={isInactive}
+                                className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

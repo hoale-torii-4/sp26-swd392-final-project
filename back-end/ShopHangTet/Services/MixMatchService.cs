@@ -2,6 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
+using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace ShopHangTet.Services;
@@ -22,12 +24,27 @@ public class MixMatchService : IMixMatchService
         return ("IN_STOCK", "In stock");
     }
 
+    private static string NormalizeSearch(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(ch == 'đ' ? 'd' : ch == 'Đ' ? 'D' : ch);
+            }
+        }
+        return builder.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+    }
+
     public async Task<object> GetItemsAsync(string? search, string? category, bool? isActive, int page, int pageSize)
     {
         var query = _context.Items.AsQueryable();
 
-        if (!string.IsNullOrWhiteSpace(search))
-            query = query.Where(i => i.Name.Contains(search));
+        var normalizedSearch = NormalizeSearch(search ?? string.Empty);
 
         if (!string.IsNullOrWhiteSpace(category))
             query = query.Where(i => i.Category.ToString() == category);
@@ -35,13 +52,21 @@ public class MixMatchService : IMixMatchService
         if (isActive.HasValue)
             query = query.Where(i => i.IsActive == isActive.Value);
 
-        var total = await query.CountAsync();
-
         var items = await query
             .OrderBy(i => i.Name)
+            .ToListAsync();
+
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            items = items.Where(i => NormalizeSearch(i.Name).Contains(normalizedSearch)).ToList();
+        }
+
+        var total = items.Count;
+
+        items = items
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToList();
 
         var data = items.Select(i =>
         {

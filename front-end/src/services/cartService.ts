@@ -13,6 +13,8 @@ export interface CartItemDto {
     UnitPrice: number;
     Name: string | null;
     ImageUrl?: string | null;
+    IsActive?: boolean;
+    StatusLabel?: string | null;
 }
 
 export interface CartDto {

@@ -59,6 +59,8 @@ namespace ShopHangTet.Services
             {
                 string name = "Sản phẩm không xác định";
                 string? imageUrl = null;
+                bool isActive = true;
+                string? statusLabel = null;
 
                 if (item.Type == OrderItemType.READY_MADE && !string.IsNullOrEmpty(item.GiftBoxId))
                 {
@@ -69,11 +71,54 @@ namespace ShopHangTet.Services
                     {
                         name = giftBox.Name;
                         imageUrl = giftBox.Images?.FirstOrDefault();
+                        isActive = giftBox.IsActive;
+                    }
+                    else
+                    {
+                        isActive = false;
+                        statusLabel = "Sản phẩm không tồn tại";
                     }
                 }
                 else if (item.Type == OrderItemType.MIX_MATCH)
                 {
                     name = "Hộp quà tự chọn (Mix & Match)";
+
+                    if (!string.IsNullOrEmpty(item.CustomBoxId))
+                    {
+                        var customBox = await _context.Set<CustomBox>()
+                            .FirstOrDefaultAsync(c => c.Id == item.CustomBoxId);
+
+                        if (customBox == null)
+                        {
+                            isActive = false;
+                            statusLabel = "Sản phẩm không tồn tại";
+                        }
+                        else
+                        {
+                            var itemIds = customBox.Items.Select(x => x.ItemId).ToList();
+                            if (itemIds.Count == 0)
+                            {
+                                isActive = false;
+                                statusLabel = "Sản phẩm không tồn tại";
+                            }
+                            else
+                            {
+                                var items = await _context.Set<Item>()
+                                    .Where(x => itemIds.Contains(x.Id))
+                                    .ToListAsync();
+                                if (items.Count != itemIds.Count || items.Any(x => !x.IsActive))
+                                {
+                                    isActive = false;
+                                    statusLabel = "Sản phẩm đã bị vô hiệu hóa";
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!isActive && string.IsNullOrWhiteSpace(statusLabel))
+                {
+                    statusLabel = "Sản phẩm đã bị vô hiệu hóa";
                 }
 
                 dto.Items.Add(new CartItemDto
@@ -84,7 +129,9 @@ namespace ShopHangTet.Services
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     Name = name,
-                    ImageUrl = imageUrl
+                    ImageUrl = imageUrl,
+                    IsActive = isActive,
+                    StatusLabel = statusLabel
                 });
             }
 
