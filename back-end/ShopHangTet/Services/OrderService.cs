@@ -88,6 +88,65 @@ namespace ShopHangTet.Services
             }).ToList();
         }
 
+        /// Lấy tất cả đơn hàng cho Admin (có phân trang, filter)
+        public async Task<AdminOrderListResult> GetAllOrdersAsync(string? status, string? orderType, string? keyword, int page, int pageSize)
+        {
+            var query = _context.Orders.AsQueryable();
+
+            // Filter by status
+            if (!string.IsNullOrEmpty(status) && Enum.TryParse<OrderStatus>(status, true, out var statusEnum))
+            {
+                query = query.Where(o => o.Status == statusEnum);
+            }
+
+            // Filter by order type
+            if (!string.IsNullOrEmpty(orderType) && Enum.TryParse<OrderType>(orderType, true, out var typeEnum))
+            {
+                query = query.Where(o => o.OrderType == typeEnum);
+            }
+
+            // Search by keyword (orderCode, customerName, customerEmail)
+            if (!string.IsNullOrEmpty(keyword))
+            {
+                var kw = keyword.Trim().ToLower();
+                query = query.Where(o =>
+                    o.OrderCode.ToLower().Contains(kw) ||
+                    o.CustomerName.ToLower().Contains(kw) ||
+                    o.CustomerEmail.ToLower().Contains(kw));
+            }
+
+            var totalItems = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+
+            var orders = await query
+                .OrderByDescending(o => o.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new AdminOrderListResult
+            {
+                Data = orders.Select(o => new AdminOrderListItem
+                {
+                    Id = o.Id.ToString(),
+                    OrderCode = o.OrderCode,
+                    CustomerName = o.CustomerName,
+                    CustomerEmail = o.CustomerEmail,
+                    CustomerPhone = o.CustomerPhone,
+                    OrderType = o.OrderType.ToString(),
+                    Status = o.Status.ToString(),
+                    TotalAmount = o.TotalAmount,
+                    TotalItems = o.Items.Sum(i => i.Quantity),
+                    CreatedAt = o.CreatedAt,
+                    DeliveryDate = o.DeliveryDate,
+                }).ToList(),
+                TotalItems = totalItems,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = totalPages,
+            };
+        }
+
         /// Cập nhật trạng thái đơn hàng và trừ kho khi chuyển sang PREPARING
         public async Task<OrderModel> UpdateStatusAsync(string orderId, Models.OrderStatus status, string updatedBy, string? notes = null)
         {

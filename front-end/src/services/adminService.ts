@@ -384,6 +384,20 @@ export interface OrderAdminResponse {
     updatedAt: string;
 }
 
+export interface AdminOrderListItem {
+    Id: string;
+    OrderCode: string;
+    CustomerName: string;
+    CustomerEmail: string;
+    CustomerPhone: string;
+    OrderType: string;
+    Status: string;
+    TotalAmount: number;
+    TotalItems: number;
+    CreatedAt: string;
+    DeliveryDate?: string;
+}
+
 /* ═══════════════════════════════════════════════════════════
    API FUNCTIONS
    ═══════════════════════════════════════════════════════════ */
@@ -569,6 +583,9 @@ export const adminService = {
         apiClient.get("/admin/reports/export/inventory-alert", { params: { threshold }, responseType: "blob" }).then(r => r.data),
 
     // ════════ ORDERS (STAFF) ════════
+    getAdminOrders: (params?: { status?: string; orderType?: string; keyword?: string; page?: number; pageSize?: number }) =>
+        apiClient.get<PagedResult<AdminOrderListItem>>("/admin/orders", { params }).then(r => r.data),
+
     updateOrderStatus: (orderId: string, status: string, note?: string) =>
         apiClient.put(`/Orders/${orderId}/status`, { Status: status, Note: note }).then(r => r.data),
 
@@ -577,4 +594,7 @@ export const adminService = {
 
     reshipDelivery: (deliveryId: string) =>
         apiClient.post(`/Orders/deliveries/${deliveryId}/reship`).then(r => r.data),
+
+    trackOrder: (orderCode: string, email: string) =>
+        apiClient.get("/Orders/track", { params: { orderCode, email } }).then(r => r.data),
 };
