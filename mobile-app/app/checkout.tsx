@@ -1,14 +1,24 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AppColors } from '../constants/theme';
 
 export default function CheckoutScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    selectedItems?: string;
+    items?: string;
+    totalAmount?: string;
+    totalItems?: string;
+    buyNow?: string;
+  }>();
 
   useEffect(() => {
-    router.replace('/checkout-payment' as any);
-  }, [router]);
+    router.replace({
+      pathname: '/checkout-payment' as any,
+      params,
+    });
+  }, [router, params]);
 
   return (
     <View style={styles.center}>

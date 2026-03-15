@@ -20,6 +20,7 @@ import VerifyEmailPage from './pages/VerifyEmailPage'
 import OrderTrackingPage from './pages/OrderTrackingPage'
 import MixMatchPage from './pages/MixMatchPage'
 import OrdersPage from './pages/OrdersPage'
+import NotFoundPage from './pages/NotFoundPage'
 import AIChatBox from './components/AIChatBox'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { ToastContainer } from 'react-toastify'
@@ -88,6 +89,7 @@ function App() {
               <Route path="reports" element={<AdminReportsPage />} />
             </Route>
           </Route>
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
         <AIChatBox />
         <ToastContainer

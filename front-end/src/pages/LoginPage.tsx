@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useFormik } from "formik";
 import { toast } from "react-toastify";
@@ -7,6 +7,8 @@ import { GoogleLogin } from "@react-oauth/google";
 import loginBg from "../assets/login-bg.png";
 import { authService } from "../services/authService";
 import type { ApiError } from "../types/auth";
+
+const REDIRECT_DEFAULT = "/";
 
 const loginSchema = Yup.object({
     email: Yup.string()
@@ -20,6 +22,19 @@ export default function LoginPage() {
     const navigate = useNavigate();
     const location = useLocation();
     const successMessage = (location.state as { message?: string })?.message;
+
+    useEffect(() => {
+        if (authService.isAuthenticated()) {
+            navigate(REDIRECT_DEFAULT, { replace: true });
+        }
+    }, [navigate]);
+    const redirectTo = (location.state as { from?: string })?.from || REDIRECT_DEFAULT;
+
+    useEffect(() => {
+        if (authService.isAuthenticated()) {
+            navigate(redirectTo, { replace: true });
+        }
+    }, [navigate, redirectTo]);
 
     const [showPassword, setShowPassword] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);

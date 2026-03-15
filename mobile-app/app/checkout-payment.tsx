@@ -48,6 +48,12 @@ export default function CheckoutPaymentScreen() {
     totalItems?: string;
     selectedItems?: string;
   }>();
+  const {
+    buyNow,
+    items: itemsParam,
+    totalAmount: totalAmountParam,
+    selectedItems,
+  } = params;
   const { user } = useAuth();
 
   const [items, setItems] = useState<CartItemDto[]>([]);
@@ -182,13 +188,13 @@ export default function CheckoutPaymentScreen() {
       }
     };
 
-    const buyNow = params.buyNow === '1';
-    const selected = params.selectedItems ? parseItems(params.selectedItems) : null;
-    const buyNowItems = params.items ? parseItems(params.items) : null;
+    const isBuyNow = buyNow === '1';
+    const selected = selectedItems ? parseItems(selectedItems) : null;
+    const buyNowItems = itemsParam ? parseItems(itemsParam) : null;
 
-    if (buyNow && buyNowItems) {
+    if (isBuyNow && buyNowItems) {
       setItems(buyNowItems);
-      setTotalAmount(Number(params.totalAmount ?? 0));
+      setTotalAmount(Number(totalAmountParam ?? 0));
       setLoading(false);
       return;
     }
@@ -209,7 +215,7 @@ export default function CheckoutPaymentScreen() {
       })
       .catch(() => setError('Không thể tải giỏ hàng.'))
       .finally(() => setLoading(false));
-  }, [params]);
+  }, [buyNow, itemsParam, totalAmountParam, selectedItems]);
 
   useEffect(() => {
     if (!user?.Id) return;

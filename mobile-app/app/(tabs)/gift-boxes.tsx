@@ -211,6 +211,27 @@ export default function GiftBoxesScreen() {
                 </Text>
             </View>
 
+            {/* Mix & Match Banner */}
+            <TouchableOpacity 
+                style={styles.mixMatchBanner}
+                activeOpacity={0.9}
+                onPress={() => router.push('/mix-match' as any)}
+            >
+                <View style={styles.mixMatchContent}>
+                    <View style={styles.mixMatchTextWrap}>
+                        <Text style={styles.mixMatchTitle}>TỰ TẠO GIỎ QUÀ</Text>
+                        <View style={styles.mixMatchBadge}>
+                            <Text style={styles.mixMatchBadgeText}>MỚI</Text>
+                        </View>
+                    </View>
+                    <Text style={styles.mixMatchDesc}>Mix & Match theo ý thích (4-6 món)</Text>
+                </View>
+                <View style={styles.mixMatchAction}>
+                    <Text style={styles.mixMatchActionText}>Thử ngay</Text>
+                    <Ionicons name="sparkles" size={16} color="#FFF" />
+                </View>
+            </TouchableOpacity>
+
             {/* Filters */}
             <View style={styles.filterPanel}>
                 <Text style={styles.filterLabel}>Bộ sưu tập</Text>
@@ -407,6 +428,46 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.8)',
     },
 
+    mixMatchBanner: {
+        margin: Spacing.lg,
+        marginTop: -Spacing.md,
+        backgroundColor: AppColors.accent,
+        borderRadius: BorderRadius.md,
+        flexDirection: 'row',
+        alignItems: 'stretch',
+        padding: Spacing.md,
+        shadowColor: AppColors.accent,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+        elevation: 6,
+    },
+    mixMatchContent: { flex: 1, justifyContent: 'center' },
+    mixMatchTextWrap: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+    mixMatchTitle: { fontSize: 13, fontWeight: '800', color: '#FFF', letterSpacing: 0.5 },
+    mixMatchBadge: {
+        backgroundColor: '#FFF',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 6,
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 18,
+    },
+    mixMatchBadgeText: { fontSize: 8, fontWeight: '900', color: AppColors.accent, letterSpacing: 0.4 },
+    mixMatchDesc: { fontSize: 11, color: 'rgba(255,255,255,0.9)', fontWeight: '500' },
+    mixMatchAction: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: BorderRadius.sm,
+        alignSelf: 'center',
+    },
+    mixMatchActionText: { fontSize: 11, fontWeight: '700', color: '#FFF' },
+
     filterPanel: {
         paddingHorizontal: Spacing.lg,
         paddingTop: Spacing.md,
@@ -569,3 +630,6 @@ const styles = StyleSheet.create({
     sortOptionText: { fontSize: 14, color: AppColors.text },
     sortOptionActive: { color: AppColors.primary, fontWeight: '700' },
 });
+
+
+
