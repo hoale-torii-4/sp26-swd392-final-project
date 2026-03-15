@@ -70,4 +70,14 @@ export const productService = {
         );
         return response.data;
     },
+
+    /**
+     * GET /api/Products/collections/{id}
+     */
+    getCollectionDetailById: async (id: string) => {
+        const response = await apiClient.get(
+            `${PRODUCTS_ENDPOINT}/collections/${id}`,
+        );
+        return response.data;
+    },
 };

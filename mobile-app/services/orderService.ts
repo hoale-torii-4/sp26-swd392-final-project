@@ -129,6 +129,26 @@ export interface OrderDto {
   DeliveryAddresses: DeliveryAddressResponseDto[];
 }
 
+export interface MyOrderItemDto {
+  Name: string;
+  Quantity: number;
+  UnitPrice: number;
+  TotalPrice: number;
+  Type: string;
+}
+
+export interface MyOrderResponseDto {
+  Id: string;
+  OrderCode: string;
+  OrderType: string;
+  Status: string;
+  TotalAmount: number;
+  CreatedAt: string;
+  DeliveryDate: string;
+  TotalItems: number;
+  Items: MyOrderItemDto[];
+}
+
 interface ApiResponse<T> {
   Success: boolean;
   Message: string;

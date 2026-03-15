@@ -30,6 +30,34 @@ export class OrderService {
     };
   }
 
+  // ========== My Orders ==========
+  async getMyOrders(userId, skip = 0, take = 20) {
+    const orders = await Order.find({ userId })
+      .sort({ createdAt: -1 })
+      .skip(Number(skip))
+      .limit(Number(take))
+      .lean();
+
+    return orders.map((o) => ({
+      OrderId: o._id.toString(),
+      OrderCode: o.orderCode,
+      OrderType: o.orderType,
+      Status: o.status,
+      SubTotal: o.subTotal,
+      ShippingFee: o.shippingFee,
+      TotalAmount: o.totalAmount,
+      CreatedAt: o.createdAt,
+      Items: (o.items || []).map((i) => ({
+        Id: i.giftBoxId?.toString() || i.customBoxId?.toString() || '',
+        Type: i.type,
+        Name: i.productName,
+        Quantity: i.quantity,
+        UnitPrice: i.unitPrice,
+        TotalPrice: i.totalPrice,
+      })),
+    }));
+  }
+
   // ========== Update Status ==========
   async updateStatus(orderId, status, updatedBy, notes = '') {
     const order = await Order.findById(orderId);

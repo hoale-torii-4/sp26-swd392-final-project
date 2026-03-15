@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { productService, type GiftBoxListDto } from "../services/productService";
@@ -39,6 +39,12 @@ export default function GiftBoxesPage() {
     const [error, setError] = useState("");
 
     /* ── filters ── */
+    const [searchParams, setSearchParams] = useSearchParams();
+    const collectionIdParam = searchParams.get("collectionId");
+
+    const [collections, setCollections] = useState<any[]>([]);
+    const [selectedCollectionId, setSelectedCollectionId] = useState<string>("all");
+
     const [selectedPriceRanges, setSelectedPriceRanges] = useState<number[]>([]);
     const [sortBy, setSortBy] = useState("popular");
     const [currentPage, setCurrentPage] = useState(1);
@@ -49,26 +55,48 @@ export default function GiftBoxesPage() {
     useEffect(() => {
         (async () => {
             try {
-                const data = await productService.getGiftBoxes();
-                setGiftBoxes(data);
-            } catch {
-                setError("Không thể tải danh sách giỏ quà. Vui lòng thử lại.");
+                setLoading(true);
+                setError("");
+                const [giftBoxesRes, collectionsRes] = await Promise.all([
+                    productService.getGiftBoxes(),
+                    productService.getCollections(),
+                ]);
+                const finalBoxes = (giftBoxesRes as any)?.data || giftBoxesRes || [];
+                const finalCols = (collectionsRes as any)?.data || collectionsRes || [];
+                setGiftBoxes(Array.isArray(finalBoxes) ? finalBoxes : []);
+                setCollections(Array.isArray(finalCols) ? finalCols : []);
+            } catch (err: any) {
+                console.error("GiftBoxes fetch error:", err);
+                setError(err?.message || "Không thể tải danh sách giỏ quà. Vui lòng thử lại.");
             } finally {
                 setLoading(false);
             }
         })();
     }, []);
 
+    useEffect(() => {
+        if (collectionIdParam) {
+            setSelectedCollectionId(collectionIdParam);
+        } else {
+            setSelectedCollectionId("all");
+        }
+    }, [collectionIdParam]);
+
     /* ── filter + sort ── */
     const filtered = useMemo(() => {
-        let items = [...giftBoxes];
+        let items = [...(giftBoxes || [])];
+
+        // Collection filter
+        if (selectedCollectionId !== "all") {
+            items = items.filter((gb) => (gb.CollectionId || (gb as any).collectionId) === selectedCollectionId);
+        }
 
         // Price filter
         if (selectedPriceRanges.length > 0) {
             items = items.filter((gb) =>
                 selectedPriceRanges.some((idx) => {
                     const r = PRICE_RANGES[idx];
-                    return gb.Price >= r.min && gb.Price < r.max;
+                    return (gb.Price || 0) >= r.min && (gb.Price || 0) < r.max;
                 }),
             );
         }
@@ -76,18 +104,18 @@ export default function GiftBoxesPage() {
         // Sort
         switch (sortBy) {
             case "newest":
-                items.sort((a, b) => new Date(b.CreatedAt).getTime() - new Date(a.CreatedAt).getTime());
+                items.sort((a, b) => new Date(b.CreatedAt || 0).getTime() - new Date(a.CreatedAt || 0).getTime());
                 break;
             case "price-asc":
-                items.sort((a, b) => a.Price - b.Price);
+                items.sort((a, b) => (a.Price || 0) - (b.Price || 0));
                 break;
             case "price-desc":
-                items.sort((a, b) => b.Price - a.Price);
+                items.sort((a, b) => (b.Price || 0) - (a.Price || 0));
                 break;
         }
 
         return items;
-    }, [giftBoxes, selectedPriceRanges, sortBy]);
+    }, [giftBoxes, selectedCollectionId, selectedPriceRanges, sortBy]);
 
     /* ── pagination ── */
     const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
@@ -110,6 +138,15 @@ export default function GiftBoxesPage() {
     const clearFilters = () => {
         setSelectedPriceRanges([]);
         setSortBy("popular");
+    };
+
+    const onSelectCollection = (id: string) => {
+        if (id === "all") {
+            searchParams.delete("collectionId");
+        } else {
+            searchParams.set("collectionId", id);
+        }
+        setSearchParams(searchParams);
     };
 
     /* ═══════════════════ RENDER ═══════════════════ */
@@ -197,6 +234,28 @@ export default function GiftBoxesPage() {
 
                     {/* ──────── PRODUCT AREA ──────── */}
                     <div className="flex-1 min-w-0">
+                        {/* Collection Filter Tabs */}
+                        <div className="mb-6 flex overflow-x-auto gap-2.5 pb-2 hide-scrollbar">
+                            <button
+                                onClick={() => onSelectCollection("all")}
+                                className={`shrink-0 px-5 py-2 rounded-full border text-sm font-medium transition-colors ${selectedCollectionId === "all" ? "bg-[#8B1A1A] border-[#8B1A1A] text-white" : "border-gray-300 text-gray-600 bg-white hover:border-[#8B1A1A]"}`}
+                            >
+                                Tất cả
+                            </button>
+                            {collections.map((col: any) => {
+                                const id = col?.Id || col?.id;
+                                return (
+                                    <button
+                                        key={id}
+                                        onClick={() => onSelectCollection(id)}
+                                        className={`shrink-0 px-5 py-2 rounded-full border text-sm font-medium transition-colors ${selectedCollectionId === id ? "bg-[#8B1A1A] border-[#8B1A1A] text-white" : "border-gray-300 text-gray-600 bg-white hover:border-[#8B1A1A]"}`}
+                                    >
+                                        {col?.Name || col?.name || "Collection"}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
                         {/* Control bar */}
                         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                             <p className="text-sm text-gray-500">
@@ -280,10 +339,10 @@ export default function GiftBoxesPage() {
                         )}
 
                         {/* ──────── 3-COL PRODUCT GRID ──────── */}
-                        {!loading && !error && paged.length > 0 && (
+                        {!loading && !error && paged && paged.length > 0 && (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {paged.map((box) => (
-                                    <ProductCard key={box.Id} box={box} />
+                                    <ProductCard key={box?.Id} box={box} />
                                 ))}
                             </div>
                         )}

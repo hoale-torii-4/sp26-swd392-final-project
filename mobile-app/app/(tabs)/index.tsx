@@ -1,36 +1,143 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  Dimensions, FlatList, Platform,
+  Dimensions, FlatList, Platform, ActivityIndicator, Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AppColors, Spacing, BorderRadius } from '../../constants/theme';
 import ProductCard from '../../components/ProductCard';
+import { productService, GiftBoxListDto } from '../../services/productService';
 
 const { width } = Dimensions.get('window');
 
-/* ───── Static Data (matching web FE) ───── */
-const collections = [
-  { name: 'Xuân Đoàn Viên', desc: 'Ấm áp tình thân, sum vầy bên tách trà thơm.' },
-  { name: 'Cát Tường Phú Quý', desc: 'Lời chúc thịnh vượng và may mắn hanh thông.' },
-  { name: 'Lộc Xuân Doanh Nghiệp', desc: 'Nâng tầm thương hiệu qua quà tặng đẳng cấp.' },
-  { name: 'An Nhiên Tân Xuân', desc: 'Thư thái tâm hồn, khởi đầu năm mới bình an.' },
-];
-
-const products = [
-  { id: '1', name: 'Hộp Quà Sum Họp', price: 1250000, badge: 'BIẾU GIA ĐÌNH', badgeColor: '#C0A062' },
-  { id: '2', name: 'Hộp Quà Trường Thọ', price: 1850000, badge: 'BIẾU ÔNG BÀ', badgeColor: '#C0A062' },
-  { id: '3', name: 'Hộp Quà Doanh Gia', price: 2450000, badge: 'BIẾU ĐỐI TÁC', badgeColor: '#8B1A1A' },
-  { id: '4', name: 'Hộp Quà Gia Ấm', price: 1550000, badge: 'BIẾU NGƯỜI THÂN', badgeColor: '#C0A062' },
-];
+/* ───── Dynamic Data via API ───── */
 
 const formatPrice = (p: number) => p.toLocaleString('vi-VN') + 'đ';
 
 /* ───── Component ───── */
 export default function HomeScreen() {
   const router = useRouter();
+  const listRef = useRef<FlatList>(null);
+
+  const [collections, setCollections] = useState<any[]>([]);
+  const [products, setProducts] = useState<GiftBoxListDto[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    const fetchHomeData = async () => {
+      try {
+        const [colsRes, prodsRes] = await Promise.all([
+          productService.getCollections(),
+          productService.getGiftBoxes()
+        ]);
+        if (active) {
+          // collections response might be nested or an array
+          setCollections(colsRes && Array.isArray(colsRes) ? colsRes : (colsRes?.data || []));
+          setProducts(prodsRes || []);
+        }
+      } catch (err) {
+        console.error('Home fetch error:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    fetchHomeData();
+    return () => { active = false; };
+  }, []);
+
+  // Continuous Auto-scroll hint for collections when data finishes loading
+  const scrollAnim = useRef(new Animated.Value(0)).current;
+  const currentOffset = useRef(0);
+  const userInteracted = useRef(false);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const startAnimation = (startPos: number) => {
+    scrollAnim.stopAnimation();
+    scrollAnim.setValue(startPos);
+    userInteracted.current = false;
+
+    // Calculate approximate max scroll distance based on items count
+    const itemWidth = 200; // width from styles.collectionCard
+    const gap = 12; // gap from styles.collectionList
+    const padding = 20; // estimated padding
+    const maxScrollDist = Math.max(0, collections.length * (itemWidth + gap) + padding - width);
+
+    if (maxScrollDist <= 0) return;
+
+    // Fixed speed: ~20ms per pixel
+    const speed = 20;
+
+    const pingPong = (toEnd: boolean, startPosition: number) => {
+      if (userInteracted.current) return;
+
+      const targetPos = toEnd ? maxScrollDist : 0;
+      const dist = Math.abs(targetPos - startPosition);
+      const duration = dist * speed;
+
+      Animated.timing(scrollAnim, {
+        toValue: targetPos,
+        duration: duration,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished && !userInteracted.current) {
+          pingPong(!toEnd, targetPos);
+        }
+      });
+    };
+
+    // Begin traversing forward from where it left off
+    pingPong(true, startPos);
+  };
+
+  useEffect(() => {
+    if (!loading && collections.length > 2) {
+      const listenerId = scrollAnim.addListener(({ value }) => {
+        if (!userInteracted.current) {
+          listRef.current?.scrollToOffset({ offset: value, animated: false });
+          currentOffset.current = value; // Keep track of latest automated position
+        }
+      });
+
+      // wait 1s before start initially
+      resumeTimer.current = setTimeout(() => startAnimation(0), 1000);
+
+      return () => {
+        if (resumeTimer.current) clearTimeout(resumeTimer.current);
+        scrollAnim.removeListener(listenerId);
+        scrollAnim.stopAnimation();
+      };
+    }
+  }, [loading, collections]);
+
+  const handleInteractionStart = () => {
+    userInteracted.current = true;
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    scrollAnim.stopAnimation();
+  };
+
+  const handleInteractionEnd = () => {
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => {
+      startAnimation(currentOffset.current);
+    }, 5000);
+  };
+
+  const onScroll = (e: any) => {
+    if (userInteracted.current) {
+      currentOffset.current = e.nativeEvent.contentOffset.x;
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.screen, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={AppColors.primary} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.screen} showsVerticalScrollIndicator={false}>
@@ -38,7 +145,7 @@ export default function HomeScreen() {
       <View style={styles.hero}>
         <View style={styles.heroOverlay}>
           <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>Mừng Xuân Giáp Thìn 2024</Text>
+            <Text style={styles.heroBadgeText}>Mừng Xuân Giáp Thìn 2026</Text>
           </View>
           <Text style={styles.heroTitleWhite}>Trao Lộc Đầu Xuân,</Text>
           <Text style={styles.heroTitleGold}>Gói Trọn Nghĩa Tình</Text>
@@ -64,29 +171,47 @@ export default function HomeScreen() {
           <Text style={styles.sectionTag}>Danh mục</Text>
           <View style={styles.sectionLine} />
         </View>
-        <Text style={styles.sectionTitle}>Bộ Sưu Tập Quà Tết 2024</Text>
+        <Text style={styles.sectionTitle}>Bộ Sưu Tập Quà Tết 2026</Text>
         <Text style={styles.sectionDesc}>
           Mỗi bộ sưu tập là một câu chuyện về văn hóa truyền thống.
         </Text>
 
         <FlatList
+          ref={listRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           data={collections}
-          keyExtractor={(item) => item.name}
+          keyExtractor={(item, index) => item?.Id?.toString() || item?.id?.toString() || item?.Name || item?.name || index.toString()}
           contentContainerStyle={styles.collectionList}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
+          onScrollBeginDrag={handleInteractionStart}
+          onTouchStart={handleInteractionStart}
+          onScrollEndDrag={handleInteractionEnd}
+          onMomentumScrollEnd={handleInteractionEnd}
+          onTouchEnd={handleInteractionEnd}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.collectionCard}
               activeOpacity={0.8}
-              onPress={() => router.push('/(tabs)/gift-boxes' as any)}
+              onPress={() => router.push({ pathname: '/(tabs)/gift-boxes', params: { collectionId: item.Id || item.id } } as any)}
             >
               <View style={styles.collectionImagePlaceholder}>
-                <Text style={styles.collectionEmoji}>🎁</Text>
+                {item.CoverImage || item.Image || item.ImageUrl || item.image ? (
+                  <Image
+                    source={{ uri: item.CoverImage || item.Image || item.ImageUrl || item.image }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <Text style={styles.collectionEmoji}>🎁</Text>
+                )}
               </View>
               <View style={styles.collectionInfo}>
-                <Text style={styles.collectionName}>{item.name}</Text>
-                <Text style={styles.collectionDesc} numberOfLines={2}>{item.desc}</Text>
+                <Text style={styles.collectionName}>{item.Name || item.name || 'Bộ Sưu Tập'}</Text>
+                <Text style={styles.collectionDesc} numberOfLines={2}>
+                  {item.Description || item.description || 'Khám phá bộ sưu tập quà Tết cao cấp'}
+                </Text>
                 <Text style={styles.collectionLink}>Xem bộ sưu tập →</Text>
               </View>
             </TouchableOpacity>
@@ -109,15 +234,15 @@ export default function HomeScreen() {
         </Text>
 
         <View style={styles.productGrid}>
-          {products.map((p) => (
+          {products.slice(0, 4).map((p) => (
             <ProductCard
-              key={p.id}
-              id={p.id}
-              name={p.name}
-              price={p.price}
-              image={null}
-              badge={p.badge}
-              badgeColor={p.badgeColor}
+              key={p.Id}
+              id={p.Id}
+              name={p.Name}
+              price={p.Price}
+              image={p.Image}
+              badge={p.CollectionName || 'NỔI BẬT'}
+              badgeColor={'#C0A062'}
             />
           ))}
         </View>

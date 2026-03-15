@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
+import { productService, type GiftBoxListDto } from "../services/productService";
 import heroBasket from "../assets/hero-basket.png";
 import personalizationBasket from "../assets/personalization-basket.png";
 import product1 from "../assets/product-1.png";
@@ -8,26 +10,73 @@ import product2 from "../assets/product-2.png";
 import product3 from "../assets/product-3.png";
 import product4 from "../assets/product-4.png";
 
-/* ───── Static Data ───── */
-const collections = [
-    { name: "Xuân Đoàn Viên", desc: "Ấm áp tình thân, sum vầy bên tách trà thơm.", img: product1 },
-    { name: "Cát Tường Phú Quý", desc: "Lời chúc thịnh vượng và may mắn hanh thông.", img: product2 },
-    { name: "Lộc Xuân Doanh Nghiệp", desc: "Nâng tầm thương hiệu qua quà tặng đẳng cấp.", img: product3 },
-    { name: "An Nhiên Tân Xuân", desc: "Thư thái tâm hồn, khởi đầu năm mới bình an.", img: product4 },
-];
-
-const products = [
-    { name: "Hộp Quà Sum Họp", price: 1250000, badge: "BIẾU GIA ĐÌNH", badgeColor: "bg-[#C0A062]", img: product1 },
-    { name: "Hộp Quà Trường Thọ", price: 1850000, badge: "BIẾU ÔNG BÀ", badgeColor: "bg-[#C0A062]", img: product2 },
-    { name: "Hộp Quà Doanh Gia", price: 2450000, badge: "BIẾU ĐỐI TÁC", badgeColor: "bg-[#8B1A1A]", img: product3 },
-    { name: "Hộp Quà Gia Ấm", price: 1550000, badge: "BIẾU NGƯỜI THÂN", badgeColor: "bg-[#C0A062]", img: product4 },
-];
-
 const formatPrice = (p: number) =>
     p.toLocaleString("vi-VN") + "đ";
 
 /* ───── Component ───── */
 export default function HomePage() {
+    const [collections, setCollections] = useState<any[]>([]);
+    const [products, setProducts] = useState<GiftBoxListDto[]>([]);
+
+    useEffect(() => {
+        Promise.all([
+            productService.getCollections(),
+            productService.getGiftBoxes()
+        ]).then(([c, p]) => {
+            setCollections(c || []);
+            setProducts(p || []);
+        });
+    }, []);
+
+    const listRef = useRef<HTMLDivElement>(null);
+    const userInteracted = useRef(false);
+    const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        if (collections.length > 0 && listRef.current) {
+            let reqId: number;
+            let direction = 1; 
+            const speed = 0.4; 
+
+            const scrollLoop = () => {
+                if (userInteracted.current) return;
+                const el = listRef.current;
+                if (!el) return;
+
+                el.scrollLeft += direction * speed;
+                
+                // toggle direction at edges
+                if (direction === 1 && el.scrollLeft >= el.scrollWidth - el.clientWidth - 1) {
+                    direction = -1;
+                }
+                if (direction === -1 && el.scrollLeft <= 0) {
+                    direction = 1;
+                }
+                reqId = requestAnimationFrame(scrollLoop);
+            };
+            
+            const timer = setTimeout(() => {
+                reqId = requestAnimationFrame(scrollLoop);
+            }, 1000);
+
+            return () => {
+                clearTimeout(timer);
+                if (reqId) cancelAnimationFrame(reqId);
+            };
+        }
+    }, [collections]);
+
+    const handleInteraction = () => {
+        userInteracted.current = true;
+        if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    };
+
+    const handleInteractionEnd = () => {
+        if (resumeTimer.current) clearTimeout(resumeTimer.current);
+        resumeTimer.current = setTimeout(() => {
+            userInteracted.current = false;
+        }, 5000);
+    };
     return (
         <div className="font-sans">
             <Header />
@@ -53,7 +102,7 @@ export default function HomePage() {
                         </p>
                         <div className="flex flex-wrap gap-4">
                             <Link
-                                to="/products"
+                                to="/gift-boxes"
                                 className="px-8 py-3.5 bg-[#8B1A1A] text-white text-xs font-bold tracking-[0.15em] uppercase rounded hover:bg-[#7A1717] transition-colors"
                             >
                                 Khám phá bộ sưu tập
@@ -97,25 +146,36 @@ export default function HomePage() {
                         </p>
                     </div>
 
-                    {/* Collection grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {/* Collection grid (Horizontal scroll) */}
+                    <div 
+                        ref={listRef}
+                        onMouseEnter={handleInteraction}
+                        onTouchStart={handleInteraction}
+                        onMouseLeave={handleInteractionEnd}
+                        onTouchEnd={handleInteractionEnd}
+                        className="flex overflow-x-auto gap-6 pb-4 snap-x hide-scrollbar"
+                    >
                         {collections.map((c) => (
                             <div
-                                key={c.name}
-                                className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow"
+                                key={c.Id || c.Name}
+                                className="group bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-shadow min-w-[260px] max-w-[280px] snap-center shrink-0"
                             >
-                                <div className="aspect-[4/3] overflow-hidden bg-[#D9E8DE]">
-                                    <img
-                                        src={c.img}
-                                        alt={c.name}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                    />
+                                <div className="aspect-[4/3] overflow-hidden bg-[#D9E8DE] flex items-center justify-center">
+                                    {c.CoverImage || c.Image ? (
+                                        <img
+                                            src={c.CoverImage || c.Image}
+                                            alt={c.Name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                    ) : (
+                                        <span className="text-4xl">🎁</span>
+                                    )}
                                 </div>
                                 <div className="p-5 text-center">
-                                    <h3 className="text-lg font-serif font-bold text-gray-900 mb-1.5">{c.name}</h3>
-                                    <p className="text-sm text-gray-500 mb-4 leading-relaxed">{c.desc}</p>
+                                    <h3 className="text-lg font-serif font-bold text-gray-900 mb-1.5">{c.Name}</h3>
+                                    <p className="text-sm text-gray-500 mb-4 leading-relaxed line-clamp-2 min-h-[40px]">{c.Description}</p>
                                     <Link
-                                        to="/products"
+                                        to={`/gift-boxes?collectionId=${c.Id}`}
                                         className="text-xs font-semibold tracking-[0.1em] text-[#8B1A1A] uppercase border-b border-[#8B1A1A] pb-0.5 hover:text-[#6B1414] transition-colors"
                                     >
                                         Xem bộ sưu tập
@@ -149,23 +209,29 @@ export default function HomePage() {
 
                     {/* Product grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {products.map((p) => (
-                            <div key={p.name} className="group">
-                                <div className="relative aspect-square rounded-xl overflow-hidden bg-[#2A4A35] mb-4">
-                                    <span className={`absolute top-4 left-4 z-10 px-3 py-1 text-[10px] font-bold tracking-wider text-white uppercase rounded ${p.badgeColor}`}>
-                                        {p.badge}
+                        {products.slice(0, 4).map((p) => (
+                            <div key={p.Id} className="group">
+                                <div className="relative aspect-square rounded-xl overflow-hidden bg-[#2A4A35] mb-4 flex items-center justify-center">
+                                    <span className={`absolute top-4 left-4 z-10 px-3 py-1 text-[10px] font-bold tracking-wider text-white uppercase rounded bg-[#C0A062]`}>
+                                        {p.CollectionName || "NỔI BẬT"}
                                     </span>
-                                    <img
-                                        src={p.img}
-                                        alt={p.name}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                    />
+                                    {p.Image ? (
+                                        <img
+                                            src={p.Image}
+                                            alt={p.Name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                    ) : (
+                                        <span className="text-5xl">🎁</span>
+                                    )}
                                 </div>
-                                <h3 className="text-base font-serif font-semibold text-gray-900 mb-1">{p.name}</h3>
-                                <p className="text-lg font-bold text-[#8B1A1A] mb-3">{formatPrice(p.price)}</p>
-                                <button className="w-full py-2.5 border border-gray-300 rounded-lg text-xs font-bold tracking-[0.1em] uppercase text-gray-700 hover:bg-[#8B1A1A] hover:text-white hover:border-[#8B1A1A] transition-colors">
-                                    Thêm vào giỏ
-                                </button>
+                                <h3 className="text-base font-serif font-semibold text-gray-900 mb-1">{p.Name}</h3>
+                                <p className="text-lg font-bold text-[#8B1A1A] mb-3">{formatPrice(p.Price)}</p>
+                                <Link to={`/gift-boxes/${p.Id}`}>
+                                    <button className="w-full py-2.5 border border-gray-300 rounded-lg text-xs font-bold tracking-[0.1em] uppercase text-gray-700 hover:bg-[#8B1A1A] hover:text-white hover:border-[#8B1A1A] transition-colors">
+                                        Chi tiết
+                                    </button>
+                                </Link>
                             </div>
                         ))}
                     </div>
@@ -173,7 +239,7 @@ export default function HomePage() {
                     {/* View all */}
                     <div className="text-center mt-10">
                         <Link
-                            to="/products"
+                            to="/gift-boxes"
                             className="inline-flex items-center gap-2 text-sm font-bold tracking-[0.1em] uppercase text-[#8B1A1A] hover:text-[#6B1414] transition-colors"
                         >
                             Xem tất cả sản phẩm

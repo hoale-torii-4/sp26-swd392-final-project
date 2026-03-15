@@ -60,13 +60,20 @@ export const productService = {
         return response.data;
     },
 
-    /**
-     * GET /api/Products/collections
-     */
     getCollections: async (name?: string) => {
         const response = await apiClient.get(
             `${PRODUCTS_ENDPOINT}/collections`,
             { params: name ? { name } : undefined },
+        );
+        return response.data;
+    },
+
+    /**
+     * GET /api/Products/collections/{id}
+     */
+    getCollectionDetailById: async (id: string) => {
+        const response = await apiClient.get(
+            `${PRODUCTS_ENDPOINT}/collections/${id}`,
         );
         return response.data;
     },

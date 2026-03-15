@@ -26,6 +26,7 @@ export default function RootLayout() {
         <Stack.Screen name="checkout-payment" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="order-success" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="order-tracking" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="order-my" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="order-detail" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="addresses" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="guide" options={{ animation: 'slide_from_right' }} />

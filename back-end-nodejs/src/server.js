@@ -43,6 +43,15 @@ import {
   createCartRouter,
   createPaymentRouter,
   createAiRouter,
+  createAddressRouter,
+  createAdminCollectionsRouter,
+  createAdminGiftBoxesRouter,
+  createAdminInventoryRouter,
+  createMixMatchRouter,
+  createReviewsRouter,
+  createAdminUsersRouter,
+  createAdminDashboardRouter,
+  createReportsRouter,
 } from './controllers/index.js';
 
 async function main() {
@@ -114,6 +123,15 @@ async function main() {
   app.use('/api/cart', createCartRouter(cartService));
   app.use('/api/payment', createPaymentRouter(orderService, app));
   app.use('/api/ai', createAiRouter(aiService));
+  app.use('/api/address', createAddressRouter());
+  app.use('/api', createMixMatchRouter());
+  app.use('/api', createReviewsRouter());
+  app.use('/api/admin/collections', createAdminCollectionsRouter());
+  app.use('/api/admin/giftboxes', createAdminGiftBoxesRouter(productService));
+  app.use('/api/admin/inventory', createAdminInventoryRouter());
+  app.use('/api/admin/users', createAdminUsersRouter());
+  app.use('/api/admin/dashboard', createAdminDashboardRouter());
+  app.use('/api/admin/reports', createReportsRouter());
 
   // ========== Seed Data ==========
   await seedDatabase();

@@ -119,7 +119,7 @@ export default function AccountScreen() {
                 <MenuItem
                     icon="receipt-outline"
                     label="Đơn hàng của tôi"
-                    onPress={() => router.push('/order-tracking' as any)}
+                    onPress={() => router.push('/order-my' as any)}
                 />
                 <MenuItem
                     icon="location-outline"

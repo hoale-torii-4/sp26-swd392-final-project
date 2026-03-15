@@ -88,6 +88,7 @@ const customBoxItemSchema = new mongoose.Schema(
 // ========== Custom Box Model - Hộp quà Mix & Match ==========
 const customBoxSchema = new mongoose.Schema(
   {
+    userId: { type: String, default: '' },
     items: [customBoxItemSchema],
     totalPrice: { type: Number, default: 0 },
   },

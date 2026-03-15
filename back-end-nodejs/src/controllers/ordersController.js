@@ -85,10 +85,32 @@ export function createOrdersRouter(orderService, emailService) {
     }
   });
 
+  // ========== GET /api/orders/my-orders ==========
+  router.get('/my-orders', authenticate, async (req, res) => {
+    try {
+      const userId = req.user?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json(ApiResponse.error('Không thể xác thực người dùng.'));
+      }
+
+      const { skip = 0, take = 20 } = req.query;
+      const orders = await orderService.getMyOrders(userId, skip, take);
+      return res.status(200).json(ApiResponse.success(orders, 'Lấy đơn hàng thành công'));
+    } catch (error) {
+      console.error('GetMyOrders error:', error);
+      return res.status(400).json(ApiResponse.error(error.message));
+    }
+  });
+
   // ========== PUT /api/orders/:id/status (STAFF/ADMIN) ==========
   router.put('/:id/status', authenticate, authorize('STAFF', 'ADMIN'), async (req, res) => {
     try {
       const { Status, Notes } = req.body;
+
+      if (req.user?.role !== 'STAFF') {
+        return res.status(403).json(ApiResponse.error('Only STAFF can update order status. Admin cannot modify orders.'));
+      }
+
       const updatedBy = req.user.email || req.user.name || 'Staff';
 
       const order = await orderService.updateStatus(req.params.id, Status, updatedBy, Notes);
