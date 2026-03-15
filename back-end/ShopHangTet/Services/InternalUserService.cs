@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -43,6 +44,22 @@ public class InternalUserService
         return $"{iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
     }
 
+    private static string NormalizeSearch(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var builder = new StringBuilder();
+        foreach (var ch in normalized)
+        {
+            var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+            if (category != UnicodeCategory.NonSpacingMark)
+            {
+                builder.Append(ch == 'đ' ? 'd' : ch == 'Đ' ? 'D' : ch);
+            }
+        }
+        return builder.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+    }
+
     public async Task<InternalUserListResponseDTO> GetInternalUsersAsync(string? search, string? role, string? status, int page, int pageSize)
     {
         var query = _context.Users.AsQueryable();
@@ -50,10 +67,7 @@ public class InternalUserService
         // Only internal accounts
         query = query.Where(u => u.Role == UserRole.ADMIN || u.Role == UserRole.STAFF);
 
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(u => u.FullName.Contains(search) || u.Email.Contains(search));
-        }
+        var normalizedSearch = NormalizeSearch(search ?? string.Empty);
 
         if (!string.IsNullOrWhiteSpace(role))
         {
@@ -71,13 +85,23 @@ public class InternalUserService
                 query = query.Where(u => u.Status != UserStatus.ACTIVE);
         }
 
-        var total = await query.CountAsync();
-
         var users = await query
             .OrderBy(u => u.FullName)
+            .ToListAsync();
+
+        if (!string.IsNullOrWhiteSpace(normalizedSearch))
+        {
+            users = users.Where(u => NormalizeSearch(u.FullName).Contains(normalizedSearch)
+                || NormalizeSearch(u.Email).Contains(normalizedSearch))
+                .ToList();
+        }
+
+        var total = users.Count;
+
+        users = users
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToList();
 
         var dtoList = users.Select(u => new InternalUserResponseDTO
         {

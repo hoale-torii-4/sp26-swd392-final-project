@@ -86,7 +86,9 @@ export default function CheckoutPage() {
         );
     }
 
-    if (error || items.length === 0) {
+    const hasInactiveItems = items.some(i => i.IsActive === false);
+
+    if (error || items.length === 0 || hasInactiveItems) {
         return (
             <div className="font-sans bg-[#F5F5F0] min-h-screen flex flex-col">
                 <Header />
@@ -96,8 +98,13 @@ export default function CheckoutPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                         </svg>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">
-                            {error || "Giỏ hàng trống"}
+                            {error || (hasInactiveItems ? "Sản phẩm đã ngừng kinh doanh" : "Giỏ hàng trống")}
                         </h2>
+                        {hasInactiveItems && (
+                            <p className="text-sm text-gray-500 mb-6">
+                                Một số sản phẩm bạn chọn không còn tồn tại hoặc đã bị vô hiệu hóa. Vui lòng quay lại giỏ hàng để cập nhật.
+                            </p>
+                        )}
                         <p className="text-sm text-gray-500 mb-6">
                             Vui lòng thêm sản phẩm vào giỏ trước khi thanh toán.
                         </p>

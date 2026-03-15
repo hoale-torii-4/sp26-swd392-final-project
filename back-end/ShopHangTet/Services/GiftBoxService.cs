@@ -3,6 +3,8 @@ using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 using MongoDB.Bson;
+using System.Globalization;
+using System.Text;
 
 namespace ShopHangTet.Services
 {
@@ -15,6 +17,22 @@ namespace ShopHangTet.Services
             _context = context;
         }
 
+        private static string NormalizeSearch(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return string.Empty;
+            var normalized = value.Normalize(NormalizationForm.FormD);
+            var builder = new StringBuilder();
+            foreach (var ch in normalized)
+            {
+                var category = CharUnicodeInfo.GetUnicodeCategory(ch);
+                if (category != UnicodeCategory.NonSpacingMark)
+                {
+                    builder.Append(ch == 'đ' ? 'd' : ch == 'Đ' ? 'D' : ch);
+                }
+            }
+            return builder.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
+        }
+
         public async Task<PagedResult<GiftBoxListResponseDTO>> GetGiftBoxesAsync(string? collectionId, string? keyword, bool? status, int page, int pageSize)
         {
             var query = _context.GiftBoxes.AsQueryable();
@@ -22,19 +40,26 @@ namespace ShopHangTet.Services
             if (!string.IsNullOrWhiteSpace(collectionId))
                 query = query.Where(g => g.CollectionId == collectionId);
 
-            if (!string.IsNullOrWhiteSpace(keyword))
-                query = query.Where(g => g.Name.Contains(keyword));
+            var normalizedKeyword = NormalizeSearch(keyword ?? string.Empty);
 
             if (status.HasValue)
                 query = query.Where(g => g.IsActive == status.Value);
 
-            var total = await query.CountAsync();
-
             var items = await query
                 .OrderBy(g => g.Name)
+                .ToListAsync();
+
+            if (!string.IsNullOrWhiteSpace(normalizedKeyword))
+            {
+                items = items.Where(g => NormalizeSearch(g.Name).Contains(normalizedKeyword)).ToList();
+            }
+
+            var total = items.Count;
+
+            items = items
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToList();
 
             // Load related collections and tags for the page
             var collectionIds = items.Select(i => i.CollectionId).Distinct().ToList();
