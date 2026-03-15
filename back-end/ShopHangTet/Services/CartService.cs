@@ -58,13 +58,18 @@ namespace ShopHangTet.Services
             foreach (var item in cart.Items)
             {
                 string name = "Sản phẩm không xác định";
+                string? imageUrl = null;
 
                 if (item.Type == OrderItemType.READY_MADE && !string.IsNullOrEmpty(item.GiftBoxId))
                 {
                     var giftBox = await _context.Set<GiftBox>()
                         .FirstOrDefaultAsync(g => g.Id == item.GiftBoxId);
 
-                    if (giftBox != null) name = giftBox.Name;
+                    if (giftBox != null)
+                    {
+                        name = giftBox.Name;
+                        imageUrl = giftBox.Images?.FirstOrDefault();
+                    }
                 }
                 else if (item.Type == OrderItemType.MIX_MATCH)
                 {
@@ -78,7 +83,8 @@ namespace ShopHangTet.Services
                     ProductId = item.GiftBoxId ?? item.CustomBoxId ?? string.Empty,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
-                    Name = name
+                    Name = name,
+                    ImageUrl = imageUrl
                 });
             }
 
@@ -122,6 +128,50 @@ namespace ShopHangTet.Services
                 cart.Items = new List<CartItem>();
             }
 
+            return await AddItemToCartAsync(cart, dto);
+        }
+
+        public async Task<ApiResponse<CartDto>> AddToCartBatchAsync(string? userId, string? sessionId, AddToCartBatchDto dto)
+        {
+            if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(sessionId))
+                return ApiResponse<CartDto>.ErrorResult("Không xác định được người dùng!");
+
+            if (dto == null || dto.Items == null || dto.Items.Count == 0)
+                return ApiResponse<CartDto>.ErrorResult("Danh sách item không hợp lệ");
+
+            var cart = await GetCartByOwnerAsync(userId, sessionId);
+
+            if (cart == null)
+            {
+                cart = new Cart
+                {
+                    UserId = userId,
+                    SessionId = sessionId
+                };
+
+                _context.Set<Cart>().Add(cart);
+                await _context.SaveChangesAsync();
+
+                cart.Items = new List<CartItem>();
+            }
+
+            foreach (var item in dto.Items)
+            {
+                var result = await AddItemToCartAsync(cart, item, saveChanges: false);
+                if (!result.Success)
+                {
+                    return result;
+                }
+            }
+
+            cart.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart), "Đã thêm vào giỏ hàng");
+        }
+
+        private async Task<ApiResponse<CartDto>> AddItemToCartAsync(Cart cart, AddToCartDto dto, bool saveChanges = true)
+        {
             decimal unitPrice = 0;
 
 #pragma warning disable CS0618
@@ -182,10 +232,15 @@ namespace ShopHangTet.Services
                 _context.Set<CartItem>().Add(newItem);
             }
 
-            cart.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            if (saveChanges)
+            {
+                cart.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
 
-            return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart), "Đã thêm vào giỏ hàng");
+                return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart), "Đã thêm vào giỏ hàng");
+            }
+
+            return ApiResponse<CartDto>.SuccessResult(await MapToDtoAsync(cart));
         }
 
         public async Task<ApiResponse<CartDto>> UpdateCartItemAsync(string? userId, string? sessionId, string cartItemId, UpdateCartItemDto dto)

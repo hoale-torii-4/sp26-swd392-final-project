@@ -108,7 +108,7 @@ export default function HomePage() {
                                 Khám phá bộ sưu tập
                             </Link>
                             <Link
-                                to="/custom"
+                                to="/mix-match"
                                 className="px-8 py-3.5 border border-gray-400 text-white text-xs font-bold tracking-[0.15em] uppercase rounded hover:bg-white/10 transition-colors"
                             >
                                 Tự tạo giỏ quà
@@ -285,7 +285,7 @@ export default function HomePage() {
                             ))}
                         </ul>
                         <Link
-                            to="/custom"
+                            to="/mix-match"
                             className="inline-flex items-center gap-3 px-8 py-3.5 bg-[#C0A062] text-[#1B3022] text-xs font-bold tracking-[0.15em] uppercase rounded hover:bg-[#D4B876] transition-colors"
                         >
                             Bắt đầu tạo giỏ quà

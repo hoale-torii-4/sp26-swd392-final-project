@@ -7,6 +7,7 @@ namespace ShopHangTet.Services
         Task<ApiResponse<CartDto>> GetCartAsync(string? userId, string? sessionId);
 
         Task<ApiResponse<CartDto>> AddToCartAsync(string? userId, string? sessionId, AddToCartDto dto);
+        Task<ApiResponse<CartDto>> AddToCartBatchAsync(string? userId, string? sessionId, AddToCartBatchDto dto);
 
         Task<ApiResponse<CartDto>> UpdateCartItemAsync(string? userId, string? sessionId, string cartItemId, UpdateCartItemDto dto);
 

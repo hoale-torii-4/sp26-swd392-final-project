@@ -771,6 +771,7 @@ namespace ShopHangTet.DTOs
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public string? Name { get; set; }
+        public string? ImageUrl { get; set; }
     }
 
     public class AddToCartDto
@@ -788,6 +789,13 @@ namespace ShopHangTet.DTOs
         [Required]
         [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
+    }
+
+    public class AddToCartBatchDto
+    {
+        [Required]
+        [MinLength(1)]
+        public List<AddToCartDto> Items { get; set; } = new();
     }
 
     public class UpdateCartItemDto

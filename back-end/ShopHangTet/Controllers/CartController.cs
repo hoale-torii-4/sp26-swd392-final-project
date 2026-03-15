@@ -64,6 +64,19 @@ namespace ShopHangTet.Controllers
             return result.Success ? Ok(result) : BadRequest(result);
         }
 
+        [HttpPost("add-batch")]
+        public async Task<IActionResult> AddToCartBatch([FromBody] AddToCartBatchDto dto)
+        {
+            var (userId, sessionId) = GetUserOrSession();
+
+            if (!IsValidIdentity(userId, sessionId))
+                return BadRequest(ApiResponse<CartDto>.ErrorResult("Cần Token hoặc X-Session-Id"));
+
+            var result = await _cartService.AddToCartBatchAsync(userId, sessionId, dto);
+
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
         [HttpPut("update/{itemId}")]
         public async Task<IActionResult> UpdateCartItem(string itemId, [FromBody] UpdateCartItemDto dto)
         {

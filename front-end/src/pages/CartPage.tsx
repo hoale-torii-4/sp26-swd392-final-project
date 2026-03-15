@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartItemDto, type CartDto } from "../services/cartService";
+import mixMatchDefault from "../assets/mix-match-default.svg";
 
 /* ═══════════════════ HELPER ═══════════════════ */
 
@@ -45,11 +46,13 @@ export default function CartPage() {
         fetchCart();
     }, []);
 
-    const items = cart?.Items ?? [];
+    const items = useMemo(() => cart?.Items ?? [], [cart]);
 
     useEffect(() => {
+        if (!cart) return;
+
         if (!items.length) {
-            setSelectedIds(new Set());
+            setSelectedIds((prev) => (prev.size === 0 ? prev : new Set()));
             return;
         }
 
@@ -60,9 +63,12 @@ export default function CartPage() {
                     next.add(item.Id);
                 }
             });
+            if (next.size === prev.size && items.every((item) => prev.has(item.Id) === next.has(item.Id))) {
+                return prev;
+            }
             return next;
         });
-    }, [items]);
+    }, [cart, items]);
 
     const { selectedItems, selectedTotals } = useMemo(() => {
         const filtered = items.filter((item) => selectedIds.has(item.Id));
@@ -337,9 +343,23 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                 </div>
                 {/* Product placeholder image */}
                 <div className="w-28 h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300">
-                    <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                    </svg>
+                    {item.ImageUrl ? (
+                        <img
+                            src={item.ImageUrl}
+                            alt={item.Name ?? "Giỏ quà"}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : item.Type === 1 ? (
+                        <img
+                            src={mixMatchDefault}
+                            alt="Giỏ quà Mix & Match"
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                    )}
                 </div>
 
                 {/* Info */}

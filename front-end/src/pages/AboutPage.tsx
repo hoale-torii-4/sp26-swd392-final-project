@@ -201,7 +201,7 @@ export default function AboutPage() {
                         trong mùa Tết này."
                     </blockquote>
                     <Link
-                        to="/products"
+                        to="/gift-boxes"
                         className="inline-block px-10 py-4 bg-[#5A0A0A] text-white text-xs font-bold tracking-[0.2em] uppercase rounded hover:bg-[#4A0808] transition-colors"
                     >
                         Khám phá các bộ sưu tập

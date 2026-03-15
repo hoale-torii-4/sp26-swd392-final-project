@@ -12,6 +12,7 @@ export interface CartItemDto {
     Quantity: number;
     UnitPrice: number;
     Name: string | null;
+    ImageUrl?: string | null;
 }
 
 export interface CartDto {
@@ -28,6 +29,10 @@ export interface AddToCartRequest {
     GiftBoxId?: string;
     CustomBoxId?: string;
     Quantity: number;
+}
+
+export interface AddToCartBatchRequest {
+    Items: AddToCartRequest[];
 }
 
 // ─── Session ID for guest users ───
@@ -69,6 +74,18 @@ export const cartService = {
      */
     addToCart: async (item: AddToCartRequest): Promise<CartDto> => {
         const res = await apiClient.post<ApiResponse<CartDto>>("/Cart/add", item, {
+            headers: getHeaders(),
+        });
+        window.dispatchEvent(new Event("cart-updated"));
+        return res.data.Data;
+    },
+
+    /**
+     * POST /api/Cart/add-batch
+     */
+    addToCartBatch: async (items: AddToCartRequest[]): Promise<CartDto> => {
+        const payload: AddToCartBatchRequest = { Items: items };
+        const res = await apiClient.post<ApiResponse<CartDto>>("/Cart/add-batch", payload, {
             headers: getHeaders(),
         });
         window.dispatchEvent(new Event("cart-updated"));

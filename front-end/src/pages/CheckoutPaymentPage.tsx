@@ -290,18 +290,18 @@ export default function CheckoutPaymentPage() {
                                     Đang tự động kiểm tra thanh toán...
                                 </div>
 
-                                <button
-                                    onClick={() => navigate(`/order-success?code=${orderCode}`)}
-                                    className="w-full py-3 bg-[#8B1A1A] hover:bg-[#701515] text-white text-sm font-bold rounded-xl transition-colors cursor-pointer"
+                                <Link
+                                    to={`/order-success?code=${orderCode}`}
+                                    className="w-full py-3 bg-[#8B1A1A] hover:bg-[#701515] text-white text-sm font-bold rounded-xl transition-colors cursor-pointer text-center"
                                 >
                                     Đã thanh toán xong →
-                                </button>
-                                <button
-                                    onClick={() => navigate(`/order-success?code=${orderCode}`)}
-                                    className="text-xs text-gray-400 hover:text-gray-600 hover:underline cursor-pointer"
+                                </Link>
+                                <Link
+                                    to={`/order-success?code=${orderCode}`}
+                                    className="text-xs text-gray-400 hover:text-gray-600 hover:underline cursor-pointer text-center"
                                 >
-                                    Thanh toán sau (COD)
-                                </button>
+                                    Thanh toán sau
+                                </Link>
                             </>
                         )}
                     </div>
