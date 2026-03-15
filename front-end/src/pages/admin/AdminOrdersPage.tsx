@@ -104,9 +104,6 @@ export default function AdminOrdersPage() {
     useEffect(() => { fetchSummary(); }, []);
     useEffect(() => { fetchOrders(); }, [page, keyword, statusFilter, typeFilter]);
 
-    const summaryTotal = statusSummary
-        ? Object.values(statusSummary).reduce((sum: number, v) => sum + (typeof v === "number" ? v : 0), 0)
-        : 0;
 
     const openUpdateForOrder = (order: AdminOrderListItem) => {
         setSelectedOrder(order);
