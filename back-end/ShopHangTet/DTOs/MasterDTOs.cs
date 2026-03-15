@@ -772,6 +772,8 @@ namespace ShopHangTet.DTOs
         public decimal UnitPrice { get; set; }
         public string? Name { get; set; }
         public string? ImageUrl { get; set; }
+        public bool IsActive { get; set; } = true;
+        public string? StatusLabel { get; set; }
     }
 
     public class AddToCartDto

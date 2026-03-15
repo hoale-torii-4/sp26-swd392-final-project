@@ -245,19 +245,20 @@ export default function ProductDetailPage() {
                             <div className="flex items-center border border-gray-200 rounded-lg w-fit">
                                 <button
                                     onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                                    disabled={quantity <= 1}
+                                    disabled={quantity <= 1 || !product.IsActive}
                                     className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                                     </svg>
                                 </button>
-                                <span className="w-12 text-center text-base font-semibold text-gray-900">
+                                <span className={`w-12 text-center text-base font-semibold ${!product.IsActive ? "text-gray-400" : "text-gray-900"}`}>
                                     {quantity}
                                 </span>
                                 <button
                                     onClick={() => setQuantity((q) => q + 1)}
-                                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 cursor-pointer transition-colors"
+                                    disabled={!product.IsActive}
+                                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                 >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -270,7 +271,7 @@ export default function ProductDetailPage() {
                         <div className="flex flex-col sm:flex-row gap-3 mb-5">
                             <button
                                 onClick={handleAddToCart}
-                                disabled={addingToCart}
+                                disabled={addingToCart || !product.IsActive}
                                 className="flex-1 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                             >
                                 {addingToCart ? (
@@ -281,6 +282,8 @@ export default function ProductDetailPage() {
                                         </svg>
                                         Đang thêm...
                                     </>
+                                ) : !product.IsActive ? (
+                                    "Ngừng kinh doanh"
                                 ) : (
                                     <>
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,14 +295,20 @@ export default function ProductDetailPage() {
                             </button>
                             <button
                                 onClick={handleBuyNow}
-                                disabled={addingToCart}
+                                disabled={addingToCart || !product.IsActive}
                                 className="flex-1 py-3.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/5 transition-colors text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 22.5a10.5 10.5 0 100-21 10.5 10.5 0 000 21z" />
-                                </svg>
-                                Mua ngay
+                                {product.IsActive ? (
+                                    <>
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 22.5a10.5 10.5 0 100-21 10.5 10.5 0 000 21z" />
+                                        </svg>
+                                        Mua ngay
+                                    </>
+                                ) : (
+                                    "Ngừng kinh doanh"
+                                )}
                             </button>
                         </div>
 

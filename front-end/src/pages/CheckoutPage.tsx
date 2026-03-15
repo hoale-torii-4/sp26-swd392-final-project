@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartDto, type CartItemDto } from "../services/cartService";
 import { authService } from "../services/authService";
+import mixMatchDefault from "../assets/mix-match-default.svg";
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 
@@ -86,7 +87,9 @@ export default function CheckoutPage() {
         );
     }
 
-    if (error || items.length === 0) {
+    const hasInactiveItems = items.some(i => i.IsActive === false);
+
+    if (error || items.length === 0 || hasInactiveItems) {
         return (
             <div className="font-sans bg-[#F5F5F0] min-h-screen flex flex-col">
                 <Header />
@@ -96,8 +99,13 @@ export default function CheckoutPage() {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                         </svg>
                         <h2 className="text-xl font-bold text-gray-900 mb-2">
-                            {error || "Giỏ hàng trống"}
+                            {error || (hasInactiveItems ? "Sản phẩm đã ngừng kinh doanh" : "Giỏ hàng trống")}
                         </h2>
+                        {hasInactiveItems && (
+                            <p className="text-sm text-gray-500 mb-6">
+                                Một số sản phẩm bạn chọn không còn tồn tại hoặc đã bị vô hiệu hóa. Vui lòng quay lại giỏ hàng để cập nhật.
+                            </p>
+                        )}
                         <p className="text-sm text-gray-500 mb-6">
                             Vui lòng thêm sản phẩm vào giỏ trước khi thanh toán.
                         </p>
@@ -348,12 +356,26 @@ function OrderItemCard({ item }: { item: CartItemDto }) {
 
     return (
         <div className="bg-white rounded-2xl p-5 shadow-sm">
-            <div className="flex gap-5">
-                {/* Product image placeholder */}
-                <div className="w-24 h-24 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                    </svg>
+            <div className="flex gap-4 sm:gap-5">
+                {/* Product image */}
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300">
+                    {item.ImageUrl ? (
+                        <img
+                            src={item.ImageUrl}
+                            alt={item.Name || "Sản phẩm"}
+                            className="w-full h-full object-cover"
+                        />
+                    ) : item.Type === 1 ? (
+                        <img
+                            src={mixMatchDefault}
+                            alt="Giỏ quà Mix & Match"
+                            className="w-full h-full object-cover"
+                        />
+                    ) : (
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+                        </svg>
+                    )}
                 </div>
 
                 {/* Info */}

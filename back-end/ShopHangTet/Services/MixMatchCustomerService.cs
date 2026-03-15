@@ -117,4 +117,50 @@ public class MixMatchCustomerService : IMixMatchCustomerService
             CreatedAt = box.CreatedAt
         };
     }
+    public async Task<bool> UpdateCustomBoxAsync(string userId, string boxId, CreateCustomBoxDTO dto)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(boxId)) return false;
+        
+        var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == boxId && cb.UserId == userId);
+        if (box == null) throw new InvalidOperationException("Custom box not found or access denied");
+
+        var totalItems = dto.Items.Sum(x => x.Quantity);
+        if (totalItems < 4 || totalItems > 6)
+            throw new InvalidOperationException("Custom box must contain between 4 and 6 items.");
+
+        var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
+        var itemsDict = await _context.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
+        if (itemsDict.Count != itemIds.Count)
+            throw new InvalidOperationException("One or more selected items were not found.");
+
+        box.Items = dto.Items.Select(i => new CustomBoxItem { ItemId = i.ItemId, Quantity = i.Quantity }).ToList();
+        box.UpdatedAt = DateTime.UtcNow;
+
+        decimal totalPrice = 0m;
+        foreach (var it in box.Items)
+        {
+            var item = itemsDict[it.ItemId];
+            totalPrice += item.Price * it.Quantity;
+        }
+        
+        box.TotalPrice = totalPrice;
+
+        _context.CustomBoxes.Update(box);
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
+
+    public async Task<bool> DeleteCustomBoxAsync(string userId, string boxId)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(boxId)) return false;
+
+        var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == boxId && cb.UserId == userId);
+        if (box == null) return false;
+
+        _context.CustomBoxes.Remove(box);
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
 }
