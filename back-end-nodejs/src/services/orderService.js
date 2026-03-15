@@ -446,24 +446,30 @@ export class OrderService {
 
     for (const dto of items) {
       if (dto.Type === OrderItemType.READY_MADE) {
-        const giftBox = await GiftBox.findById(dto.GiftBoxId);
+        const giftBoxId = dto.Id || dto.GiftBoxId;
+        if (!giftBoxId) throw new Error('GiftBoxId is required');
+
+        const giftBox = await GiftBox.findById(giftBoxId);
         if (!giftBox) throw new Error('GiftBox not found');
 
         result.push({
           type: OrderItemType.READY_MADE,
           productName: giftBox.name,
-          giftBoxId: new mongoose.Types.ObjectId(dto.GiftBoxId),
+          giftBoxId: new mongoose.Types.ObjectId(giftBoxId),
           quantity: dto.Quantity,
           unitPrice: giftBox.price,
           totalPrice: giftBox.price * dto.Quantity,
           snapshotItems: await this._buildGiftBoxSnapshot(giftBox),
         });
       } else if (dto.Type === OrderItemType.MIX_MATCH) {
-        const customBox = await CustomBox.findById(dto.CustomBoxId);
+        const customBoxId = dto.Id || dto.CustomBoxId;
+        if (!customBoxId) throw new Error('CustomBoxId is required');
+
+        const customBox = await CustomBox.findById(customBoxId);
         if (!customBox) throw new Error('CustomBox not found');
 
         // Validate Mix & Match rules
-        const validation = await this.validateMixMatchRules(dto.CustomBoxId);
+        const validation = await this.validateMixMatchRules(customBoxId);
         if (!validation.IsValid) {
           throw new Error(`Mix & Match validation failed: ${validation.Errors.join(', ')}`);
         }
@@ -471,7 +477,7 @@ export class OrderService {
         result.push({
           type: OrderItemType.MIX_MATCH,
           productName: 'Custom Mix & Match Box',
-          customBoxId: new mongoose.Types.ObjectId(dto.CustomBoxId),
+          customBoxId: new mongoose.Types.ObjectId(customBoxId),
           quantity: dto.Quantity,
           unitPrice: customBox.totalPrice,
           totalPrice: customBox.totalPrice * dto.Quantity,

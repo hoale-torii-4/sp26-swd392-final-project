@@ -7,6 +7,7 @@ import type { ApiResponse } from '../types/auth';
 export interface CartItemDto {
     Id: string;
     Type: number;            // 0 = READY_MADE, 1 = MIX_MATCH
+    ProductId?: string;
     GiftBoxId: string | null;
     CustomBoxId: string | null;
     Quantity: number;

@@ -23,6 +23,13 @@ export default function RootLayout() {
         <Stack.Screen name="reset-password" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="product/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="checkout" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="checkout-payment" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="order-success" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="order-tracking" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="order-detail" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="addresses" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="guide" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="about" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </AuthProvider>
   );

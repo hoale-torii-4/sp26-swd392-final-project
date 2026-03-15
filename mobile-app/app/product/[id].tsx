@@ -125,7 +125,7 @@ export default function ProductDetailScreen() {
                     </View>
                 ) : (
                     <View style={styles.noImagePlaceholder}>
-                        <Text style={{ fontSize: 64 }}>🎁</Text>
+                        <Ionicons name="gift-outline" size={64} color={AppColors.primary} />
                     </View>
                 )}
 
@@ -213,7 +213,7 @@ export default function ProductDetailScreen() {
                                         {item.Image ? (
                                             <Image source={{ uri: item.Image }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                                         ) : (
-                                            <Text style={{ fontSize: 16 }}>📦</Text>
+                                            <Ionicons name="cube-outline" size={16} color={AppColors.textMuted} />
                                         )}
                                     </View>
                                     <View style={{ flex: 1 }}>

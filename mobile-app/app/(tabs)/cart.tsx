@@ -86,7 +86,7 @@ export default function CartScreen() {
         <View style={styles.cartItem}>
             <View style={styles.cartItemLeft}>
                 <View style={styles.itemImagePlaceholder}>
-                    <Text style={{ fontSize: 28 }}>🎁</Text>
+                    <Ionicons name="gift-outline" size={28} color={AppColors.primary} />
                 </View>
             </View>
             <View style={styles.cartItemRight}>

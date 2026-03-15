@@ -13,6 +13,21 @@ export default function AccountScreen() {
     const router = useRouter();
     const { user, isAuthenticated, logout } = useAuth();
 
+    const initials = user?.FullName?.charAt(0).toUpperCase() || 'U';
+
+    // Profile state
+    const [fullName, setFullName] = useState(user?.FullName || '');
+    const [phone, setPhone] = useState(user?.Phone || '');
+    const [profileMsg, setProfileMsg] = useState('');
+
+    // Password state
+    const [oldPw, setOldPw] = useState('');
+    const [newPw, setNewPw] = useState('');
+    const [confirmPw, setConfirmPw] = useState('');
+    const [pwLoading, setPwLoading] = useState(false);
+    const [pwMsg, setPwMsg] = useState('');
+    const [pwIsSuccess, setPwIsSuccess] = useState(false);
+
     // If not authenticated, show login prompt
     if (!isAuthenticated || !user) {
         return (
@@ -37,21 +52,6 @@ export default function AccountScreen() {
             </View>
         );
     }
-
-    const initials = user.FullName?.charAt(0).toUpperCase() || 'U';
-
-    // Profile state
-    const [fullName, setFullName] = useState(user.FullName || '');
-    const [phone, setPhone] = useState(user.Phone || '');
-    const [profileMsg, setProfileMsg] = useState('');
-
-    // Password state
-    const [oldPw, setOldPw] = useState('');
-    const [newPw, setNewPw] = useState('');
-    const [confirmPw, setConfirmPw] = useState('');
-    const [pwLoading, setPwLoading] = useState(false);
-    const [pwMsg, setPwMsg] = useState('');
-    const [pwIsSuccess, setPwIsSuccess] = useState(false);
 
     const handleProfileSave = () => {
         setProfileMsg('Thông tin đã được cập nhật thành công!');
@@ -116,8 +116,16 @@ export default function AccountScreen() {
             {/* Menu Items */}
             <View style={styles.menuCard}>
                 <MenuItem icon="person-outline" label="Thông tin tài khoản" active />
-                <MenuItem icon="receipt-outline" label="Đơn hàng của tôi" />
-                <MenuItem icon="location-outline" label="Sổ địa chỉ" />
+                <MenuItem
+                    icon="receipt-outline"
+                    label="Đơn hàng của tôi"
+                    onPress={() => router.push('/order-tracking' as any)}
+                />
+                <MenuItem
+                    icon="location-outline"
+                    label="Sổ địa chỉ"
+                    onPress={() => router.push('/addresses' as any)}
+                />
             </View>
 
             {/* Profile Form */}
@@ -229,9 +237,22 @@ export default function AccountScreen() {
     );
 }
 
-function MenuItem({ icon, label, active }: { icon: string; label: string; active?: boolean }) {
+function MenuItem({
+    icon,
+    label,
+    active,
+    onPress,
+}: {
+    icon: string;
+    label: string;
+    active?: boolean;
+    onPress?: () => void;
+}) {
     return (
-        <TouchableOpacity style={[styles.menuItem, active && styles.menuItemActive]}>
+        <TouchableOpacity
+            style={[styles.menuItem, active && styles.menuItemActive]}
+            onPress={onPress}
+        >
             <Ionicons name={icon as any} size={20} color={active ? AppColors.primary : AppColors.textMuted} />
             <Text style={[styles.menuItemText, active && styles.menuItemTextActive]}>{label}</Text>
             <Ionicons name="chevron-forward" size={16} color={AppColors.textMuted} />
