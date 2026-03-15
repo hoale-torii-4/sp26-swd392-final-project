@@ -11,4 +11,8 @@ public interface IMixMatchCustomerService
     Task<CustomBoxResponseDTO?> GetCustomBoxByUserAsync(string userId);
 
     Task<List<CustomBoxResponseDTO>> GetCustomBoxesByUserAsync(string userId);
+
+    Task<bool> UpdateCustomBoxAsync(string userId, string boxId, CreateCustomBoxDTO dto);
+
+    Task<bool> DeleteCustomBoxAsync(string userId, string boxId);
 }

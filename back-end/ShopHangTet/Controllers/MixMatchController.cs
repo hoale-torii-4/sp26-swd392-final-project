@@ -127,5 +127,39 @@ namespace ShopHangTet.Controllers
             var res = await _customerService.GetCustomBoxesByUserAsync(userId);
             return Ok(res);
         }
+
+        [HttpPut]
+        [Authorize]
+        [Route("/api/mix-match/custom-box/{id}")]
+        public async Task<IActionResult> UpdateCustomBox(string id, [FromBody] CreateCustomBoxDTO dto)
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+            
+            try 
+            {
+                var success = await _customerService.UpdateCustomBoxAsync(userId, id, dto);
+                if (!success) return NotFound("Custom box not found or access denied.");
+                return NoContent();
+            } 
+            catch (Exception ex) 
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
+        [HttpDelete]
+        [Authorize]
+        [Route("/api/mix-match/custom-box/{id}")]
+        public async Task<IActionResult> DeleteCustomBox(string id)
+        {
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId)) return Unauthorized();
+
+            var success = await _customerService.DeleteCustomBoxAsync(userId, id);
+            if (!success) return NotFound("Custom box not found or access denied.");
+            
+            return NoContent();
+        }
     }
 }

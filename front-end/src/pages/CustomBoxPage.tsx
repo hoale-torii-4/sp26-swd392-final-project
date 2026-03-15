@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
@@ -93,6 +94,23 @@ export default function CustomBoxPage() {
     const handleLogout = () => {
         authService.logout();
         navigate("/login");
+    };
+
+    const handleDeleteCustomBox = async (boxId: string) => {
+        if (!window.confirm("Bạn có chắc chắn muốn xóa giỏ quà này không?")) return;
+        
+        try {
+            await cartService.deleteCustomBox(boxId);
+            toast.success("Đã xóa giỏ quà thành công.");
+            setCustomBoxes((prev) => prev.filter((box) => (box.Id ?? box.id) !== boxId));
+            setSelectedBoxIds((prev) => {
+                const next = { ...prev };
+                delete next[boxId];
+                return next;
+            });
+        } catch (err: any) {
+             toast.error(err?.response?.data || err?.message || "Không thể xóa giỏ quà.");
+        }
     };
 
     const toggleSelect = (id: string) => {
@@ -262,9 +280,27 @@ export default function CustomBoxPage() {
                                                         Tổng tiền: {(customBox.TotalPrice ?? customBox.totalPrice ?? 0).toLocaleString("vi-VN")}₫
                                                     </span>
                                                 </div>
-                                                <span className="text-xs text-gray-400">
-                                                    Tạo lúc: {customBox.CreatedAt ? new Date(customBox.CreatedAt).toLocaleDateString("vi-VN") : "--"}
-                                                </span>
+                                                <div className="flex items-center gap-4 mt-2 sm:mt-0">
+                                                    <span className="text-xs text-gray-400">
+                                                        Tạo lúc: {customBox.CreatedAt ? new Date(customBox.CreatedAt).toLocaleDateString("vi-VN") : "--"}
+                                                    </span>
+                                                    <div className="flex items-center gap-2">
+                                                         <Link 
+                                                            to="/mix-match" 
+                                                            state={{ editBoxId: boxId, items: customBox.Items ?? customBox.items }}
+                                                            className="text-xs font-semibold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                                                         >
+                                                             Sửa
+                                                         </Link>
+                                                         <span className="text-gray-300">|</span>
+                                                         <button 
+                                                            onClick={() => handleDeleteCustomBox(boxId)}
+                                                            className="text-xs font-semibold text-red-500 hover:text-red-700 hover:underline cursor-pointer"
+                                                         >
+                                                             Xóa
+                                                         </button>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">

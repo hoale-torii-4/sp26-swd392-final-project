@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -25,13 +25,33 @@ type DragSource = {
 };
 
 export default function MixMatchPage() {
+    const location = useLocation();
     const navigate = useNavigate();
+    const editBoxId = location.state?.editBoxId;
+    const initialItems = location.state?.items; // Array of items from custom box
+
     const [items, setItems] = useState<MixMatchItem[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("all");
     const [slots, setSlots] = useState<Array<string | null>>(EMPTY_SLOTS);
     const [dragSource, setDragSource] = useState<DragSource | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Load initial slots if editing
+    useEffect(() => {
+        if (initialItems && Array.isArray(initialItems)) {
+            const newSlots = Array.from({ length: 6 }, () => null as string | null);
+            let slotIdx = 0;
+            initialItems.forEach((it: any) => {
+                const qty = it.Quantity ?? it.quantity ?? 1;
+                const itemId = it.ItemId ?? it.itemId;
+                for (let i = 0; i < qty && slotIdx < 6; i++) {
+                    newSlots[slotIdx++] = itemId;
+                }
+            });
+            setSlots(newSlots);
+        }
+    }, [initialItems]);
 
     useEffect(() => {
         const load = async () => {
@@ -106,10 +126,17 @@ export default function MixMatchPage() {
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
-            await mixMatchService.createCustomBox(itemsPayload);
-            toast.success("Đã tạo giỏ quà custom");
+            if (editBoxId) {
+                await cartService.updateCustomBox(editBoxId, itemsPayload);
+                toast.success("Đã cập nhật giỏ quà custom thành công.");
+                navigate("/custom-box");
+            } else {
+                await mixMatchService.createCustomBox(itemsPayload);
+                toast.success("Đã tạo giỏ quà custom thành công.");
+                navigate("/custom-box");
+            }
         } catch (err: unknown) {
-            const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tạo giỏ quà.";
+            const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tải cấu hình giỏ quà.";
             toast.error(errMsg);
         } finally {
             setIsSubmitting(false);
@@ -120,9 +147,16 @@ export default function MixMatchPage() {
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
-            const id = await mixMatchService.createCustomBox(itemsPayload);
-            await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
-            toast.success("Đã thêm giỏ quà vào giỏ hàng.");
+            let id = editBoxId;
+            if (editBoxId) {
+                await cartService.updateCustomBox(editBoxId, itemsPayload);
+            } else {
+                id = await mixMatchService.createCustomBox(itemsPayload);
+            }
+            if (id) {
+                 await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
+                 toast.success(editBoxId ? "Đã cập nhật và thêm vào giỏ hàng." : "Đã thêm giỏ quà vào giỏ hàng.");
+            }
         } catch (err: unknown) {
             const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể thêm vào giỏ hàng.";
             toast.error(errMsg);
@@ -135,19 +169,26 @@ export default function MixMatchPage() {
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
-            const id = await mixMatchService.createCustomBox(itemsPayload);
-            const cart = await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
-            const addedItem = cart.Items.find((entry) => entry.ProductId === id);
-            if (addedItem) {
-                navigate("/checkout", {
-                    state: {
-                        selectedItems: [addedItem],
-                        totalItems: addedItem.Quantity,
-                        totalAmount: addedItem.Quantity * addedItem.UnitPrice,
-                    },
-                });
+            let id = editBoxId;
+            if (editBoxId) {
+                 await cartService.updateCustomBox(editBoxId, itemsPayload);
             } else {
-                navigate("/cart");
+                 id = await mixMatchService.createCustomBox(itemsPayload);
+            }
+            if (id) {
+                const cart = await cartService.addToCart({ Type: 1, CustomBoxId: id, Quantity: 1 });
+                const addedItem = cart.Items.find((entry) => entry.ProductId === id || entry.Id === id);
+                if (addedItem) {
+                    navigate("/checkout", {
+                        state: {
+                            selectedItems: [addedItem],
+                            totalItems: addedItem.Quantity,
+                            totalAmount: addedItem.Quantity * addedItem.UnitPrice,
+                        },
+                    });
+                } else {
+                    navigate("/cart");
+                }
             }
         } catch (err: unknown) {
             const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể mua ngay.";
@@ -282,7 +323,7 @@ export default function MixMatchPage() {
                                         disabled={totals.totalItems < 4 || totals.totalItems > 6 || isSubmitting}
                                         onClick={handleCreateCustomBox}
                                     >
-                                        {isSubmitting ? "Đang xử lý..." : "Tạo giỏ quà Mix & Match"}
+                                        {isSubmitting ? "Đang xử lý..." : editBoxId ? "Lưu thay đổi giỏ quà" : "Tạo giỏ quà Mix & Match"}
                                     </button>
                                     <button
                                         className="w-full py-3 border border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/10 transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
