@@ -234,12 +234,14 @@ export interface InventoryLog {
     Id: string;
     ItemId: string;
     ItemName: string;
+    Sku: string;
     ChangeType: string;
+    ChangeTypeLabel: string;
     QuantityChange: number;
-    PreviousQuantity: number;
-    NewQuantity: number;
+    PreviousStock: number;
+    NewStock: number;
     Source: string;
-    Note?: string;
+    Reason?: string;
     CreatedAt: string;
 }
 
@@ -252,8 +254,19 @@ export interface InventorySummaryDto {
 
 export interface InventoryAdjustDto {
     ItemId: string;
-    QuantityChange: number;
-    Note?: string;
+    AdjustType: "INCREASE" | "DECREASE";
+    Quantity: number;
+    Reason?: string;
+}
+
+export interface InventoryCreateDto {
+    Name: string;
+    Category: string;
+    Price: number;
+    Image?: string;
+    IsAlcohol: boolean;
+    InitialStock: number;
+    IsActive?: boolean;
 }
 
 // ── MixMatch ──
@@ -503,6 +516,9 @@ export const adminService = {
 
     adjustInventory: (data: InventoryAdjustDto) =>
         apiClient.post("/admin/inventory/adjust", data),
+
+    createInventoryItem: (data: InventoryCreateDto) =>
+        apiClient.post<{ Id: string }>("/admin/inventory", data).then(r => r.data),
 
     getInventorySummary: () =>
         apiClient.get<InventorySummaryDto>("/admin/inventory/summary").then(r => r.data),

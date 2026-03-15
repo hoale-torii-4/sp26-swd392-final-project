@@ -1340,6 +1340,29 @@ namespace ShopHangTet.DTOs
         public DateTime CreatedAt { get; set; }
     }
 
+    public class InventoryCreateRequestDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public string Category { get; set; } = string.Empty; // DRINK, FOOD, NUT, ALCOHOL
+
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal Price { get; set; }
+
+        public string? Image { get; set; }
+
+        public bool IsAlcohol { get; set; }
+
+        [Required]
+        [Range(0, int.MaxValue)]
+        public int InitialStock { get; set; }
+
+        public bool IsActive { get; set; } = true;
+    }
+
     public class InventoryAdjustRequestDTO
     {
         [Required]

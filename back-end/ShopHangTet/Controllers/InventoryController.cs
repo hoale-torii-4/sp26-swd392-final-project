@@ -44,6 +44,13 @@ namespace ShopHangTet.Controllers
             return NoContent();
         }
 
+        [HttpPost]
+        public async Task<ActionResult<string>> Create([FromBody] InventoryCreateRequestDTO dto)
+        {
+            var id = await _service.CreateItemAsync(dto);
+            return Ok(new { Id = id });
+        }
+
         [HttpGet("summary")]
         public async Task<ActionResult<InventorySummaryDTO>> Summary()
         {

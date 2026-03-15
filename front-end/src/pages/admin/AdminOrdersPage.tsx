@@ -200,8 +200,9 @@ export default function AdminOrdersPage() {
 
             {/* Orders table */}
             <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[800px]">
+                        <thead className="bg-gray-50 border-b">
                         <tr className="text-left text-xs text-gray-400 uppercase">
                             <th className="px-4 py-3 font-medium">Mã đơn</th>
                             <th className="px-4 py-3 font-medium">Khách hàng</th>
@@ -251,7 +252,8 @@ export default function AdminOrdersPage() {
                             );
                         })}
                     </tbody>
-                </table>
+                    </table>
+                </div>
 
                 {/* Pagination */}
                 {totalPages > 1 && (
