@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
 import { mixMatchService } from "../services/mixMatchService";
+import { cartService } from "../services/cartService";
 
 const sidebarLinks = [
     {
@@ -52,7 +53,9 @@ export default function CustomBoxPage() {
     const initials = user?.FullName?.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase() ?? "?";
 
     const [customBoxes, setCustomBoxes] = useState<any[]>([]);
+    const [selectedBoxIds, setSelectedBoxIds] = useState<Record<string, boolean>>({});
     const [loading, setLoading] = useState(true);
+    const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -67,6 +70,12 @@ export default function CustomBoxPage() {
                 const res = await mixMatchService.getMyCustomBoxes();
                 const payload = res?.Data ?? res?.data ?? res ?? [];
                 setCustomBoxes(payload);
+                const selectedInit: Record<string, boolean> = {};
+                payload.forEach((box: any) => {
+                    const key = box.Id ?? box.id;
+                    if (key) selectedInit[key] = false;
+                });
+                setSelectedBoxIds(selectedInit);
             } catch (err: any) {
                 if (err?.status === 404) {
                     setCustomBoxes([]);
@@ -84,6 +93,47 @@ export default function CustomBoxPage() {
     const handleLogout = () => {
         authService.logout();
         navigate("/login");
+    };
+
+    const toggleSelect = (id: string) => {
+        setSelectedBoxIds((prev) => ({
+            ...prev,
+            [id]: !prev[id],
+        }));
+    };
+
+    const handleAddSelectedToCart = async () => {
+        const selectedIds = Object.entries(selectedBoxIds)
+            .filter(([, isSelected]) => isSelected)
+            .map(([id]) => id);
+
+        if (selectedIds.length === 0) {
+            setError("Vui lòng chọn ít nhất một giỏ quà custom để thêm vào giỏ hàng.");
+            return;
+        }
+
+        setSubmitting(true);
+        setError(null);
+        try {
+            await cartService.addToCartBatch(
+                selectedIds.map((id) => ({
+                    Type: 1,
+                    CustomBoxId: id,
+                    Quantity: 1,
+                })),
+            );
+            setSelectedBoxIds((prev) => {
+                const next: Record<string, boolean> = {};
+                Object.keys(prev).forEach((key) => {
+                    next[key] = false;
+                });
+                return next;
+            });
+        } catch (err: any) {
+            setError(err?.message ?? "Không thể thêm giỏ quà vào giỏ hàng.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -130,20 +180,35 @@ export default function CustomBoxPage() {
                     </aside>
 
                     <div className="space-y-6">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h1 className="text-2xl font-serif font-bold italic text-[#8B1A1A]">Giỏ quà custom</h1>
                                 <p className="text-sm text-gray-500 mt-1">Quản lý giỏ quà tùy chọn của bạn.</p>
                             </div>
-                            <Link
-                                to="/mix-match"
-                                className="flex items-center gap-2 px-5 py-2.5 bg-[#8B1A1A] text-white text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors"
-                            >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />
-                                </svg>
-                                Tạo giỏ quà mới
-                            </Link>
+                            <div className="flex flex-wrap items-center gap-3">
+                                <button
+                                    onClick={handleAddSelectedToCart}
+                                    disabled={submitting}
+                                    className={`flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider rounded-lg transition-colors ${submitting
+                                        ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                                        : "bg-[#1B3022] text-white hover:bg-[#142318]"
+                                        }`}
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.2 2.4a1 1 0 00.9 1.6h12.6m-9 4.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm9 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
+                                    </svg>
+                                    {submitting ? "Đang thêm..." : "Thêm vào giỏ hàng"}
+                                </button>
+                                <Link
+                                    to="/mix-match"
+                                    className="flex items-center gap-2 px-5 py-2.5 bg-[#8B1A1A] text-white text-xs font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors"
+                                >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" />
+                                    </svg>
+                                    Tạo giỏ quà mới
+                                </Link>
+                            </div>
                         </div>
 
                         {loading ? (
@@ -175,34 +240,48 @@ export default function CustomBoxPage() {
                             </div>
                         ) : (
                             <div className="space-y-6">
-                                {customBoxes.map((customBox) => (
-                                    <div key={customBox.Id ?? customBox.id} className="bg-white rounded-2xl p-6 shadow-sm">
-                                        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-                                            <span className="px-3 py-1 rounded-full bg-[#8B1A1A]/10 text-[#8B1A1A] font-semibold">
-                                                {customBox.TotalItems ?? customBox.totalItems ?? 0} sản phẩm
-                                            </span>
-                                            <span className="font-semibold text-gray-800">
-                                                Tổng tiền: {(customBox.TotalPrice ?? customBox.totalPrice ?? 0).toLocaleString("vi-VN")}₫
-                                            </span>
-                                            <span className="text-xs text-gray-400">
-                                                Tạo lúc: {customBox.CreatedAt ? new Date(customBox.CreatedAt).toLocaleDateString("vi-VN") : "--"}
-                                            </span>
-                                        </div>
-
-                                        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {(customBox.Items ?? customBox.items ?? []).map((item: any) => (
-                                                <div key={`${customBox.Id ?? customBox.id}-${item.ItemId ?? item.itemId}`} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                                                    <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name ?? item.name}</p>
-                                                    <p className="text-xs text-gray-500">Số lượng: {item.Quantity ?? item.quantity}</p>
-                                                    <p className="text-xs text-gray-500">Đơn giá: {(item.Price ?? item.price ?? 0).toLocaleString("vi-VN")}₫</p>
-                                                    <p className="text-sm font-semibold text-[#8B1A1A] mt-2">
-                                                        {(item.Subtotal ?? item.subtotal ?? 0).toLocaleString("vi-VN")}₫
-                                                    </p>
+                                {customBoxes.map((customBox) => {
+                                    const boxId = customBox.Id ?? customBox.id;
+                                    return (
+                                        <div
+                                            key={boxId}
+                                            className={`bg-white rounded-2xl p-6 shadow-sm border-2 ${selectedBoxIds[boxId] ? "border-[#8B1A1A]" : "border-transparent"}`}
+                                        >
+                                            <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-600">
+                                                <div className="flex items-center gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={Boolean(selectedBoxIds[boxId])}
+                                                        onChange={() => toggleSelect(boxId)}
+                                                        className="w-4 h-4 accent-[#8B1A1A]"
+                                                    />
+                                                    <span className="px-3 py-1 rounded-full bg-[#8B1A1A]/10 text-[#8B1A1A] font-semibold">
+                                                        {customBox.TotalItems ?? customBox.totalItems ?? 0} sản phẩm
+                                                    </span>
+                                                    <span className="font-semibold text-gray-800">
+                                                        Tổng tiền: {(customBox.TotalPrice ?? customBox.totalPrice ?? 0).toLocaleString("vi-VN")}₫
+                                                    </span>
                                                 </div>
-                                            ))}
+                                                <span className="text-xs text-gray-400">
+                                                    Tạo lúc: {customBox.CreatedAt ? new Date(customBox.CreatedAt).toLocaleDateString("vi-VN") : "--"}
+                                                </span>
+                                            </div>
+
+                                            <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {(customBox.Items ?? customBox.items ?? []).map((item: any) => (
+                                                    <div key={`${boxId}-${item.ItemId ?? item.itemId}`} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                                                        <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name ?? item.name}</p>
+                                                        <p className="text-xs text-gray-500">Số lượng: {item.Quantity ?? item.quantity}</p>
+                                                        <p className="text-xs text-gray-500">Đơn giá: {(item.Price ?? item.price ?? 0).toLocaleString("vi-VN")}₫</p>
+                                                        <p className="text-sm font-semibold text-[#8B1A1A] mt-2">
+                                                            {(item.Subtotal ?? item.subtotal ?? 0).toLocaleString("vi-VN")}₫
+                                                        </p>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
