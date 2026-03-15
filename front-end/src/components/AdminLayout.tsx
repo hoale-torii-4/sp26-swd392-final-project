@@ -1,5 +1,23 @@
 import { useState } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { authService } from "../services/authService";
+
+/* ═══════════════════ HELPERS ═══════════════════ */
+
+const ROLE_MAP: Record<number, string> = {
+    0: "Khách hàng",
+    1: "Staff",
+    2: "Admin",
+};
+
+function getInitials(name: string): string {
+    return name
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+}
 
 /* ═══════════════════ NAV ITEMS ═══════════════════ */
 
@@ -91,7 +109,17 @@ const NAV_ITEMS = [
 
 export default function AdminLayout() {
     const location = useLocation();
+    const navigate = useNavigate();
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+    const user = authService.getUser();
+    const roleName = user ? (ROLE_MAP[user.Role] ?? "User") : "";
+
+    const handleLogout = () => {
+        authService.logout();
+        authService.clearGuestCartSession();
+        navigate("/admin/login");
+    };
 
     const isActive = (path: string) => {
         if (path === "/admin") return location.pathname === "/admin";
@@ -137,6 +165,39 @@ export default function AdminLayout() {
                         </Link>
                     ))}
                 </nav>
+
+                {/* ──── Account info ──── */}
+                {user && (
+                    <div className="border-t border-white/10 px-3 py-3">
+                        <div className="flex items-center gap-3">
+                            {/* Avatar */}
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8B1A1A] to-[#c0392b] flex items-center justify-center shrink-0 text-white text-xs font-bold">
+                                {getInitials(user.FullName)}
+                            </div>
+                            {!sidebarCollapsed && (
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-white text-sm font-medium truncate">{user.FullName}</p>
+                                    <p className="text-gray-400 text-[11px] truncate">{user.Email}</p>
+                                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#8B1A1A]/30 text-[#f1a9a0]">
+                                        {roleName}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* ──── Logout button ──── */}
+                <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 px-4 py-3 border-t border-white/10 text-gray-400 hover:text-red-400 text-xs transition-colors cursor-pointer"
+                    title={sidebarCollapsed ? "Đăng xuất" : undefined}
+                >
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>
+                    {!sidebarCollapsed && <span>Đăng xuất</span>}
+                </button>
 
                 {/* Collapse toggle */}
                 <button
