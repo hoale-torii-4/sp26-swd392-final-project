@@ -150,6 +150,10 @@ export default function MixMatchPage() {
         if (snackCount < 2) {
             return "Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo).";
         }
+        if (hasChivas21 && totalItems > 4) {
+            return "Nếu hộp có Chivas 21, tổng số item tối đa là 4.";
+        }
+
         if (hasChivas21 && savoryCount > 1) {
             return "Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn.";
         }
