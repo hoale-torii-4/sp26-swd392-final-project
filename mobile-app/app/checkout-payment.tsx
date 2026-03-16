@@ -66,6 +66,9 @@ export default function CheckoutPaymentScreen() {
   const [orderCode, setOrderCode] = useState<string | null>(null);
   const [paymentDetected, setPaymentDetected] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [qrRemainingSeconds, setQrRemainingSeconds] = useState<number | null>(null);
+  const [qrExpired, setQrExpired] = useState(false);
+  const qrCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const [addressBook, setAddressBook] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
@@ -241,7 +244,7 @@ export default function CheckoutPaymentScreen() {
   }, [user?.Id]);
 
   useEffect(() => {
-    if (!qrUrl || !orderCode) return;
+    if (!qrUrl || !orderCode || qrExpired) return;
 
     const poll = async () => {
       try {
@@ -249,6 +252,7 @@ export default function CheckoutPaymentScreen() {
         if (status.IsPaid) {
           setPaymentDetected(true);
           if (pollRef.current) clearInterval(pollRef.current);
+          if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
           setTimeout(() => router.replace(`/order-success?code=${orderCode}` as any), 1500);
         }
       } catch {
@@ -260,7 +264,41 @@ export default function CheckoutPaymentScreen() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [qrUrl, orderCode, router]);
+  }, [qrUrl, orderCode, router, qrExpired]);
+
+  useEffect(() => {
+    if (!qrUrl || !orderCode) return;
+
+    const countdownMinutes = Number(process.env.EXPO_PUBLIC_QR_TIMEOUT_MINUTES ?? 10);
+    const totalSeconds = Math.max(1, Math.round(countdownMinutes * 60));
+    setQrExpired(false);
+    setQrRemainingSeconds(totalSeconds);
+
+    if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
+    qrCountdownRef.current = setInterval(() => {
+      setQrRemainingSeconds((prev) => {
+        if (prev === null) return prev;
+        if (prev <= 1) {
+          if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
+          if (pollRef.current) clearInterval(pollRef.current);
+          setQrExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
+    };
+  }, [qrUrl, orderCode]);
+
+  const formatCountdown = (seconds: number | null) => {
+    if (seconds === null) return '';
+    const mm = Math.floor(seconds / 60);
+    const ss = seconds % 60;
+    return `${mm.toString().padStart(2, '0')}:${ss.toString().padStart(2, '0')}`;
+  };
 
   const handleSubmit = async () => {
     if (!receiverName || !receiverPhone || !addressDetail || !deliveryDate) {
@@ -300,6 +338,9 @@ export default function CheckoutPaymentScreen() {
 
       const result = await orderService.createB2COrder(orderData);
       setOrderCode(result.orderCode);
+      setPaymentDetected(false);
+      setQrExpired(false);
+      setQrRemainingSeconds(null);
 
       // Only clear cart if this is a standard cart checkout, 
       // not a "buy now" or partial selected items checkout
@@ -582,6 +623,24 @@ export default function CheckoutPaymentScreen() {
                   </View>
                 </View>
 
+                <View style={styles.qrCountdownRow}>
+                  <Text style={styles.qrCountdownLabel}>Hết hạn sau</Text>
+                  <Text
+                    style={[
+                      styles.qrCountdownValue,
+                      qrRemainingSeconds !== null && qrRemainingSeconds <= 30 && styles.qrCountdownUrgent,
+                    ]}
+                  >
+                    {formatCountdown(qrRemainingSeconds)}
+                  </Text>
+                </View>
+
+                {qrExpired && (
+                  <View style={styles.qrExpiredBanner}>
+                    <Text style={styles.qrExpiredText}>Mã QR đã hết hạn. Vui lòng tạo lại để thanh toán.</Text>
+                  </View>
+                )}
+
                 <View style={styles.qrActions}>
                   <TouchableOpacity
                     style={[styles.secondaryBtn, (!qrUrl || savingQr) && styles.btnDisabled]}
@@ -604,10 +663,13 @@ export default function CheckoutPaymentScreen() {
                 </View>
 
                 <TouchableOpacity
-                  style={styles.primaryBtn}
-                  onPress={() => router.replace(`/order-success?code=${orderCode}` as any)}
+                  style={[styles.primaryBtn, qrExpired && styles.btnDisabled]}
+                  onPress={() => {
+                    if (!qrExpired) router.replace(`/order-success?code=${orderCode}` as any);
+                  }}
+                  disabled={qrExpired}
                 >
-                  <Text style={styles.primaryBtnText}>Đã thanh toán xong →</Text>
+                  <Text style={styles.primaryBtnText}>Đã thanh toán xong</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -870,6 +932,26 @@ const styles = StyleSheet.create({
     gap: 12,
     justifyContent: 'space-between',
   },
+  qrCountdownRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+  },
+  qrCountdownLabel: { fontSize: 12, color: AppColors.textSecondary },
+  qrCountdownValue: { fontSize: 13, fontWeight: '700', color: AppColors.text },
+  qrCountdownUrgent: { color: '#DC2626' },
+  qrExpiredBanner: {
+    width: '100%',
+    backgroundColor: '#FEF2F2',
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  qrExpiredText: { fontSize: 12, color: '#DC2626', fontWeight: '600', textAlign: 'center' },
   secondaryBtn: {
     flex: 1,
     borderWidth: 1,

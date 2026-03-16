@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -17,6 +17,9 @@ function formatPrice(v: number) {
 export default function ProductDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const type = searchParams.get("type");
+
     const [product, setProduct] = useState<GiftBoxDetailDto | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -30,8 +33,9 @@ export default function ProductDetailPage() {
     useEffect(() => {
         if (!id) return;
         setLoading(true);
-        productService
-            .getGiftBoxById(id)
+        const fetcher = type === "item" ? productService.getItemByIdAsProduct : productService.getGiftBoxById;
+
+        fetcher(id)
             .then((data) => {
                 setProduct(data);
                 setSelectedImage(0);
@@ -238,80 +242,85 @@ export default function ProductDetailPage() {
                         {/* Divider */}
                         <div className="border-t border-gray-200 mb-6" />
 
-                        {/* Quantity selector */}
-                        <div className="mb-6">
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                                Số lượng
-                            </label>
-                            <div className="flex items-center border border-gray-200 rounded-lg w-fit">
-                                <button
-                                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                                    disabled={quantity <= 1 || !product.IsActive}
-                                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                    </svg>
-                                </button>
-                                <span className={`w-12 text-center text-base font-semibold ${!product.IsActive ? "text-gray-400" : "text-gray-900"}`}>
-                                    {quantity}
-                                </span>
-                                <button
-                                    onClick={() => setQuantity((q) => q + 1)}
-                                    disabled={!product.IsActive}
-                                    className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                                >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
+                        {/* Action buttons and Quantity logic block */}
+                        {type !== 'item' && (
+                            <>
+                                {/* Quantity selector */}
+                                <div className="mb-6">
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                                        Số lượng
+                                    </label>
+                                    <div className="flex items-center border border-gray-200 rounded-lg w-fit">
+                                        <button
+                                            onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                                            disabled={quantity <= 1 || !product.IsActive}
+                                            className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                                            </svg>
+                                        </button>
+                                        <span className={`w-12 text-center text-base font-semibold ${!product.IsActive ? "text-gray-400" : "text-gray-900"}`}>
+                                            {quantity}
+                                        </span>
+                                        <button
+                                            onClick={() => setQuantity((q) => q + 1)}
+                                            disabled={!product.IsActive}
+                                            className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </div>
 
-                        {/* Action buttons */}
-                        <div className="flex flex-col sm:flex-row gap-3 mb-5">
-                            <button
-                                onClick={handleAddToCart}
-                                disabled={addingToCart || !product.IsActive}
-                                className="flex-1 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                            >
-                                {addingToCart ? (
-                                    <>
-                                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                        </svg>
-                                        Đang thêm...
-                                    </>
-                                ) : !product.IsActive ? (
-                                    "Ngừng kinh doanh"
-                                ) : (
-                                    <>
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                                        </svg>
-                                        Thêm vào giỏ
-                                    </>
-                                )}
-                            </button>
-                            <button
-                                onClick={handleBuyNow}
-                                disabled={addingToCart || !product.IsActive}
-                                className="flex-1 py-3.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/5 transition-colors text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                {product.IsActive ? (
-                                    <>
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 22.5a10.5 10.5 0 100-21 10.5 10.5 0 000 21z" />
-                                        </svg>
-                                        Mua ngay
-                                    </>
-                                ) : (
-                                    "Ngừng kinh doanh"
-                                )}
-                            </button>
-                        </div>
+                                {/* Action buttons */}
+                                <div className="flex flex-col sm:flex-row gap-3 mb-5">
+                                    <button
+                                        onClick={handleAddToCart}
+                                        disabled={addingToCart || !product.IsActive}
+                                        className="flex-1 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                    >
+                                        {addingToCart ? (
+                                            <>
+                                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                                </svg>
+                                                Đang thêm...
+                                            </>
+                                        ) : !product.IsActive ? (
+                                            "Ngừng kinh doanh"
+                                        ) : (
+                                            <>
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                                                </svg>
+                                                Thêm vào giỏ
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        onClick={handleBuyNow}
+                                        disabled={addingToCart || !product.IsActive}
+                                        className="flex-1 py-3.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/5 transition-colors text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {product.IsActive ? (
+                                            <>
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5" />
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 22.5a10.5 10.5 0 100-21 10.5 10.5 0 000 21z" />
+                                                </svg>
+                                                Mua ngay
+                                            </>
+                                        ) : (
+                                            "Ngừng kinh doanh"
+                                        )}
+                                    </button>
+                                </div>
+                            </>
+                        )}
 
                         {/* Cart success/error message */}
                         {cartMsg && (
