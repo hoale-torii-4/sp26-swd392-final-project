@@ -19,6 +19,10 @@ namespace ShopHangTet.Services
         
         // === Order Tracking ===
         Task<OrderTrackingResult?> TrackOrderAsync(string orderCode, string email);
+        Task<OrderDto?> GetOrderDetailByCodeAsync(string orderCode, string? email, string? requesterUserId, bool isStaffOrAdmin);
+        Task<OrderDto?> GetOrderDetailByIdAsync(string orderId, string requesterUserId, bool isStaffOrAdmin);
+        Task<bool> ConfirmReceivedByCustomerAsync(string orderCode, string email);
+        Task<bool> ConfirmDeliveryReceivedByCustomerAsync(string deliveryId, string email);
 
         // === My Orders ===
         Task<List<MyOrderResponseDto>> GetMyOrdersAsync(string userId, int skip, int take);
@@ -58,6 +62,7 @@ namespace ShopHangTet.Services
         public DateTime CreatedAt { get; set; }
         public DateTime? DeliveryDate { get; set; }
         public decimal TotalAmount { get; set; }
+        public List<OrderItemResponseDto> Items { get; set; } = new();
         public List<OrderStatusHistoryDto> StatusHistory { get; set; } = new();
     }
 }

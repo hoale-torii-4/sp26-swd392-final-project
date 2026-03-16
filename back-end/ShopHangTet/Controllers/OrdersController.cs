@@ -188,6 +188,113 @@ public class OrdersController : ControllerBase
         }
     }
 
+    [HttpGet("detail/{orderCode}")]
+    public async Task<IActionResult> GetOrderDetailByCode(string orderCode, [FromQuery] string? email)
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var role = User.FindFirst("role")?.Value ?? User.FindFirstValue(ClaimTypes.Role);
+            var isStaffOrAdmin = string.Equals(role, "STAFF", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
+
+            if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Guest cần truyền email để xem chi tiết đơn hàng."));
+            }
+
+            var detail = await _orderService.GetOrderDetailByCodeAsync(orderCode, email, userId, isStaffOrAdmin);
+            if (detail == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
+            }
+
+            return Ok(ApiResponse<OrderDto>.SuccessResult(detail, "Lấy chi tiết đơn hàng thành công"));
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+        }
+    }
+
+    [Authorize]
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetOrderDetailById(string id)
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+            }
+
+            var role = User.FindFirst("role")?.Value ?? User.FindFirstValue(ClaimTypes.Role);
+            var isStaffOrAdmin = string.Equals(role, "STAFF", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
+
+            var detail = await _orderService.GetOrderDetailByIdAsync(id, userId, isStaffOrAdmin);
+            if (detail == null)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
+            }
+
+            return Ok(ApiResponse<OrderDto>.SuccessResult(detail, "Lấy chi tiết đơn hàng thành công"));
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+        }
+    }
+
+    [HttpPost("{orderCode}/confirm-received")]
+    public async Task<IActionResult> ConfirmReceived(string orderCode, [FromQuery] string email)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
+            }
+
+            var ok = await _orderService.ConfirmReceivedByCustomerAsync(orderCode, email);
+            if (!ok)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(new { confirmed = true }, "Xác nhận đã nhận hàng thành công"));
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+        }
+    }
+
+    [HttpPost("deliveries/{deliveryId}/confirm-received")]
+    public async Task<IActionResult> ConfirmDeliveryReceived(string deliveryId, [FromQuery] string email)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(email))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
+            }
+
+            var ok = await _orderService.ConfirmDeliveryReceivedByCustomerAsync(deliveryId, email);
+            if (!ok)
+            {
+                return NotFound(ApiResponse<object>.ErrorResult("Delivery not found"));
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(new { confirmed = true }, "Xác nhận shipment đã giao thành công"));
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+        }
+    }
+
     [Authorize]
     [HttpGet("my-orders")]
     public async Task<IActionResult> GetMyOrders([FromQuery] int skip = 0, [FromQuery] int take = 20)

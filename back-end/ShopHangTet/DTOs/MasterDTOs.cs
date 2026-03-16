@@ -708,6 +708,7 @@ namespace ShopHangTet.DTOs
         public DateTime CreatedAt { get; set; }
         public List<OrderItemResponseDto> Items { get; set; } = new();
         public List<DeliveryAddressResponseDto> DeliveryAddresses { get; set; } = new();
+        public List<DeliveryShipmentResponseDto> DeliveryShipments { get; set; } = new();
     }
 
     public class OrderItemResponseDto
@@ -742,6 +743,29 @@ namespace ShopHangTet.DTOs
         public int Quantity { get; set; }
         public string? GreetingMessage { get; set; }
         public bool HideInvoice { get; set; }
+    }
+
+    public class DeliveryShipmentResponseDto
+    {
+        public string DeliveryId { get; set; } = string.Empty;
+        public string AddressId { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public int RetryCount { get; set; }
+        public int MaxRetries { get; set; }
+        public DateTime? LastAttemptAt { get; set; }
+        public string? FailureReason { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public List<DeliveryShipmentItemResponseDto> Items { get; set; } = new();
+    }
+
+    public class DeliveryShipmentItemResponseDto
+    {
+        public string OrderItemId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public OrderItemType Type { get; set; }
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+        public decimal TotalPrice { get; set; }
     }
 
     public class OrderStatusHistoryDto

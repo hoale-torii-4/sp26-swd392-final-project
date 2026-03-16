@@ -46,6 +46,15 @@ namespace ShopHangTet.Services
                 CreatedAt = order.CreatedAt,
                 DeliveryDate = order.DeliveryDate,
                 TotalAmount = order.TotalAmount,
+                Items = order.Items.Select(i => new OrderItemResponseDto
+                {
+                    Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
+                    Type = i.Type,
+                    Name = i.ProductName,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice,
+                    TotalPrice = i.TotalPrice
+                }).ToList(),
                 StatusHistory = order.StatusHistory.Select(x => new OrderStatusHistoryDto
                 {
                     Status = x.Status,
@@ -54,6 +63,143 @@ namespace ShopHangTet.Services
                     ChangedBy = x.UpdatedBy
                 }).ToList()
             };
+        }
+
+        public async Task<OrderDto?> GetOrderDetailByCodeAsync(string orderCode, string? email, string? requesterUserId, bool isStaffOrAdmin)
+        {
+            var order = await _context.Orders.FirstOrDefaultAsync(x => x.OrderCode == orderCode);
+            if (order == null)
+            {
+                return null;
+            }
+
+            if (!isStaffOrAdmin)
+            {
+                if (!string.IsNullOrWhiteSpace(requesterUserId))
+                {
+                    if (order.UserId == null || order.UserId.Value.ToString() != requesterUserId)
+                    {
+                        return null;
+                    }
+                }
+                else
+                {
+                    if (string.IsNullOrWhiteSpace(email)
+                        || !string.Equals(order.CustomerEmail, email, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return null;
+                    }
+                }
+            }
+
+            return await BuildOrderDetailDtoAsync(order);
+        }
+
+        public async Task<OrderDto?> GetOrderDetailByIdAsync(string orderId, string requesterUserId, bool isStaffOrAdmin)
+        {
+            if (!ObjectId.TryParse(orderId, out var objectId))
+            {
+                return null;
+            }
+
+            var order = await _context.Orders.FirstOrDefaultAsync(x => x.Id == objectId);
+            if (order == null)
+            {
+                return null;
+            }
+
+            if (!isStaffOrAdmin && (order.UserId == null || order.UserId.Value.ToString() != requesterUserId))
+            {
+                return null;
+            }
+
+            return await BuildOrderDetailDtoAsync(order);
+        }
+
+        public async Task<bool> ConfirmReceivedByCustomerAsync(string orderCode, string email)
+        {
+            var order = await _context.Orders
+                .FirstOrDefaultAsync(x => x.OrderCode == orderCode && x.CustomerEmail == email);
+
+            if (order == null)
+            {
+                return false;
+            }
+
+            if (order.OrderType == OrderType.B2B)
+            {
+                throw new InvalidOperationException("B2B order must be confirmed by delivery shipment.");
+            }
+
+            if (order.Status != OrderStatus.SHIPPING)
+            {
+                throw new InvalidOperationException("Only SHIPPING orders can be confirmed as received.");
+            }
+
+            await UpdateStatusAsync(
+                order.Id.ToString(),
+                OrderStatus.COMPLETED,
+                "Customer",
+                "Khach hang xac nhan da nhan hang");
+
+            return true;
+        }
+
+        public async Task<bool> ConfirmDeliveryReceivedByCustomerAsync(string deliveryId, string email)
+        {
+            var delivery = await _context.OrderDeliveries.FirstOrDefaultAsync(d => d.Id == deliveryId);
+            if (delivery == null)
+            {
+                return false;
+            }
+
+            if (!ObjectId.TryParse(delivery.OrderId, out var orderObjectId))
+            {
+                throw new InvalidOperationException("Invalid order id for delivery.");
+            }
+
+            var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == orderObjectId);
+            if (order == null)
+            {
+                return false;
+            }
+
+            if (!string.Equals(order.CustomerEmail, email, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (order.OrderType != OrderType.B2B)
+            {
+                throw new InvalidOperationException("Only B2B delivery shipment can use this endpoint.");
+            }
+
+            if (!string.Equals(delivery.Status, "SHIPPING", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("Only SHIPPING delivery can be confirmed as received.");
+            }
+
+            delivery.Status = "DELIVERED";
+            delivery.LastAttemptAt = DateTime.UtcNow;
+            delivery.FailureReason = null;
+            await _context.SaveChangesAsync();
+
+            var aggregatedStatus = await AggregateDeliveryStatusAsync(delivery.OrderId);
+            if (order.Status != aggregatedStatus)
+            {
+                order.Status = aggregatedStatus;
+                order.StatusHistory.Add(new OrderStatusHistory
+                {
+                    Status = aggregatedStatus,
+                    Timestamp = DateTime.UtcNow,
+                    UpdatedBy = "Customer",
+                    Notes = $"Khach hang xac nhan da nhan shipment {deliveryId}"
+                });
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
+
+            return true;
         }
 
         /// Lấy đơn hàng của user (profile)
@@ -422,6 +568,150 @@ namespace ShopHangTet.Services
             }
 
             return true;
+        }
+
+        private async Task<OrderDto> BuildOrderDetailDtoAsync(OrderModel order)
+        {
+            var result = new OrderDto
+            {
+                Id = order.Id.ToString(),
+                OrderCode = order.OrderCode,
+                UserId = order.UserId?.ToString(),
+                Email = order.CustomerEmail,
+                OrderType = order.OrderType,
+                Status = order.Status,
+                TotalAmount = order.TotalAmount,
+                DeliveryDate = order.DeliveryDate,
+                GreetingMessage = order.GreetingMessage,
+                GreetingCardUrl = order.GreetingCardUrl,
+                CreatedAt = order.CreatedAt,
+                Items = order.Items.Select(i => new OrderItemResponseDto
+                {
+                    Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
+                    Type = i.Type,
+                    Name = i.ProductName,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice,
+                    TotalPrice = i.TotalPrice
+                }).ToList()
+            };
+
+            if (order.OrderType == OrderType.B2C && order.DeliveryAddress != null)
+            {
+                result.DeliveryAddresses.Add(new DeliveryAddressResponseDto
+                {
+                    Id = order.DeliveryAddress.AddressId ?? string.Empty,
+                    ReceiverName = order.DeliveryAddress.RecipientName,
+                    ReceiverPhone = order.DeliveryAddress.RecipientPhone,
+                    FullAddress = order.DeliveryAddress.AddressLine,
+                    Quantity = order.DeliveryAddress.Quantity,
+                    GreetingMessage = order.DeliveryAddress.GreetingMessage,
+                    HideInvoice = order.DeliveryAddress.HideInvoice
+                });
+
+                return result;
+            }
+
+            if (order.OrderType != OrderType.B2B)
+            {
+                return result;
+            }
+
+            var deliveries = await _context.OrderDeliveries
+                .Where(d => d.OrderId == order.Id.ToString())
+                .OrderBy(d => d.CreatedAt)
+                .ToListAsync();
+
+            if (!deliveries.Any())
+            {
+                return result;
+            }
+
+            var deliveryIds = deliveries.Select(d => d.Id).ToList();
+            var deliveryItems = await _context.OrderDeliveryItems
+                .Where(x => deliveryIds.Contains(x.OrderDeliveryId))
+                .ToListAsync();
+
+            var addressIds = deliveries
+                .Select(d => d.AddressId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+
+            var addresses = await _context.Addresses
+                .Where(a => addressIds.Contains(a.Id))
+                .ToListAsync();
+            var addressMap = addresses.ToDictionary(a => a.Id, a => a);
+
+            var orderItemMap = order.Items.ToDictionary(i => i.Id.ToString(), i => i);
+            var addressQuantityMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var delivery in deliveries)
+            {
+                var shipmentAllocations = deliveryItems
+                    .Where(x => x.OrderDeliveryId == delivery.Id)
+                    .ToList();
+
+                var shipmentItems = new List<DeliveryShipmentItemResponseDto>();
+
+                foreach (var allocation in shipmentAllocations)
+                {
+                    if (!addressQuantityMap.ContainsKey(delivery.AddressId))
+                    {
+                        addressQuantityMap[delivery.AddressId] = 0;
+                    }
+                    addressQuantityMap[delivery.AddressId] += allocation.Quantity;
+
+                    if (!orderItemMap.TryGetValue(allocation.OrderItemId, out var orderItem))
+                    {
+                        continue;
+                    }
+
+                    shipmentItems.Add(new DeliveryShipmentItemResponseDto
+                    {
+                        OrderItemId = allocation.OrderItemId,
+                        Name = orderItem.ProductName,
+                        Type = orderItem.Type,
+                        Quantity = allocation.Quantity,
+                        UnitPrice = orderItem.UnitPrice,
+                        TotalPrice = orderItem.UnitPrice * allocation.Quantity
+                    });
+                }
+
+                result.DeliveryShipments.Add(new DeliveryShipmentResponseDto
+                {
+                    DeliveryId = delivery.Id,
+                    AddressId = delivery.AddressId,
+                    Status = delivery.Status,
+                    RetryCount = delivery.RetryCount,
+                    MaxRetries = delivery.MaxRetries,
+                    LastAttemptAt = delivery.LastAttemptAt,
+                    FailureReason = delivery.FailureReason,
+                    CreatedAt = delivery.CreatedAt,
+                    Items = shipmentItems
+                });
+            }
+
+            foreach (var addressId in addressIds)
+            {
+                if (!addressMap.TryGetValue(addressId, out var address))
+                {
+                    continue;
+                }
+
+                result.DeliveryAddresses.Add(new DeliveryAddressResponseDto
+                {
+                    Id = address.Id,
+                    ReceiverName = address.ReceiverName,
+                    ReceiverPhone = address.ReceiverPhone,
+                    FullAddress = address.FullAddress,
+                    Quantity = addressQuantityMap.TryGetValue(address.Id, out var quantity) ? quantity : 0,
+                    GreetingMessage = order.GreetingMessage,
+                    HideInvoice = false
+                });
+            }
+
+            return result;
         }
 
         private static bool IsValidEmail(string email)
