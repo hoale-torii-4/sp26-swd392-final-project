@@ -5,9 +5,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
 import { AppColors, Spacing, BorderRadius } from '../../constants/theme';
+import ConfirmModal from '../../components/ConfirmModal';
 
 export default function AccountScreen() {
     const router = useRouter();
@@ -27,6 +29,8 @@ export default function AccountScreen() {
     const [pwLoading, setPwLoading] = useState(false);
     const [pwMsg, setPwMsg] = useState('');
     const [pwIsSuccess, setPwIsSuccess] = useState(false);
+
+    const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
     // If not authenticated, show login prompt
     if (!isAuthenticated || !user) {
@@ -69,13 +73,17 @@ export default function AccountScreen() {
             const res = await authService.changePassword({ oldPassword: oldPw, newPassword: newPw });
             if (res.Success) {
                 setPwIsSuccess(true);
-                setPwMsg('Đổi mật khẩu thành công!');
+                setPwMsg('');
                 setOldPw(''); setNewPw(''); setConfirmPw('');
-                Alert.alert(
-                    'Thành công',
-                    'Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại.',
-                    [{ text: 'Đăng nhập lại', onPress: async () => { await logout(); router.replace('/login' as any); } }],
-                );
+                Toast.show({
+                    type: 'success',
+                    text1: 'Thành công',
+                    text2: 'Mật khẩu đã được thay đổi. Vui lòng đăng nhập lại.',
+                });
+                setTimeout(async () => {
+                    await logout();
+                    router.replace('/login' as any);
+                }, 1500);
             } else {
                 setPwIsSuccess(false);
                 setPwMsg(res.Message || 'Đổi mật khẩu thất bại.');
@@ -89,17 +97,13 @@ export default function AccountScreen() {
     };
 
     const handleLogout = () => {
-        Alert.alert(
-            'Đăng xuất',
-            'Bạn có chắc muốn đăng xuất?',
-            [
-                { text: 'Hủy', style: 'cancel' },
-                {
-                    text: 'Đăng xuất', style: 'destructive',
-                    onPress: async () => { await logout(); router.replace('/login' as any); },
-                },
-            ],
-        );
+        setShowLogoutConfirm(true);
+    };
+
+    const confirmLogout = async () => {
+        setShowLogoutConfirm(false);
+        await logout();
+        router.replace('/login' as any);
     };
 
     return (
@@ -238,6 +242,17 @@ export default function AccountScreen() {
             </TouchableOpacity>
 
             <View style={{ height: 40 }} />
+            
+            <ConfirmModal
+                visible={showLogoutConfirm}
+                title="Đăng xuất"
+                message="Bạn có chắc muốn đăng xuất khỏi tài khoản này không?"
+                confirmText="Đăng xuất"
+                cancelText="Hủy"
+                onConfirm={confirmLogout}
+                onCancel={() => setShowLogoutConfirm(false)}
+                isDestructive={true}
+            />
         </ScrollView>
     );
 }

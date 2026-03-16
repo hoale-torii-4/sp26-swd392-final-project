@@ -5,6 +5,59 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from '../contexts/AuthContext';
 import { AppColors } from '../constants/theme';
+import Toast, { BaseToast, ErrorToast, ToastConfig } from 'react-native-toast-message';
+
+// Global Toast Config
+const toastConfig: ToastConfig = {
+  success: (props) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: AppColors.primary, backgroundColor: '#FAFAF8' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: AppColors.primary
+      }}
+      text2Style={{
+        fontSize: 13,
+        color: AppColors.text
+      }}
+    />
+  ),
+  error: (props) => (
+    <ErrorToast
+      {...props}
+      style={{ borderLeftColor: AppColors.error, backgroundColor: '#FAFAF8' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: AppColors.error
+      }}
+      text2Style={{
+        fontSize: 13,
+        color: AppColors.text
+      }}
+    />
+  ),
+  info: (props) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: AppColors.accent, backgroundColor: '#FAFAF8' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: 'bold',
+        color: AppColors.dark
+      }}
+      text2Style={{
+        fontSize: 13,
+        color: AppColors.text
+      }}
+    />
+  )
+};
 
 export default function RootLayout() {
   return (
@@ -39,6 +92,7 @@ export default function RootLayout() {
           </Stack>
         </View>
       </AuthProvider>
+      <Toast config={toastConfig} />
     </GestureHandlerRootView>
   );
 }

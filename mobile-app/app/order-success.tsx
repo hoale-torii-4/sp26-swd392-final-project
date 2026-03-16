@@ -135,7 +135,7 @@ export default function OrderSuccessScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.secondaryBtn}
-              onPress={() => router.push(`/order-tracking?code=${orderCode}` as any)}
+              onPress={() => router.push('/order-my' as any)}
             >
               <Text style={styles.secondaryBtnText}>Theo dõi đơn hàng</Text>
             </TouchableOpacity>

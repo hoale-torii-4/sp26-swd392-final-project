@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 import { AppColors } from '../constants/theme';
 import { mixMatchService, type CustomBoxResponse } from '../services/mixMatchService';
 import { cartService, type AddToCartRequest } from '../services/cartService';
+import ConfirmModal from '../components/ConfirmModal';
 
 const formatPrice = (value: number) => value.toLocaleString('vi-VN') + '\u20AB';
 
@@ -66,31 +68,28 @@ export default function CustomBoxesScreen() {
     setSelectedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const [boxToDelete, setBoxToDelete] = useState<string | null>(null);
+
+  const confirmDelete = async () => {
+    if (!boxToDelete) return;
+    try {
+      await mixMatchService.deleteCustomBox(boxToDelete);
+      setBoxes((prev) => prev.filter((b) => b.Id !== boxToDelete));
+      setSelectedIds((prev) => {
+        const next = { ...prev };
+        delete next[boxToDelete];
+        return next;
+      });
+      Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã xóa giỏ quà.' });
+    } catch (err: any) {
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: err?.response?.data || err?.message || 'Không thể xóa giỏ quà.' });
+    } finally {
+      setBoxToDelete(null);
+    }
+  };
+
   const handleDelete = (boxId: string) => {
-    Alert.alert('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa giỏ quà này không?', [
-      { text: 'Hủy', style: 'cancel' },
-      {
-        text: 'Xóa',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await mixMatchService.deleteCustomBox(boxId);
-            setBoxes((prev) => prev.filter((b) => b.Id !== boxId));
-            setSelectedIds((prev) => {
-              const next = { ...prev };
-              delete next[boxId];
-              return next;
-            });
-            Alert.alert('Thành công', 'Đã xóa giỏ quà.');
-          } catch (err: any) {
-            Alert.alert(
-              'Lỗi',
-              err?.response?.data || err?.message || 'Không thể xóa giỏ quà.',
-            );
-          }
-        },
-      },
-    ]);
+    setBoxToDelete(boxId);
   };
 
   const handleEdit = (box: CustomBoxResponse) => {
@@ -109,7 +108,7 @@ export default function CustomBoxesScreen() {
       .map(([id]) => id);
 
     if (selected.length === 0) {
-      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một giỏ quà custom.');
+      Toast.show({ type: 'info', text1: 'Thông báo', text2: 'Vui lòng chọn ít nhất một giỏ quà custom.' });
       return;
     }
 
@@ -129,9 +128,9 @@ export default function CustomBoxesScreen() {
         });
         return next;
       });
-      Alert.alert('Thành công', 'Đã thêm ' + selected.length + ' giỏ quà vào giỏ hàng.');
+      Toast.show({ type: 'success', text1: 'Thành công', text2: `Đã thêm ${selected.length} giỏ quà vào giỏ hàng.` });
     } catch (err: any) {
-      Alert.alert('Lỗi', err?.message ?? 'Không thể thêm vào giỏ hàng.');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: err?.message ?? 'Không thể thêm vào giỏ hàng.' });
     } finally {
       setSubmitting(false);
     }
@@ -245,7 +244,12 @@ export default function CustomBoxesScreen() {
               {/* Items list */}
               <View style={styles.itemsGrid}>
                 {box.Items.map((item) => (
-                  <View key={box.Id + '-' + item.ItemId} style={styles.itemCard}>
+                  <TouchableOpacity 
+                    key={box.Id + '-' + item.ItemId} 
+                    style={styles.itemCard}
+                    activeOpacity={0.7}
+                    onPress={() => router.push(`/product/${item.ItemId}` as any)}
+                  >
                     <Text style={styles.itemName} numberOfLines={2}>
                       {item.Name}
                     </Text>
@@ -253,7 +257,7 @@ export default function CustomBoxesScreen() {
                       SL: {item.Quantity} x {formatPrice(item.Price)}
                     </Text>
                     <Text style={styles.itemSubtotal}>{formatPrice(item.Subtotal)}</Text>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
 
@@ -273,6 +277,16 @@ export default function CustomBoxesScreen() {
           ))}
         </ScrollView>
       )}
+      <ConfirmModal
+        visible={!!boxToDelete}
+        title="Xác nhận xóa"
+        message="Bạn có chắc chắn muốn xóa giỏ quà này không?"
+        confirmText="Xóa"
+        cancelText="Hủy"
+        onConfirm={confirmDelete}
+        onCancel={() => setBoxToDelete(null)}
+        isDestructive={true}
+      />
     </View>
   );
 }
