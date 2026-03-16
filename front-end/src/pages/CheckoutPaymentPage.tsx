@@ -5,6 +5,15 @@ import Footer from "../components/Footer";
 import { cartService, type CartDto, type CartItemDto } from "../services/cartService";
 import { orderService, type CreateOrderB2CDto, OrderItemType } from "../services/orderService";
 import { authService } from "../services/authService";
+import apiClient from "../services/apiClient";
+
+interface Address {
+    Id: string;
+    ReceiverName: string;
+    ReceiverPhone: string;
+    FullAddress: string;
+    IsDefault: boolean;
+}
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 
@@ -33,6 +42,11 @@ export default function CheckoutPaymentPage() {
     const [addressDetail, setAddressDetail] = useState("");
     const [greetingMessage, setGreetingMessage] = useState("");
     const [deliveryDate, setDeliveryDate] = useState("");
+
+    // ── Address Book state ──
+    const [addresses, setAddresses] = useState<Address[]>([]);
+    const [selectedAddressId, setSelectedAddressId] = useState<string>("new");
+    const [addressesLoading, setAddressesLoading] = useState(false);
 
     // ── Customer info (from auth or manual) ──
     const user = authService.getUser?.() ?? null;
@@ -68,6 +82,24 @@ export default function CheckoutPaymentPage() {
             .catch(() => setError("Không thể tải giỏ hàng."))
             .finally(() => setLoading(false));
     }, [isBuyNow, isSelectedCheckout]);
+
+    // Fetch user addresses if logged in
+    useEffect(() => {
+        if (user) {
+            setAddressesLoading(true);
+            apiClient.get("/Address")
+                .then(r => {
+                    const data = r.data?.Data ?? r.data ?? [];
+                    setAddresses(data);
+                    if (data.length > 0) {
+                        const def = data.find((a: any) => a.IsDefault);
+                        setSelectedAddressId(def ? def.Id : data[0].Id);
+                    }
+                })
+                .catch(() => {})
+                .finally(() => setAddressesLoading(false));
+        }
+    }, [user?.Id]);
 
     // ── Auto-polling: check payment status every 3 sec when QR is shown ──
     useEffect(() => {
@@ -112,8 +144,21 @@ export default function CheckoutPaymentPage() {
 
     // ── Submit order ──
     const handleSubmit = async () => {
-        if (!receiverName || !receiverPhone || !addressDetail || !deliveryDate) {
-            setError("Vui lòng điền đầy đủ thông tin người nhận và ngày giao hàng.");
+        let finalReceiverName = receiverName;
+        let finalReceiverPhone = receiverPhone;
+        let finalDeliveryAddress = [addressDetail, ward, district, province].filter(Boolean).join(", ");
+
+        if (user && selectedAddressId !== "new") {
+            const addr = addresses.find((a) => a.Id === selectedAddressId);
+            if (addr) {
+                finalReceiverName = addr.ReceiverName;
+                finalReceiverPhone = addr.ReceiverPhone;
+                finalDeliveryAddress = addr.FullAddress;
+            }
+        }
+
+        if (!finalReceiverName || !finalReceiverPhone || !finalDeliveryAddress || !deliveryDate) {
+            setError("Vui lòng điền đầy đủ thông tin người nhận, địa chỉ và ngày giao hàng.");
             return;
         }
         if (!customerEmail) {
@@ -124,8 +169,6 @@ export default function CheckoutPaymentPage() {
         setSubmitting(true);
         setError(null);
         try {
-            const fullAddress = [addressDetail, ward, district, province].filter(Boolean).join(", ");
-
             const orderData: CreateOrderB2CDto = {
                 UserId: user?.Id,
                 CustomerEmail: customerEmail,
@@ -138,9 +181,9 @@ export default function CheckoutPaymentPage() {
                     Price: item.UnitPrice,
                     Name: item.Name ?? undefined,
                 })),
-                ReceiverName: receiverName,
-                ReceiverPhone: receiverPhone,
-                DeliveryAddress: fullAddress,
+                ReceiverName: finalReceiverName,
+                ReceiverPhone: finalReceiverPhone,
+                DeliveryAddress: finalDeliveryAddress,
                 GreetingMessage: greetingMessage || undefined,
                 DeliveryDate: new Date(deliveryDate).toISOString(),
             };
@@ -374,63 +417,89 @@ export default function CheckoutPaymentPage() {
                                 Thông tin người nhận
                             </h2>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                <input
-                                    type="text"
-                                    placeholder="Họ tên người nhận"
-                                    value={receiverName}
-                                    onChange={(e) => setReceiverName(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
-                                />
-                                <input
-                                    type="tel"
-                                    placeholder="Số điện thoại"
-                                    value={receiverPhone}
-                                    onChange={(e) => setReceiverPhone(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
-                                />
-                            </div>
+                            {/* Address Book Selection for logged in users */}
+                            {user && addresses.length > 0 && !addressesLoading && (
+                                <div className="space-y-3 mb-6">
+                                    {addresses.map((addr) => (
+                                        <label key={addr.Id} className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAddressId === addr.Id ? "border-[#8B1A1A] bg-[#8B1A1A]/5" : "border-gray-200 hover:border-gray-300"}`}>
+                                            <input type="radio" checked={selectedAddressId === addr.Id} onChange={() => setSelectedAddressId(addr.Id)} className="mt-0.5 w-4 h-4 accent-[#8B1A1A]" />
+                                            <div>
+                                                <p className="text-sm font-bold text-gray-900">{addr.ReceiverName} <span className="text-gray-400 font-normal ml-2">({addr.ReceiverPhone})</span></p>
+                                                <p className="text-xs text-gray-500 mt-1">{addr.FullAddress}</p>
+                                            </div>
+                                        </label>
+                                    ))}
+                                    <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAddressId === "new" ? "border-[#8B1A1A] bg-[#8B1A1A]/5" : "border-gray-200 hover:border-gray-300"}`}>
+                                        <input type="radio" checked={selectedAddressId === "new"} onChange={() => setSelectedAddressId("new")} className="mt-0.5 w-4 h-4 accent-[#8B1A1A]" />
+                                        <div>
+                                            <p className="text-sm font-bold text-gray-900">Giao đến địa chỉ khác</p>
+                                            <p className="text-xs text-gray-500 mt-1">Nhập thông tin địa chỉ mới phía dưới</p>
+                                        </div>
+                                    </label>
+                                </div>
+                            )}
 
-                            {/* Address dropdowns */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                                <select
-                                    value={province}
-                                    onChange={(e) => setProvince(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
-                                >
-                                    <option value="">Tỉnh / Thành phố</option>
-                                    <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                                    <option value="Hà Nội">Hà Nội</option>
-                                    <option value="Đà Nẵng">Đà Nẵng</option>
-                                </select>
-                                <select
-                                    value={district}
-                                    onChange={(e) => setDistrict(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
-                                >
-                                    <option value="">Quận / Huyện</option>
-                                    <option value="Quận 1">Quận 1</option>
-                                    <option value="Quận 3">Quận 3</option>
-                                    <option value="Quận 7">Quận 7</option>
-                                </select>
-                                <select
-                                    value={ward}
-                                    onChange={(e) => setWard(e.target.value)}
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
-                                >
-                                    <option value="">Phường / Xã</option>
-                                    <option value="Phường Bến Nghé">Phường Bến Nghé</option>
-                                    <option value="Phường Bến Thành">Phường Bến Thành</option>
-                                </select>
-                            </div>
+                            {(!user || selectedAddressId === "new" || addresses.length === 0) && (
+                                <>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                        <input
+                                            type="text"
+                                            placeholder="Họ tên người nhận"
+                                            value={receiverName}
+                                            onChange={(e) => setReceiverName(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
+                                        />
+                                        <input
+                                            type="tel"
+                                            placeholder="Số điện thoại"
+                                            value={receiverPhone}
+                                            onChange={(e) => setReceiverPhone(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
+                                        />
+                                    </div>
 
-                            <textarea
-                                placeholder="Số nhà, tên đường, phường/xã..."
-                                value={addressDetail}
-                                onChange={(e) => setAddressDetail(e.target.value)}
-                                rows={2}
-                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all resize-none"
-                            />
+                                    {/* Address dropdowns */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                                        <select
+                                            value={province}
+                                            onChange={(e) => setProvince(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Tỉnh / Thành phố</option>
+                                            <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                                            <option value="Hà Nội">Hà Nội</option>
+                                            <option value="Đà Nẵng">Đà Nẵng</option>
+                                        </select>
+                                        <select
+                                            value={district}
+                                            onChange={(e) => setDistrict(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Quận / Huyện</option>
+                                            <option value="Quận 1">Quận 1</option>
+                                            <option value="Quận 3">Quận 3</option>
+                                            <option value="Quận 7">Quận 7</option>
+                                        </select>
+                                        <select
+                                            value={ward}
+                                            onChange={(e) => setWard(e.target.value)}
+                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
+                                        >
+                                            <option value="">Phường / Xã</option>
+                                            <option value="Phường Bến Nghé">Phường Bến Nghé</option>
+                                            <option value="Phường Bến Thành">Phường Bến Thành</option>
+                                        </select>
+                                    </div>
+
+                                    <textarea
+                                        placeholder="Số nhà, tên đường, phường/xã..."
+                                        value={addressDetail}
+                                        onChange={(e) => setAddressDetail(e.target.value)}
+                                        rows={2}
+                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all resize-none"
+                                    />
+                                </>
+                            )}
 
                             {/* Decorative delivery illustration */}
                             <div className="mt-5 rounded-xl overflow-hidden bg-gradient-to-r from-[#f0e6d4] to-[#e8dcc8] flex items-center gap-4 p-4">

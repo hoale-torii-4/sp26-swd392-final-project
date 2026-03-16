@@ -21,7 +21,9 @@ public class MixMatchCustomerService : IMixMatchCustomerService
 
         var totalItems = dto.Items.Sum(x => x.Quantity);
         if (totalItems < 4 || totalItems > 6)
-            throw new InvalidOperationException("Custom box must contain between 4 and 6 items.");
+            throw new InvalidOperationException("Mix & Match phải có tổng từ 4 đến 6 món");
+
+        await ValidateMixMatchItemsAsync(dto.Items);
 
         var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
         var itemsDict = await _context.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
@@ -126,7 +128,9 @@ public class MixMatchCustomerService : IMixMatchCustomerService
 
         var totalItems = dto.Items.Sum(x => x.Quantity);
         if (totalItems < 4 || totalItems > 6)
-            throw new InvalidOperationException("Custom box must contain between 4 and 6 items.");
+            throw new InvalidOperationException("Mix & Match phải có tổng từ 4 đến 6 món");
+
+        await ValidateMixMatchItemsAsync(dto.Items);
 
         var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
         var itemsDict = await _context.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
@@ -162,5 +166,42 @@ public class MixMatchCustomerService : IMixMatchCustomerService
         await _context.SaveChangesAsync();
         
         return true;
+    }
+
+    private async Task ValidateMixMatchItemsAsync(List<CreateCustomBoxItemDTO> items)
+    {
+        var itemIds = items.Select(x => x.ItemId).ToList();
+        var itemEntities = await _context.Items.Where(x => itemIds.Contains(x.Id)).ToListAsync();
+        var itemMap = itemEntities.ToDictionary(x => x.Id, x => x);
+
+        int drinkCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.DRINK).Sum(i => i.Quantity);
+        int alcoholCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.ALCOHOL).Sum(i => i.Quantity);
+        int nutCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.NUT).Sum(i => i.Quantity);
+        int foodCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.FOOD).Sum(i => i.Quantity);
+        int snackCount = nutCount + foodCount;
+
+        var savoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Khô gà lá chanh", "Khô bò", "Chà bông cá hồi", "Lạp xưởng tươi"
+        };
+
+        int savoryCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && savoryNames.Contains(itemMap[i.ItemId].Name)).Sum(i => i.Quantity);
+
+        bool hasChivas21 = items.Any(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Name.Contains("Chivas 21", StringComparison.OrdinalIgnoreCase));
+
+        if (drinkCount + alcoholCount < 1)
+        {
+            throw new InvalidOperationException("Mix & Match phải có ít nhất 1 sản phẩm nhóm đồ uống (Trà hoặc Rượu)");
+        }
+
+        if (snackCount < 2)
+        {
+            throw new InvalidOperationException("Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo)");
+        }
+
+        if (hasChivas21 && savoryCount > 1)
+        {
+            throw new InvalidOperationException("Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn");
+        }
     }
 }

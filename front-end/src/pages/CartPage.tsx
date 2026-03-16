@@ -12,12 +12,12 @@ function formatPrice(v: number) {
     return v.toLocaleString("vi-VN") + "₫";
 }
 
-function getTypeLabel(type: number): string {
-    return type === 0 ? "GIỎ QUÀ CÓ SẴN" : "TỰ CHỈNH RIÊNG";
+function getTypeLabel(type: number | string): string {
+    return (type === 0 || type === "READY_MADE") ? "GIỎ QUÀ CÓ SẴN" : "TỰ CHỈNH RIÊNG";
 }
 
-function getTypeColor(type: number): string {
-    return type === 0 ? "bg-teal-700" : "bg-amber-600";
+function getTypeColor(type: number | string): string {
+    return (type === 0 || type === "READY_MADE") ? "bg-teal-700" : "bg-amber-600";
 }
 
 /* ═══════════════════ COMPONENT ═══════════════════ */
@@ -357,7 +357,7 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                             alt={item.Name ?? "Giỏ quà"}
                             className="w-full h-full object-cover"
                         />
-                    ) : item.Type === 1 ? (
+                    ) : (item.Type === 1 || item.Type === "MIX_MATCH") ? (
                         <img
                             src={mixMatchDefault}
                             alt="Giỏ quà Mix & Match"

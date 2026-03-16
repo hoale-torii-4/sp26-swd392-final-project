@@ -78,6 +78,7 @@ export default function ProductDetailPage() {
                 Quantity: quantity,
                 UnitPrice: product.Price,
                 Name: product.Name,
+                ImageUrl: mainImage || undefined,
             };
 
             navigate("/checkout", {
