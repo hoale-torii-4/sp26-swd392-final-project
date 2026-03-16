@@ -12,7 +12,7 @@ namespace ShopHangTet.Controllers;
 [Route("api/[controller]")]
 public class PaymentController : ControllerBase
 {
-    private static readonly Regex OrderCodeRegex = new(@"\bSHT\d{3,10}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex OrderCodeRegex = new(@"SHT\d{6,14}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly IOrderService _orderService;
     private readonly ILogger<PaymentController> _logger;
