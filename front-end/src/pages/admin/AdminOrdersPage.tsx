@@ -267,80 +267,100 @@ export default function AdminOrdersPage() {
                 )}
             </div>
 
-            {/* Update Status Panel */}
+            {/* Update Status Modal */}
             {showUpdate && selectedOrder && (
-                <div className="bg-white rounded-xl p-5 shadow-sm border-2 border-[#8B1A1A]/20">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold text-gray-900">
-                            Cập nhật trạng thái — <span className="text-[#8B1A1A] font-mono">{selectedOrder.OrderCode}</span>
-                            <span className="ml-2 text-gray-400 font-normal">({selectedOrder.CustomerName})</span>
-                        </h3>
-                        <button onClick={() => { setShowUpdate(false); setUpdateResult(null); }} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-2 mb-4">
-                        <span className="text-xs text-gray-400">Trạng thái hiện tại:</span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${getStatusInfo(selectedOrder.Status).cls}`}>{getStatusInfo(selectedOrder.Status).text}</span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái mới</label>
-                            <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer">
-                                {STATUS_UPDATE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowUpdate(false); setUpdateResult(null); }}>
+                    <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-gray-900">
+                                Cập nhật trạng thái — <span className="text-[#8B1A1A] font-mono">{selectedOrder.OrderCode}</span>
+                            </h3>
+                            <button onClick={() => { setShowUpdate(false); setUpdateResult(null); }} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Ghi chú</label>
-                            <input type="text" value={statusNote} onChange={e => setStatusNote(e.target.value)} placeholder="Tùy chọn..." className="w-full px-3 py-2 border rounded-lg text-sm" />
+                        <p className="text-sm text-gray-500 mb-4">Khách hàng: <span className="font-semibold">{selectedOrder.CustomerName}</span></p>
+
+                        <div className="flex items-center gap-2 mb-6">
+                            <span className="text-sm font-medium text-gray-600">Trạng thái hiện tại:</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${getStatusInfo(selectedOrder.Status).cls}`}>{getStatusInfo(selectedOrder.Status).text}</span>
                         </div>
-                    </div>
-                    <div className="flex items-center gap-3 mt-4">
-                        <button onClick={handleUpdateStatus} disabled={updating} className="px-5 py-2 bg-[#8B1A1A] text-white rounded-lg text-sm font-bold hover:bg-[#701515] disabled:opacity-50 cursor-pointer">
-                            {updating ? "Đang cập nhật..." : "Cập nhật"}
-                        </button>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái mới</label>
+                                <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20">
+                                    {STATUS_UPDATE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Ghi chú (Tùy chọn)</label>
+                                <textarea rows={2} value={statusNote} onChange={e => setStatusNote(e.target.value)} placeholder="Nhập thêm ghi chú với khách hàng hoặc nhân viên..." className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20" />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 mt-8">
+                            <button onClick={() => { setShowUpdate(false); setUpdateResult(null); }} className="flex-1 px-4 py-2 border rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">
+                                Hủy
+                            </button>
+                            <button onClick={handleUpdateStatus} disabled={updating} className="flex-1 px-4 py-2 bg-[#8B1A1A] text-white rounded-lg text-sm font-bold hover:bg-[#701515] disabled:opacity-50 cursor-pointer">
+                                {updating ? "Đang cập nhật..." : "Cập nhật"}
+                            </button>
+                        </div>
+
                         {updateResult && (
-                            <span className={`text-sm font-medium ${updateResult.success ? "text-emerald-600" : "text-red-600"}`}>
+                            <div className={`mt-4 p-3 rounded-lg text-sm font-medium text-center ${updateResult.success ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
                                 {updateResult.message}
-                            </span>
+                            </div>
                         )}
                     </div>
                 </div>
             )}
 
-            {/* Update Delivery Panel */}
+            {/* Update Delivery Modal */}
             {showDelivery && (
-                <div className="bg-white rounded-xl p-5 shadow-sm border-2 border-indigo-200">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold text-gray-900">Cập nhật trạng thái giao hàng</h3>
-                        <button onClick={() => setShowDelivery(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Delivery ID</label>
-                            <input type="text" value={deliveryId} onChange={e => setDeliveryId(e.target.value)} placeholder="Nhập Delivery ID..." className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDelivery(false)}>
+                    <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-bold text-gray-900">Cập nhật Giao Hàng</h3>
+                            <button onClick={() => setShowDelivery(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái</label>
-                            <select value={deliveryStatus} onChange={e => setDeliveryStatus(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer">
-                                <option value="SHIPPING">Đang giao</option>
-                                <option value="DELIVERED">Đã giao</option>
-                                <option value="FAILED">Giao thất bại</option>
-                                <option value="RESHIP">Giao lại</option>
-                            </select>
-                        </div>
-                        {deliveryStatus === "FAILED" && (
+                        
+                        <div className="space-y-4">
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Lý do thất bại</label>
-                                <input type="text" value={failureReason} onChange={e => setFailureReason(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Mã vận đơn (Delivery ID)</label>
+                                <input type="text" value={deliveryId} onChange={e => setDeliveryId(e.target.value)} placeholder="GHTK... VNPOST..." className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400" />
                             </div>
-                        )}
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái vận chuyển</label>
+                                <select value={deliveryStatus} onChange={e => setDeliveryStatus(e.target.value)} className="w-full px-4 py-2 border rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                                    <option value="SHIPPING">Đang giao</option>
+                                    <option value="DELIVERED">Đã giao tận nơi</option>
+                                    <option value="FAILED">Giao thất bại</option>
+                                    <option value="RESHIP">Yêu cầu Giao lại</option>
+                                </select>
+                            </div>
+
+                            {deliveryStatus === "FAILED" && (
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Lý do thất bại / Hoàn hàng</label>
+                                    <textarea rows={2} value={failureReason} onChange={e => setFailureReason(e.target.value)} placeholder="Khách không nghe máy, sai địa chỉ..." className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400" />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3 mt-8">
+                            <button onClick={() => setShowDelivery(false)} className="flex-1 px-4 py-2 border rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">
+                                Hủy
+                            </button>
+                            <button onClick={handleUpdateDelivery} disabled={updatingDelivery || !deliveryId.trim()} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">
+                                {updatingDelivery ? "Đang xử lý..." : "Cập nhật"}
+                            </button>
+                        </div>
                     </div>
-                    <button onClick={handleUpdateDelivery} disabled={updatingDelivery || !deliveryId.trim()} className="mt-4 px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">
-                        {updatingDelivery ? "Đang cập nhật..." : "Cập nhật giao hàng"}
-                    </button>
                 </div>
             )}
         </div>

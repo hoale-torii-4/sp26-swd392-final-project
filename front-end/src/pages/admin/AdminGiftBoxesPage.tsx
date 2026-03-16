@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import { adminService, type GiftBoxListItem, type GiftBoxDetail, type SimpleCollectionDto, type SimpleItemDto, type SimpleTagDto, type GiftBoxCreateDto, type GiftBoxUpdateDto } from "../../services/adminService";
 
 function formatPrice(v: number) { return v.toLocaleString("vi-VN") + "₫"; }
@@ -28,6 +29,7 @@ function GiftBoxFormModal({ editData, collections, allItems, allTags, onClose, o
         editData?.Items?.map(i => ({ ItemId: i.ItemId, ItemName: i.ItemName, Quantity: i.Quantity, ItemPrice: i.Price })) ?? []
     );
     const [imageUrls, setImageUrls] = useState<string>(editData?.Images?.join("\n") ?? "");
+    const [isActive, setIsActive] = useState<boolean>(editData?.IsActive ?? true);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
 
@@ -56,28 +58,32 @@ function GiftBoxFormModal({ editData, collections, allItems, allTags, onClose, o
         setError("");
 
         const images = imageUrls.split("\n").map(s => s.trim()).filter(Boolean);
+        const calcPrice = items.reduce((sum, item) => sum + item.ItemPrice * item.Quantity, 0);
+        const finalPrice = priceOverride ? Number(priceOverride) : calcPrice;
 
         try {
             if (isEdit) {
                 const dto: GiftBoxUpdateDto = {
                     Name: name.trim(),
                     Description: description.trim(),
-                    PriceOverride: priceOverride ? Number(priceOverride) : undefined,
+                    Price: finalPrice,
                     CollectionId: collectionId,
-                    Tags: selectedTags,
+                    TagIds: selectedTags,
                     Items: items.map(i => ({ ItemId: i.ItemId, ItemName: i.ItemName, Quantity: i.Quantity, ItemPrice: i.ItemPrice })),
                     Images: images,
+                    IsActive: isActive,
                 };
                 await adminService.updateGiftBox(editData!.Id, dto);
             } else {
                 const dto: GiftBoxCreateDto = {
                     Name: name.trim(),
                     Description: description.trim(),
-                    PriceOverride: priceOverride ? Number(priceOverride) : undefined,
+                    Price: finalPrice,
                     CollectionId: collectionId,
-                    Tags: selectedTags,
+                    TagIds: selectedTags,
                     Items: items.map(i => ({ ItemId: i.ItemId, ItemName: i.ItemName, Quantity: i.Quantity, ItemPrice: i.ItemPrice })),
                     Images: images,
+                    IsActive: isActive,
                 };
                 await adminService.createGiftBox(dto);
             }
@@ -194,6 +200,12 @@ function GiftBoxFormModal({ editData, collections, allItems, allTags, onClose, o
                         <textarea value={imageUrls} onChange={e => setImageUrls(e.target.value)} rows={3} placeholder={"https://example.com/image1.jpg\nhttps://example.com/image2.jpg"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A] resize-none font-mono text-xs" />
                     </div>
 
+                    {/* Status Toggle */}
+                    <div className="flex items-center gap-2">
+                        <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} id="is-active" className="cursor-pointer" />
+                        <label htmlFor="is-active" className="text-sm text-gray-600 cursor-pointer">Hiển thị (Đang bán)</label>
+                    </div>
+
                     {/* Error */}
                     {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
                 </div>
@@ -266,7 +278,13 @@ export default function AdminGiftBoxesPage() {
 
     const handleDelete = async (item: GiftBoxListItem) => {
         if (!confirm(`Xóa giỏ quà "${item.Name}"?`)) return;
-        try { await adminService.deleteGiftBox(item.Id); fetchData(); } catch { /* ignore */ }
+        try { 
+            await adminService.deleteGiftBox(item.Id); 
+            toast.success("Đã xóa giỏ quà");
+            fetchData(); 
+        } catch (err: any) { 
+            toast.error(err?.response?.data?.Message || "Không thể xóa giỏ quà này");
+        }
     };
 
     const openCreate = () => {

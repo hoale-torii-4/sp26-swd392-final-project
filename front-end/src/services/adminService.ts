@@ -165,20 +165,21 @@ export interface GiftBoxDetail {
 export interface GiftBoxCreateDto {
     Name: string;
     Description: string;
-    PriceOverride?: number;
+    Price: number;
     Images: string[];
     CollectionId: string;
-    Tags: string[];
+    TagIds: string[];
     Items: { ItemId: string; ItemName: string; Quantity: number; ItemPrice: number }[];
+    IsActive?: boolean;
 }
 
 export interface GiftBoxUpdateDto {
     Name?: string;
     Description?: string;
-    PriceOverride?: number;
+    Price?: number;
     Images?: string[];
     CollectionId?: string;
-    Tags?: string[];
+    TagIds?: string[];
     Items?: { ItemId: string; ItemName: string; Quantity: number; ItemPrice: number }[];
     IsActive?: boolean;
 }

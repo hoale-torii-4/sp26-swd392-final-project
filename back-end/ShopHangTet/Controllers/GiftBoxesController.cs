@@ -54,8 +54,15 @@ namespace ShopHangTet.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(string id)
         {
-            await _service.DeleteGiftBoxAsync(id);
-            return NoContent();
+            try
+            {
+                await _service.DeleteGiftBoxAsync(id);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
         }
 
         [HttpGet("collections")]

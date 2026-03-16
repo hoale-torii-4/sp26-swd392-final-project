@@ -60,8 +60,15 @@ namespace ShopHangTet.Controllers
         [HttpDelete("items/{id}")]
         public async Task<IActionResult> DeleteItem(string id)
         {
-            await _service.DeleteItemAsync(id);
-            return NoContent();
+            try
+            {
+                await _service.DeleteItemAsync(id);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { Message = ex.Message });
+            }
         }
 
         [HttpGet("categories")]

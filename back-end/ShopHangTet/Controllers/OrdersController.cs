@@ -216,7 +216,7 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var userRole = User.FindFirst("role")?.Value ?? "MEMBER";
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value ?? "MEMBER";
             if (userRole != "STAFF")
             {
                 return Forbid("Only STAFF can update order status. Admin cannot modify orders.");

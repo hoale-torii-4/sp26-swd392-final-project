@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import { adminService, type MixMatchItem, type MixMatchRule } from "../../services/adminService";
 
 function formatPrice(v: number) { return v.toLocaleString("vi-VN") + "₫"; }
@@ -59,7 +60,13 @@ export default function AdminMixMatchPage() {
 
     const handleDelete = async (item: MixMatchItem) => {
         if (!confirm(`Xóa "${item.Name}"?`)) return;
-        try { await adminService.deleteMixMatchItem(item.Id); fetchItems(); } catch { /* ignore */ }
+        try { 
+            await adminService.deleteMixMatchItem(item.Id); 
+            toast.success("Đã xóa sản phẩm");
+            fetchItems(); 
+        } catch (err: any) { 
+            toast.error(err?.response?.data?.Message || "Không thể xóa sản phẩm này");
+        }
     };
 
     const handleSaveRules = async () => {
