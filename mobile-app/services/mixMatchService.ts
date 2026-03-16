@@ -7,6 +7,7 @@ export interface MixMatchItem {
     Category?: string;
     CategoryLabel?: string;
     Price?: number;
+    IsAlcohol?: boolean;
 }
 
 export interface CustomBoxItemPayload {

@@ -12,6 +12,7 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Image } from 'expo-image';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import Toast from 'react-native-toast-message';
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import * as Sharing from 'expo-sharing';
@@ -120,15 +121,16 @@ export default function CheckoutPaymentScreen() {
             link.download = fileName;
             link.click();
             setQrSaved(true);
+            Toast.show({ type: 'success', text1: 'Lưu mã QR', text2: 'Đã lưu mã QR thành công.' });
           } catch {
-            Alert.alert('Lưu mã QR', 'Không thể lưu mã QR trên thiết bị này.');
+            Toast.show({ type: 'error', text1: 'Lưu mã QR', text2: 'Không thể lưu mã QR trên thiết bị này.' });
           } finally {
             setSavingQr(false);
           }
         };
         reader.onerror = () => {
           setSavingQr(false);
-          Alert.alert('Lưu mã QR', 'Không thể tải mã QR để lưu.');
+          Toast.show({ type: 'error', text1: 'Lưu mã QR', text2: 'Không thể tải mã QR để lưu.' });
         };
         reader.readAsDataURL(blob);
         return;
@@ -138,7 +140,7 @@ export default function CheckoutPaymentScreen() {
       const download = await FileSystem.downloadAsync(qrUrl, downloadPath);
 
       const { status } = await MediaLibrary.requestPermissionsAsync();
-      if (status === 'granted' || status === 'limited') {
+      if (status === 'granted') {
         await MediaLibrary.saveToLibraryAsync(download.uri);
         setQrSaved(true);
         return;
@@ -148,10 +150,10 @@ export default function CheckoutPaymentScreen() {
         await Sharing.shareAsync(download.uri);
         setQrSaved(true);
       } else {
-        Alert.alert('Lưu mã QR', 'Thiết bị không hỗ trợ lưu hoặc chia sẻ ảnh.');
+        Toast.show({ type: 'error', text1: 'Lưu mã QR', text2: 'Thiết bị không hỗ trợ lưu hoặc chia sẻ ảnh.' });
       }
     } catch {
-      Alert.alert('Lưu mã QR', 'Không thể lưu mã QR. Vui lòng thử lại.');
+      Toast.show({ type: 'error', text1: 'Lưu mã QR', text2: 'Không thể lưu mã QR. Vui lòng thử lại.' });
     } finally {
       setSavingQr(false);
     }
@@ -162,12 +164,12 @@ export default function CheckoutPaymentScreen() {
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(qrUrl);
-        Alert.alert('Sao chép liên kết', 'Đã sao chép link QR để bạn lưu hoặc chia sẻ.');
+        Toast.show({ type: 'success', text1: 'Sao chép liên kết', text2: 'Đã sao chép link QR để bạn lưu hoặc chia sẻ.' });
       } else {
-        Alert.alert('Sao chép liên kết', 'Thiết bị này không hỗ trợ sao chép.');
+        Toast.show({ type: 'error', text1: 'Sao chép liên kết', text2: 'Thiết bị này không hỗ trợ sao chép.' });
       }
     } catch {
-      Alert.alert('Sao chép liên kết', 'Không thể sao chép link QR.');
+      Toast.show({ type: 'error', text1: 'Sao chép liên kết', text2: 'Không thể sao chép link QR.' });
     }
   };
 
