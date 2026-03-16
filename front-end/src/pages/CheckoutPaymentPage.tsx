@@ -32,6 +32,9 @@ export default function CheckoutPaymentPage() {
     const [error, setError] = useState<string | null>(null);
     const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
     const [qrLoading, setQrLoading] = useState(false);
+    const [qrRemainingSeconds, setQrRemainingSeconds] = useState<number | null>(null);
+    const [qrExpired, setQrExpired] = useState(false);
+    const qrCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // ── Form state ──
     const [receiverName, setReceiverName] = useState("");
@@ -103,7 +106,7 @@ export default function CheckoutPaymentPage() {
 
     // ── Auto-polling: check payment status every 3 sec when QR is shown ──
     useEffect(() => {
-        if (!qrImageUrl || !orderCode) return;
+        if (!qrImageUrl || !orderCode || qrExpired) return;
 
         const apiBase = import.meta.env.VITE_API_BASE_URL || "https://shophangtet-api.onrender.com";
 
@@ -116,6 +119,7 @@ export default function CheckoutPaymentPage() {
                 if (isPaid) {
                     setPaymentDetected(true);
                     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                    if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
                     setTimeout(() => navigate(`/order-success?code=${orderCode}`), 1500);
                 }
             } catch {
@@ -128,7 +132,34 @@ export default function CheckoutPaymentPage() {
         return () => {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         };
-    }, [qrImageUrl, orderCode, navigate]);
+    }, [qrImageUrl, orderCode, navigate, qrExpired]);
+
+    useEffect(() => {
+        if (!qrImageUrl || !orderCode) return;
+
+        const countdownMinutes = Number(import.meta.env.VITE_QR_TIMEOUT_MINUTES ?? 10);
+        const totalSeconds = Math.max(1, Math.round(countdownMinutes * 60));
+        setQrExpired(false);
+        setQrRemainingSeconds(totalSeconds);
+
+        if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
+        qrCountdownRef.current = setInterval(() => {
+            setQrRemainingSeconds((prev) => {
+                if (prev === null) return prev;
+                if (prev <= 1) {
+                    if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
+                    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                    setQrExpired(true);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => {
+            if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
+        };
+    }, [qrImageUrl, orderCode]);
 
 
     const items = isBuyNow
@@ -143,6 +174,13 @@ export default function CheckoutPaymentPage() {
             : cart?.TotalAmount ?? 0;
 
     // ── Submit order ──
+    const formatCountdown = (seconds: number | null) => {
+        if (seconds === null) return "";
+        const mm = Math.floor(seconds / 60);
+        const ss = seconds % 60;
+        return `${mm.toString().padStart(2, "0")}:${ss.toString().padStart(2, "0")}`;
+    };
+
     const handleSubmit = async () => {
         let finalReceiverName = receiverName;
         let finalReceiverPhone = receiverPhone;
@@ -191,6 +229,9 @@ export default function CheckoutPaymentPage() {
             const result = await orderService.createB2COrder(orderData);
             setOrderCode(result.orderCode);
             sessionStorage.setItem("last_order_code", result.orderCode);
+            setPaymentDetected(false);
+            setQrExpired(false);
+            setQrRemainingSeconds(null);
 
             if (!isBuyNow && !isSelectedCheckout) {
                 await cartService.clearCart();
@@ -327,15 +368,30 @@ export default function CheckoutPaymentPage() {
                                     Tổng thanh toán: <span className="font-bold text-gray-800">{formatPrice(totalAmount + 35000)}</span>
                                 </p>
 
-                                {/* Polling status */}
-                                <div className="flex items-center gap-2 text-xs text-gray-400">
-                                    <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                    Đang tự động kiểm tra thanh toán...
+                                <div className="flex items-center justify-between w-full text-xs">
+                                    <div className="flex items-center gap-2 text-gray-400">
+                                        <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                        Đang tự động kiểm tra thanh toán...
+                                    </div>
+                                    {qrRemainingSeconds !== null && (
+                                        <span className={`font-semibold ${qrRemainingSeconds <= 30 ? "text-red-600" : "text-gray-500"}`}>
+                                            Hết hạn sau: {formatCountdown(qrRemainingSeconds)}
+                                        </span>
+                                    )}
                                 </div>
+
+                                {qrExpired && (
+                                    <div className="w-full text-center text-xs text-red-600 font-semibold bg-red-50 border border-red-200 rounded-lg py-2">
+                                        Mã QR đã hết hạn. Vui lòng tạo lại để thanh toán.
+                                    </div>
+                                )}
 
                                 <Link
                                     to={`/order-success?code=${orderCode}`}
-                                    className="w-full py-3 bg-[#8B1A1A] hover:bg-[#701515] text-white text-sm font-bold rounded-xl transition-colors cursor-pointer text-center"
+                                    className={`w-full py-3 text-white text-sm font-bold rounded-xl transition-colors cursor-pointer text-center ${qrExpired ? "bg-gray-400 cursor-not-allowed" : "bg-[#8B1A1A] hover:bg-[#701515]"}`}
+                                    onClick={(event) => {
+                                        if (qrExpired) event.preventDefault();
+                                    }}
                                 >
                                     Đã thanh toán xong →
                                 </Link>

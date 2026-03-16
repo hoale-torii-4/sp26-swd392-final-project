@@ -350,7 +350,7 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                     />
                 </div>
                 {/* Product placeholder image */}
-                <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 ${isInactive ? "grayscale" : ""}`}>
+                <Link to={(item.Type === 0 || item.Type === "READY_MADE") ? `/gift-boxes/${item.ProductId || item.Id}` : '/custom-box'} className={`w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 hover:opacity-80 transition-opacity ${isInactive ? "grayscale" : ""}`}>
                     {item.ImageUrl ? (
                         <img
                             src={item.ImageUrl}
@@ -368,15 +368,15 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                         </svg>
                     )}
-                </div>
+                </Link>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h3 className="font-bold text-gray-900 text-base mb-1.5">
+                            <Link to={(item.Type === 0 || item.Type === "READY_MADE") ? `/gift-boxes/${item.ProductId || item.Id}` : '/custom-box'} className="font-bold text-gray-900 text-base mb-1.5 hover:text-[#8B1A1A] transition-colors line-clamp-2">
                                 {item.Name || "Sản phẩm"}
-                            </h3>
+                            </Link>
                             {/* Type tag */}
                             <div className="flex flex-wrap gap-1.5 mb-2">
                                 <span className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-white rounded ${getTypeColor(item.Type)}`}>
