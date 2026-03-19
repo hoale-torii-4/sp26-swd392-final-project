@@ -3,49 +3,56 @@ using ShopHangTet.Models;
 
 namespace ShopHangTet.Services
 {
-    /// Interface cho OrderService - quản lý đơn hàng B2C và B2B
     public interface IOrderService
     {
-        // ===Compliant Methods - Tách riêng B2C và B2B ===
+        // ── Đặt hàng ────────────────────────────────────────────────────────
         Task<OrderModel> PlaceB2COrderAsync(CreateOrderB2CDto dto);
         Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto);
-        
-        // === Order Validation ===
+
+        // ── Validation ───────────────────────────────────────────────────────
         Task<OrderValidationResult> ValidateB2COrderAsync(CreateOrderB2CDto dto);
         Task<OrderValidationResult> ValidateB2BOrderAsync(CreateOrderB2BDto dto);
-        
-        // ===Mix & Match Validation ===
         Task<MixMatchValidationResult> ValidateMixMatchRulesAsync(string customBoxId);
-        
-        // === Order Tracking ===
+
+        // ── Tra cứu đơn ─────────────────────────────────────────────────────
         Task<OrderTrackingResult?> TrackOrderAsync(string orderCode, string email);
         Task<OrderDto?> GetOrderDetailByCodeAsync(string orderCode, string? email, string? requesterUserId, bool isStaffOrAdmin);
         Task<OrderDto?> GetOrderDetailByIdAsync(string orderId, string requesterUserId, bool isStaffOrAdmin);
         Task<bool> ConfirmReceivedByCustomerAsync(string orderCode, string email);
         Task<bool> ConfirmDeliveryReceivedByCustomerAsync(string deliveryId, string email);
 
-        // === My Orders ===
-        Task<List<MyOrderResponseDto>> GetMyOrdersAsync(string userId, int skip, int take);
+        // ── My Orders (Member) ───────────────────────────────────────────────
+        /// <param name="statusFilter">null = tất cả, hoặc tên enum VD: "PREPARING"</param>
+        Task<List<MyOrderResponseDto>> GetMyOrdersAsync(string userId, int skip, int take, string? statusFilter = null);
 
-        // === Status & Inventory ===
+        // ── Staff Order List ─────────────────────────────────────────────────
+        /// Lấy danh sách đơn cho Staff dashboard với filter và phân trang
+        Task<StaffOrderListResponseDto> GetStaffOrdersAsync(
+            int page, int pageSize,
+            string? statusFilter,
+            string? typeFilter,
+            string? search);
+
+        // ── Cập nhật trạng thái ──────────────────────────────────────────────
         Task<OrderModel> UpdateStatusAsync(string orderId, OrderStatus status, string updatedBy, string? notes = null);
 
-        // === SePay Payment ===
-        /// Xác nhận thanh toán từ SePay webhook - cập nhật trạng thái và trừ kho
+        // ── Thanh toán ───────────────────────────────────────────────────────
+        /// Xác nhận thanh toán từ SePay webhook (tự động)
         Task<bool> ConfirmPaymentAsync(string orderCode, decimal amountPaid);
-        /// Lấy đơn hàng theo mã đơn (cho frontend polling)
+
+        /// Xác nhận thanh toán thủ công bởi Staff
+        Task<bool> StaffConfirmPaymentAsync(string orderId, string staffName);
+
+        /// Lấy đơn theo mã (cho frontend polling check-status)
         Task<OrderModel?> GetOrderByCodeAsync(string orderCode);
 
-        // === Inventory Reservation ===
-        /// Release reserved inventory khi cancel/expire
+        // ── Inventory ────────────────────────────────────────────────────────
+        /// Release reserved inventory khi cancel / expire
         Task ReleaseInventoryReservationAsync(OrderModel order, string updatedBy);
 
-        // === Delivery Management ===
-        /// Aggregate delivery statuses thành order status (B2B)
+        // ── Delivery (B2B) ───────────────────────────────────────────────────
         Task<OrderStatus> AggregateDeliveryStatusAsync(string orderId);
-        /// Cập nhật delivery status và tự aggregate order status
         Task UpdateDeliveryStatusAsync(string deliveryId, string status, string? failureReason = null);
-        /// Reship — thử giao lại delivery đã fail
         Task<bool> ReshipDeliveryAsync(string deliveryId);
     }
 

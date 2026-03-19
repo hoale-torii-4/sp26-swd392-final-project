@@ -17,9 +17,10 @@ public class MyOrderResponseDto
     public string OrderCode { get; set; } = string.Empty;
     public OrderType OrderType { get; set; }
     public OrderStatus Status { get; set; }
+    public string StatusLabel { get; set; } = string.Empty;
     public decimal TotalAmount { get; set; }
     public DateTime CreatedAt { get; set; }
-    public DateTime DeliveryDate { get; set; }
+    public DateTime? DeliveryDate { get; set; }
     public int TotalItems { get; set; }
     public List<MyOrderItemDto> Items { get; set; } = new();
 }

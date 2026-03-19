@@ -13,8 +13,14 @@ public static class SeedData
         await context.Database.EnsureCreatedAsync();
 
         await SeedItemsAsync(context);
+        await context.SaveChangesAsync();
+
         await SeedTagsAsync(context);
+        await context.SaveChangesAsync();
+
         await SeedCollectionsAsync(context);
+        await context.SaveChangesAsync();
+
         await SeedGiftBoxesAsync(context);
 
         await context.SaveChangesAsync();
@@ -22,8 +28,6 @@ public static class SeedData
 
     private static async Task SeedItemsAsync(ShopHangTetDbContext context)
     {
-        if (await context.Items.AnyAsync()) return;
-
         var itemsWithImages = new (string Name, ItemCategory Category, decimal Price, int Stock, bool IsAlcohol, string Image)[]
         {
             // Nhóm hạt - dinh dưỡng (10 items)
@@ -82,14 +86,21 @@ public static class SeedData
             ("Rượu vang trắng", ItemCategory.ALCOHOL, 300000, 500, true, "https://winecellar.vn/wp-content/uploads/2024/05/ruou-vang-trang-khong-con-cantina-zaccagnini-de-alcoholised-wine-white-1.jpg"),
             ("Rượu sake", ItemCategory.ALCOHOL, 350000, 500, true, "https://bizweb.dktcdn.net/100/237/115/products/9485002997790.jpg?v=1511316377803"),
 
-            // Nhóm đặc sản mặn (4 items)
-            ("Khô gà lá chanh", ItemCategory.FOOD, 120000, 1000, false, "https://storage.googleapis.com/onelife-public/8938530880170.jpg"),
-            ("Khô bò", ItemCategory.FOOD, 180000, 1000, false, "https://product.hstatic.net/200000423303/product/1_f1d16d07a4484d589ca28c608c6c3557.png"),
-            ("Chà bông cá hồi", ItemCategory.FOOD, 210000, 1000, false, "https://ghienfood.com/wp-content/uploads/2020/02/baner1-1024x676.jpg"),
-            ("Lạp xưởng tươi", ItemCategory.FOOD, 160000, 1000, false, "https://dacsanvungmienngon.com/wp-content/uploads/2019/04/LAP-XUONG-HEO-5.jpg")
+            // Nhóm đặc sản mặn (4 items) - dùng SAVORY để validate Mix & Match ổn định
+            ("Khô gà lá chanh", ItemCategory.SAVORY, 120000, 1000, false, "https://storage.googleapis.com/onelife-public/8938530880170.jpg"),
+            ("Khô bò", ItemCategory.SAVORY, 180000, 1000, false, "https://product.hstatic.net/200000423303/product/1_f1d16d07a4484d589ca28c608c6c3557.png"),
+            ("Chà bông cá hồi", ItemCategory.SAVORY, 210000, 1000, false, "https://ghienfood.com/wp-content/uploads/2020/02/baner1-1024x676.jpg"),
+            ("Lạp xưởng tươi", ItemCategory.SAVORY, 160000, 1000, false, "https://dacsanvungmienngon.com/wp-content/uploads/2019/04/LAP-XUONG-HEO-5.jpg")
         };
 
-        var items = itemsWithImages.Select(x => new Item
+        var existingNames = await context.Items
+            .Select(x => x.Name)
+            .ToListAsync();
+        var existingNameSet = new HashSet<string>(existingNames, StringComparer.Ordinal);
+
+        var items = itemsWithImages
+            .Where(x => !existingNameSet.Contains(x.Name))
+            .Select(x => new Item
         {
             Name = x.Name,
             Category = x.Category,
@@ -98,36 +109,47 @@ public static class SeedData
             IsAlcohol = x.IsAlcohol,
             IsActive = true,
             Images = new List<string> { x.Image }
-        }).ToList();
+        })
+            .ToList();
 
-        await context.Items.AddRangeAsync(items);
+        if (items.Count > 0)
+            await context.Items.AddRangeAsync(items);
     }
 
     private static async Task SeedTagsAsync(ShopHangTetDbContext context)
     {
-        if (await context.Tags.AnyAsync()) return;
-
         var tags = new List<Tag>
         {
             new() { Name = "Gia đình", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Bạn bè", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Đối tác", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Nhân viên", Type = "RECIPIENT", IsActive = true },
+            new() { Name = "Doanh nghiệp", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Người lớn tuổi", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Sum vầy", Type = "MEANING", IsActive = true },
             new() { Name = "Tri ân", Type = "MEANING", IsActive = true },
+            new() { Name = "Mừng năm mới", Type = "MEANING", IsActive = true },
+            new() { Name = "Lời cảm ơn", Type = "MEANING", IsActive = true },
             new() { Name = "Chúc sức khỏe", Type = "MEANING", IsActive = true },
             new() { Name = "Chúc tài lộc", Type = "MEANING", IsActive = true },
             new() { Name = "Chúc thành công", Type = "MEANING", IsActive = true }
         };
 
-        await context.Tags.AddRangeAsync(tags);
+        var existingNames = await context.Tags
+            .Select(x => x.Name)
+            .ToListAsync();
+        var existingNameSet = new HashSet<string>(existingNames, StringComparer.Ordinal);
+
+        var missingTags = tags
+            .Where(x => !existingNameSet.Contains(x.Name))
+            .ToList();
+
+        if (missingTags.Count > 0)
+            await context.Tags.AddRangeAsync(missingTags);
     }
 
     private static async Task SeedCollectionsAsync(ShopHangTetDbContext context)
     {
-        if (await context.Collections.AnyAsync()) return;
-
         var collections = new List<Collection>
         {
             new()
@@ -182,7 +204,17 @@ public static class SeedData
             }
         };
 
-        await context.Collections.AddRangeAsync(collections);
+        var existingNames = await context.Collections
+            .Select(x => x.Name)
+            .ToListAsync();
+        var existingNameSet = new HashSet<string>(existingNames, StringComparer.Ordinal);
+
+        var missingCollections = collections
+            .Where(x => !existingNameSet.Contains(x.Name))
+            .ToList();
+
+        if (missingCollections.Count > 0)
+            await context.Collections.AddRangeAsync(missingCollections);
     }
 
     private static async Task SeedGiftBoxesAsync(ShopHangTetDbContext context)

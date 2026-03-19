@@ -4,6 +4,7 @@ using ShopHangTet.Models;
 
 namespace ShopHangTet.Services;
 
+/// Background service tự động hủy đơn hết 10 phút chưa thanh toán và release kho
 public class OrderExpirationBackgroundService : BackgroundService
 {
     private static readonly TimeSpan ExpireAfter = TimeSpan.FromMinutes(10);
@@ -30,7 +31,7 @@ public class OrderExpirationBackgroundService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Order expiration background service failed in current cycle");
+                _logger.LogError(ex, "Order expiration service failed in current cycle");
             }
 
             try
@@ -52,25 +53,27 @@ public class OrderExpirationBackgroundService : BackgroundService
 
         var cutoff = DateTime.UtcNow - ExpireAfter;
 
+        // Chỉ lấy đơn đang PAYMENT_CONFIRMING và đã quá thời gian
         var expiredOrders = await context.Orders
             .Where(o => o.Status == OrderStatus.PAYMENT_CONFIRMING && o.CreatedAt <= cutoff)
             .ToListAsync(cancellationToken);
 
-        if (expiredOrders.Count == 0)
-        {
-            return;
-        }
+        if (expiredOrders.Count == 0) return;
+
+        _logger.LogInformation("Found {Count} expired orders to cancel", expiredOrders.Count);
 
         foreach (var order in expiredOrders)
         {
-            // Release reserved inventory trước khi expire
             try
             {
+                // Release reserved inventory trước khi hủy
                 await orderService.ReleaseInventoryReservationAsync(order, "System-ExpirationService");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to release inventory for expired order {OrderCode}", order.OrderCode);
+                _logger.LogWarning(ex, "Failed to release inventory for expired order {Code}",
+                    order.OrderCode);
+                // Vẫn tiếp tục hủy đơn dù release inventory lỗi
             }
 
             order.Status = OrderStatus.CANCELLED;
@@ -82,11 +85,13 @@ public class OrderExpirationBackgroundService : BackgroundService
                 Notes = "Đơn quá thời gian thanh toán 10 phút - tự động hủy và release reserve"
             });
             order.UpdatedAt = DateTime.UtcNow;
-
         }
 
+        // Lưu tất cả đơn đã cập nhật trong 1 lần SaveChanges
         await context.SaveChangesAsync(cancellationToken);
 
-        _logger.LogInformation("Order expiration service marked {Count} order(s) as expired and released inventory", expiredOrders.Count);
+        _logger.LogInformation(
+            "Expired and cancelled {Count} order(s), released inventory",
+            expiredOrders.Count);
     }
 }
