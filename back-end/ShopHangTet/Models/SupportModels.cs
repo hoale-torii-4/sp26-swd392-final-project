@@ -46,6 +46,8 @@ namespace ShopHangTet.Models
         [BsonId] [BsonRepresentation(BsonType.ObjectId)]
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
 
+        [BsonElement("configKey")] public string ConfigKey { get; set; } = string.Empty;
+        [BsonElement("configValue")] public string ConfigValue { get; set; } = string.Empty;
         [BsonElement("emailTemplate")] public string EmailTemplate { get; set; } = string.Empty;
         [BsonElement("smtpSettings")] public SmtpSettings SmtpSettings { get; set; } = new();
         [BsonElement("updatedAt")] public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

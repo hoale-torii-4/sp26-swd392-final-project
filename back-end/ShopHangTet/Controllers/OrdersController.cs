@@ -3,6 +3,7 @@ using ShopHangTet.Services;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 using Microsoft.AspNetCore.Authorization;
+using MongoDB.Bson;
 using System.Security.Claims;
 
 namespace ShopHangTet.Controllers;
@@ -186,9 +187,12 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = GetUserIdFromClaims();
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+
+            if (!ObjectId.TryParse(userId, out _))
+                return Unauthorized(ApiResponse<object>.ErrorResult("Token không chứa user id hợp lệ."));
 
             var orders = await _orderService.GetMyOrdersAsync(userId, skip, take, status);
             return Ok(ApiResponse<List<MyOrderResponseDto>>.SuccessResult(
@@ -419,6 +423,14 @@ public class OrdersController : ControllerBase
         var role = User.FindFirst("role")?.Value ?? User.FindFirstValue(ClaimTypes.Role) ?? "";
         return string.Equals(role, "STAFF", StringComparison.OrdinalIgnoreCase)
             || string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string? GetUserIdFromClaims()
+    {
+        return User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirst("Id")?.Value
+            ?? User.FindFirst("id")?.Value
+            ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
     }
 
     private static string GetStatusLabel(OrderStatus status) => status switch

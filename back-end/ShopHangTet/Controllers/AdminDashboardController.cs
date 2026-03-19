@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.Services;
 using ShopHangTet.DTOs;
@@ -6,6 +7,7 @@ namespace ShopHangTet.Controllers;
 
 [ApiController]
 [Route("api/admin/dashboard")]
+[Authorize(Roles = "ADMIN")]
 public class AdminDashboardController : ControllerBase
 {
     private readonly IDashboardService _dashboardService;
