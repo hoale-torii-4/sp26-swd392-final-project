@@ -109,7 +109,12 @@ namespace ShopHangTet.Services
         public async Task<List<MyOrderResponseDto>> GetMyOrdersAsync(
             string userId, int skip, int take, string? statusFilter = null)
         {
-            var userObjectId = ObjectId.Parse(userId);
+            if (!ObjectId.TryParse(userId, out var userObjectId))
+            {
+                _logger.LogWarning("GetMyOrdersAsync received invalid user id claim: {UserId}", userId);
+                return new List<MyOrderResponseDto>();
+            }
+
             var query = _context.Orders.Where(o => o.UserId == userObjectId);
 
             if (!string.IsNullOrWhiteSpace(statusFilter)

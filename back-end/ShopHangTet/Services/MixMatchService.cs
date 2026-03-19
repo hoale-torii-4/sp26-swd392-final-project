@@ -10,6 +10,7 @@ namespace ShopHangTet.Services;
 
 public class MixMatchService : IMixMatchService
 {
+    private const string MixMatchRuleConfigKey = "MIX_MATCH_RULE";
     private readonly ShopHangTetDbContext _context;
 
     public MixMatchService(ShopHangTetDbContext context)
@@ -218,14 +219,18 @@ public class MixMatchService : IMixMatchService
     public async Task<MixMatchRuleDTO> GetRulesAsync()
     {
         var cfg = await _context.SystemConfigs
-            .FirstOrDefaultAsync(s => s.Id == "MIX_MATCH_RULE");
+            .FirstOrDefaultAsync(s => s.ConfigKey == MixMatchRuleConfigKey);
 
-        if (cfg == null || string.IsNullOrWhiteSpace(cfg.EmailTemplate))
+        var rawValue = cfg?.ConfigValue;
+        if (string.IsNullOrWhiteSpace(rawValue))
+            rawValue = cfg?.EmailTemplate;
+
+        if (string.IsNullOrWhiteSpace(rawValue))
             return GetDefaultRules();
 
         try
         {
-            return JsonSerializer.Deserialize<MixMatchRuleDTO>(cfg.EmailTemplate)
+            return JsonSerializer.Deserialize<MixMatchRuleDTO>(rawValue)
                 ?? GetDefaultRules();
         }
         catch
@@ -244,13 +249,14 @@ public class MixMatchService : IMixMatchService
 
         var json = JsonSerializer.Serialize(dto);
         var cfg = await _context.SystemConfigs
-            .FirstOrDefaultAsync(s => s.Id == "MIX_MATCH_RULE");
+            .FirstOrDefaultAsync(s => s.ConfigKey == MixMatchRuleConfigKey);
 
         if (cfg == null)
         {
             cfg = new Models.SystemConfig
             {
-                Id = "MIX_MATCH_RULE",
+                ConfigKey = MixMatchRuleConfigKey,
+                ConfigValue = json,
                 EmailTemplate = json,
                 UpdatedAt = DateTime.UtcNow
             };
@@ -258,6 +264,8 @@ public class MixMatchService : IMixMatchService
         }
         else
         {
+            cfg.ConfigKey = MixMatchRuleConfigKey;
+            cfg.ConfigValue = json;
             cfg.EmailTemplate = json;
             cfg.UpdatedAt = DateTime.UtcNow;
             _context.SystemConfigs.Update(cfg);
