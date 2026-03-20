@@ -17,12 +17,7 @@ namespace ShopHangTet.DTOs
 
         public static ApiResponse<T> SuccessResult(T data, string message = "")
         {
-            return new ApiResponse<T>
-            {
-                Success = true,
-                Message = message,
-                Data = data
-            };
+            return new ApiResponse<T> { Success = true, Message = message, Data = data };
         }
 
         public static ApiResponse<T> ErrorResult(string message, List<string>? errors = null)
@@ -56,12 +51,10 @@ namespace ShopHangTet.DTOs
     // ========== USER DTOs ==========
     public class RegisterDto
     {
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
-        [Required]
-        [MinLength(6)]
+        [Required] [MinLength(6)]
         public string Password { get; set; } = string.Empty;
 
         [Required]
@@ -85,10 +78,10 @@ namespace ShopHangTet.DTOs
         [Required]
         public string IdToken { get; set; } = string.Empty;
     }
+
     public class LoginDto
     {
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
         [Required]
@@ -125,31 +118,28 @@ namespace ShopHangTet.DTOs
 
     public class OtpVerifyDto
     {
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
         [Required]
         public string Otp { get; set; } = string.Empty;
     }
+
     public class ForgotPasswordDto
     {
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
     }
 
     public class ResetPasswordDto
     {
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
         [Required]
         public string Otp { get; set; } = string.Empty;
 
-        [Required]
-        [MinLength(6)]
+        [Required] [MinLength(6)]
         public string NewPassword { get; set; } = string.Empty;
     }
 
@@ -158,10 +148,10 @@ namespace ShopHangTet.DTOs
         [Required]
         public string OldPassword { get; set; } = string.Empty;
 
-        [Required]
-        [MinLength(6)]
+        [Required] [MinLength(6)]
         public string NewPassword { get; set; } = string.Empty;
     }
+
     public class ResendOtpDto
     {
         public string Email { get; set; } = string.Empty;
@@ -181,7 +171,6 @@ namespace ShopHangTet.DTOs
         public DateTime CreatedAt { get; set; }
     }
 
-    // Admin-facing Collection DTOs
     public class CollectionResponseDTO
     {
         public string Id { get; set; } = string.Empty;
@@ -189,7 +178,7 @@ namespace ShopHangTet.DTOs
         public string Description { get; set; } = string.Empty;
         public int DisplayOrder { get; set; }
         public bool IsActive { get; set; }
-        public string StatusLabel { get; set; } = string.Empty; // "Published" | "Unpublished"
+        public string StatusLabel { get; set; } = string.Empty;
         public int GiftBoxCount { get; set; }
         public string? Thumbnail { get; set; }
     }
@@ -198,11 +187,8 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public string Name { get; set; } = string.Empty;
-
         public string Description { get; set; } = string.Empty;
-
         public int DisplayOrder { get; set; }
-
         public bool IsActive { get; set; } = true;
     }
 
@@ -210,21 +196,15 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public string Name { get; set; } = string.Empty;
-
         public string Description { get; set; } = string.Empty;
-
         public int DisplayOrder { get; set; }
-
         public bool IsActive { get; set; }
     }
 
     public class CollectionReorderDTO
     {
-        [Required]
-        public string Id { get; set; } = string.Empty;
-
-        [Required]
-        public int DisplayOrder { get; set; }
+        [Required] public string Id { get; set; } = string.Empty;
+        [Required] public int DisplayOrder { get; set; }
     }
 
     // ========== GIFT BOX DTOs ==========
@@ -254,7 +234,7 @@ namespace ShopHangTet.DTOs
     {
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
-        public string Category { get; set; } = string.Empty; // DRINK, FOOD, NUT, ALCOHOL
+        public string Category { get; set; } = string.Empty; // DRINK, FOOD, NUT, ALCOHOL, SAVORY
         public decimal Price { get; set; }
         public bool IsAlcohol { get; set; }
         public int StockQuantity { get; set; }
@@ -265,18 +245,16 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public string ItemId { get; set; } = string.Empty;
-        
-        [Required]
-        [Range(1, int.MaxValue)]
+
+        [Required] [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
-        
+
         public decimal? Price { get; set; }
         public string? Name { get; set; }
         public string? Category { get; set; }
         public bool IsAlcohol { get; set; }
     }
 
-    // ========== CUSTOM BOX DTOs ==========
     public class CustomBoxDto
     {
         public string Id { get; set; } = string.Empty;
@@ -287,30 +265,26 @@ namespace ShopHangTet.DTOs
 
     public class CreateCustomBoxDto
     {
-        [Required]
-        [MinLength(1, ErrorMessage = "Ít nhất 1 item được yêu cầu")]
+        [Required] [MinLength(1, ErrorMessage = "Ít nhất 1 item được yêu cầu")]
         public List<CustomBoxItemDto> Items { get; set; } = new();
-        
+
         public string? GreetingMessage { get; set; }
         public string? CanvaCardLink { get; set; }
         public bool HideInvoice { get; set; }
     }
 
-    // Customer-facing DTOs for Mix & Match custom box
     public class CreateCustomBoxItemDTO
     {
         [Required]
         public string ItemId { get; set; } = string.Empty;
 
-        [Required]
-        [Range(1, int.MaxValue)]
+        [Required] [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
     }
 
     public class CreateCustomBoxDTO
     {
-        [Required]
-        [MinLength(1)]
+        [Required] [MinLength(1)]
         public List<CreateCustomBoxItemDTO> Items { get; set; } = new();
     }
 
@@ -333,21 +307,19 @@ namespace ShopHangTet.DTOs
         public DateTime CreatedAt { get; set; }
     }
 
-    /// Rule cho Mix & Match:
+    // ========== MIX & MATCH RULES DTOs ==========
+    /// Rules hiện tại (đã bỏ rule Chivas):
     /// - Tổng 4-6 món
-    /// - Ít nhất 1 đồ uống (Trà hoặc Rượu)
-    /// - Ít nhất 2 snack (Hạt/Bánh/Kẹo)
-    /// - Đặc sản mặn tối đa 2
-    /// - Có Chivas 21: tối đa 4 món; có Chivas 12: tối đa 5 món
+    /// - Ít nhất 1 đồ uống (Trà hoặc Rượu) — DRINK hoặc ALCOHOL
+    /// - Ít nhất 2 snack (NUT hoặc FOOD)
+    /// - Đặc sản mặn (SAVORY) tối đa 2
     public class MixMatchRulesDto
     {
         public int MinTotalItems { get; set; } = 4;
         public int MaxTotalItems { get; set; } = 6;
-        public int MinBeverageItems { get; set; } = 1;
-        public int MinSnackItems { get; set; } = 2;
-        public int MaxSavoryItems { get; set; } = 2;
-        public int MaxItemsWhenHasChivas12 { get; set; } = 5;
-        public int MaxItemsWhenHasChivas21 { get; set; } = 4;
+        public int MinBeverageItems { get; set; } = 1;  // DRINK + ALCOHOL >= 1
+        public int MinSnackItems { get; set; } = 2;     // NUT + FOOD >= 2
+        public int MaxSavoryItems { get; set; } = 2;    // SAVORY <= 2
     }
 
     // ========== MIX & MATCH DTOs (Admin) ==========
@@ -356,19 +328,13 @@ namespace ShopHangTet.DTOs
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Image { get; set; } = string.Empty;
-
         public string Category { get; set; } = string.Empty;
         public string CategoryLabel { get; set; } = string.Empty;
-
         public decimal Price { get; set; }
-
         public bool IsAlcohol { get; set; }
-
         public int StockQuantity { get; set; }
-
         public string StockStatus { get; set; } = string.Empty;
         public string StockStatusLabel { get; set; } = string.Empty;
-
         public bool IsActive { get; set; }
         public string StatusLabel { get; set; } = string.Empty;
     }
@@ -377,18 +343,14 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public string Name { get; set; } = string.Empty;
-
         public decimal Price { get; set; }
 
         [Required]
-        public string Category { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty; // DRINK|FOOD|NUT|ALCOHOL|SAVORY
 
         public string? Image { get; set; }
-
         public string? Description { get; set; }
-
         public bool IsAlcohol { get; set; }
-
         public bool IsActive { get; set; } = true;
     }
 
@@ -396,18 +358,14 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public string Name { get; set; } = string.Empty;
-
         public decimal Price { get; set; }
 
         [Required]
         public string Category { get; set; } = string.Empty;
 
         public string? Image { get; set; }
-
         public string? Description { get; set; }
-
         public bool IsAlcohol { get; set; }
-
         public bool IsActive { get; set; } = true;
     }
 
@@ -426,13 +384,10 @@ namespace ShopHangTet.DTOs
         public string Id { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
-
         public string Role { get; set; } = string.Empty;
         public string RoleLabel { get; set; } = string.Empty;
-
         public bool IsActive { get; set; }
         public string StatusLabel { get; set; } = string.Empty;
-
         public DateTime CreatedAt { get; set; }
     }
 
@@ -449,12 +404,10 @@ namespace ShopHangTet.DTOs
         [Required]
         public string FullName { get; set; } = string.Empty;
 
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
-        [Required]
-        [MinLength(6)]
+        [Required] [MinLength(6)]
         public string Password { get; set; } = string.Empty;
 
         [Required]
@@ -501,8 +454,7 @@ namespace ShopHangTet.DTOs
         [Required]
         public string ReceiverName { get; set; } = string.Empty;
 
-        [Required]
-        [Phone]
+        [Required] [Phone]
         public string ReceiverPhone { get; set; } = string.Empty;
 
         [Required]
@@ -525,46 +477,39 @@ namespace ShopHangTet.DTOs
         [Required]
         public OrderItemType Type { get; set; }
 
-        // Unified ID: Type=READY_MADE -> GiftBoxId, Type=MIX_MATCH -> CustomBoxId
+        /// GiftBoxId nếu READY_MADE, CustomBoxId nếu MIX_MATCH
         public string? Id { get; set; }
 
-        // Backward-compat legacy fields for old clients
         [Obsolete("Use Id instead")]
         public string? GiftBoxId { get; set; }
         [Obsolete("Use Id instead")]
         public string? CustomBoxId { get; set; }
-        
-        [Required]
-        [Range(1, int.MaxValue)]
+
+        [Required] [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
     }
 
-    /// DTO cho đơn hàng B2C - 1 địa chỉ giao hàng
-    /// Guest có thể dùng
+    /// DTO đặt hàng B2C — 1 địa chỉ, Guest hoặc Member
     public class CreateOrderB2CDto
     {
-        public string? UserId { get; set; } // Nullable for Guest
-        
-        [Required]
-        [EmailAddress]
+        public string? UserId { get; set; }
+
+        [Required] [EmailAddress]
         public string CustomerEmail { get; set; } = string.Empty;
-        
+
         [Required]
         public string CustomerName { get; set; } = string.Empty;
-        
-        [Required]
-        [Phone]
+
+        [Required] [Phone]
         public string CustomerPhone { get; set; } = string.Empty;
-        
-        [Required]
-        [MinLength(1)]
+
+        [Required] [MinLength(1)]
         public List<OrderItemDto> Items { get; set; } = new();
 
         [Required]
         public string ReceiverName { get; set; } = string.Empty;
 
-        [Required]
-        [Phone]
+        [Required] [Phone]
         public string ReceiverPhone { get; set; } = string.Empty;
 
         [Required]
@@ -572,88 +517,77 @@ namespace ShopHangTet.DTOs
 
         public string? GreetingMessage { get; set; }
         public string? GreetingCardUrl { get; set; }
-        
+
+        /// Ngày giao hàng — chỉ cần chọn ngày, không cần slot giờ
         [Required]
         public DateTime DeliveryDate { get; set; }
     }
 
-    /// DTO cho đơn hàng B2B - nhiều địa chỉ giao hàng
-    /// Chỉ Member mới dùng được
+    /// DTO đặt hàng B2B — nhiều địa chỉ, Member only
     public class CreateOrderB2BDto
     {
         [Required]
-        public string UserId { get; set; } = string.Empty; // B2B BẮT BUỘC login
-        
-        [Required]
-        [EmailAddress]
+        public string UserId { get; set; } = string.Empty;
+
+        [Required] [EmailAddress]
         public string CustomerEmail { get; set; } = string.Empty;
-        
-        [Required]
-        public string CustomerName { get; set; } = string.Empty;
-        
-        [Required]
-        [Phone]
-        public string CustomerPhone { get; set; } = string.Empty;
-        
-        [Required]
-        [MinLength(1)]
-        public List<OrderItemDto> Items { get; set; } = new();
 
         [Required]
-        [MinLength(2)] // B2B phải có ít nhất 2 địa chỉ
+        public string CustomerName { get; set; } = string.Empty;
+
+        [Required] [Phone]
+        public string CustomerPhone { get; set; } = string.Empty;
+
+        [Required] [MinLength(1)]
+        public List<OrderItemDto> Items { get; set; } = new();
+
+        /// Ngày giao hàng mặc định
+        [Required]
+        public DateTime DeliveryDate { get; set; }
+
+        /// Phân bổ giao hàng theo địa chỉ — tối thiểu 1 địa chỉ
+        [Required] [MinLength(1)]
         public List<B2BDeliveryAllocationDto> DeliveryAllocations { get; set; } = new();
 
         public string? GreetingMessage { get; set; }
         public string? GreetingCardUrl { get; set; }
-
-        [Required]
-        public DateTime DeliveryDate { get; set; }
     }
 
-    /// B2B Delivery Allocation - Phân bổ TỪNG SẢN PHẨM cho TỪNG ĐỊA CHỈ
+    /// Phân bổ giao hàng cho 1 địa chỉ trong B2B
+    /// Mỗi địa chỉ có ngày giao riêng và danh sách sản phẩm riêng
     public class B2BDeliveryAllocationDto
     {
         [Required]
-        public string AddressId { get; set; } = string.Empty; // FK to Address
-        
-        [Required]
-        [MinLength(1)]
+        public string AddressId { get; set; } = string.Empty;
+
+
+        public DateTime? DeliveryDate { get; set; }
+
+        [Required] [MinLength(1)]
         public List<OrderItemAllocationDto> ItemAllocations { get; set; } = new();
-        
+
         public string? GreetingMessage { get; set; }
         public bool HideInvoice { get; set; }
     }
 
-    /// Phân bổ số lượng cho từng OrderItem
+    /// Phân bổ số lượng sản phẩm cho 1 địa chỉ
+    /// Dùng ItemId (GiftBoxId hoặc CustomBoxId) thay vì index để tránh map nhầm
     public class OrderItemAllocationDto
     {
+        /// GiftBoxId nếu READY_MADE, CustomBoxId nếu MIX_MATCH — phải khớp với Items trong CreateOrderB2BDto
         [Required]
-        public int OrderItemIndex { get; set; } // Index trong CreateOrderB2BDto.Items
-        
-        [Required]
-        [Range(1, int.MaxValue)]
-        public int Quantity { get; set; }
-    }
+        public string ItemId { get; set; } = string.Empty;
 
-    /// ⚠️ DEPRECATED - Sử dụng B2BDeliveryAllocationDto thay thế
-    [Obsolete("Use B2BDeliveryAllocationDto with item allocations instead")]
-    public class B2BDeliveryAddressDto
-    {
         [Required]
-        public string AddressId { get; set; } = string.Empty;
-        
-        [Required]
-        [Range(1, int.MaxValue)]
+        public OrderItemType ItemType { get; set; }
+
+        [Required] [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
-        
-        public string? GreetingMessage { get; set; }
-        public bool HideInvoice { get; set; }
     }
 
     public class OrderTrackingDto
     {
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
 
         [Required]
@@ -664,11 +598,12 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public OrderStatus Status { get; set; }
-        
+
         public string? Note { get; set; }
     }
 
-    /// Mix & Match Validation Result
+    // ========== MIX & MATCH VALIDATION RESULT ==========
+    /// Kết quả validate Mix & Match (đã bỏ rule Chivas)
     public class MixMatchValidationResult
     {
         public bool IsValid { get; set; }
@@ -677,20 +612,16 @@ namespace ShopHangTet.DTOs
         public int DrinkCount { get; set; }
         public int FoodCount { get; set; }
         public int NutCount { get; set; }
-        public int SnackCount { get; set; }
-        public int SavoryCount { get; set; }
+        public int SnackCount { get; set; }   // NUT + FOOD
+        public int SavoryCount { get; set; }  // SAVORY category
         public int AlcoholCount { get; set; }
-        public bool HasChivas12 { get; set; }
-        public bool HasChivas21 { get; set; }
-        
+
         public bool MeetsRules =>
             TotalItemCount >= 4
             && TotalItemCount <= 6
             && (DrinkCount + AlcoholCount) >= 1
             && SnackCount >= 2
-            && SavoryCount <= 2
-            && (!HasChivas21 || TotalItemCount <= 4)
-            && (!HasChivas12 || TotalItemCount <= 5);
+            && SavoryCount <= 2;
     }
 
     // ========== ORDER RESPONSE DTOs ==========
@@ -702,8 +633,9 @@ namespace ShopHangTet.DTOs
         public string Email { get; set; } = string.Empty;
         public OrderType OrderType { get; set; }
         public OrderStatus Status { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
-        public DateTime DeliveryDate { get; set; }
+        public DateTime? DeliveryDate { get; set; }
         public string? GreetingMessage { get; set; }
         public string? GreetingCardUrl { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -720,6 +652,15 @@ namespace ShopHangTet.DTOs
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
+        public List<OrderItemSnapshotResponseDto> SnapshotItems { get; set; } = new();
+    }
+
+    public class OrderItemSnapshotResponseDto
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
     }
 
     public class CreateOrderResponseDto
@@ -728,6 +669,7 @@ namespace ShopHangTet.DTOs
         public string OrderCode { get; set; } = string.Empty;
         public OrderType OrderType { get; set; }
         public OrderStatus Status { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
         public decimal SubTotal { get; set; }
         public decimal ShippingFee { get; set; }
         public decimal TotalAmount { get; set; }
@@ -742,6 +684,7 @@ namespace ShopHangTet.DTOs
         public string ReceiverPhone { get; set; } = string.Empty;
         public string FullAddress { get; set; } = string.Empty;
         public int Quantity { get; set; }
+        public DateTime? DeliveryDate { get; set; }
         public string? GreetingMessage { get; set; }
         public bool HideInvoice { get; set; }
     }
@@ -753,6 +696,7 @@ namespace ShopHangTet.DTOs
         public string Status { get; set; } = string.Empty;
         public int RetryCount { get; set; }
         public int MaxRetries { get; set; }
+        public DateTime? DeliveryDate { get; set; }
         public DateTime? LastAttemptAt { get; set; }
         public string? FailureReason { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -775,6 +719,32 @@ namespace ShopHangTet.DTOs
         public DateTime ChangedAt { get; set; }
         public string? Note { get; set; }
         public string? ChangedBy { get; set; }
+    }
+
+    // ========== STAFF ORDER LIST DTOs ==========
+    public class StaffOrderListItemDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string OrderCode { get; set; } = string.Empty;
+        public OrderType OrderType { get; set; }
+        public OrderStatus Status { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
+        public string CustomerName { get; set; } = string.Empty;
+        public string CustomerEmail { get; set; } = string.Empty;
+        public string CustomerPhone { get; set; } = string.Empty;
+        public decimal TotalAmount { get; set; }
+        public int TotalItems { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? DeliveryDate { get; set; }
+    }
+
+    public class StaffOrderListResponseDto
+    {
+        public List<StaffOrderListItemDto> Items { get; set; } = new();
+        public int Page { get; set; }
+        public int PageSize { get; set; }
+        public int TotalItems { get; set; }
+        public int TotalPages { get; set; }
     }
 
     // ========== CART DTOs ==========
@@ -812,23 +782,20 @@ namespace ShopHangTet.DTOs
         public string? GiftBoxId { get; set; }
         [Obsolete("Use Id instead")]
         public string? CustomBoxId { get; set; }
-        
-        [Required]
-        [Range(1, int.MaxValue)]
+
+        [Required] [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
     }
 
     public class AddToCartBatchDto
     {
-        [Required]
-        [MinLength(1)]
+        [Required] [MinLength(1)]
         public List<AddToCartDto> Items { get; set; } = new();
     }
 
     public class UpdateCartItemDto
     {
-        [Required]
-        [Range(1, int.MaxValue)]
+        [Required] [Range(1, int.MaxValue)]
         public int Quantity { get; set; }
     }
 
@@ -841,7 +808,7 @@ namespace ShopHangTet.DTOs
         public string UserId { get; set; } = string.Empty;
         public int Rating { get; set; }
         public string Comment { get; set; } = string.Empty;
-        public string Status { get; set; } = string.Empty; // PENDING, APPROVED, HIDDEN
+        public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
     }
 
@@ -850,15 +817,11 @@ namespace ShopHangTet.DTOs
     {
         public decimal TotalRevenue { get; set; }
         public double RevenueGrowthPercent { get; set; }
-
         public int TotalOrders { get; set; }
         public double OrderGrowthPercent { get; set; }
-
         public int OrdersToday { get; set; }
-
         public double B2cPercent { get; set; }
         public double B2bPercent { get; set; }
-
         public DateTime LastUpdated { get; set; }
     }
 
@@ -877,10 +840,8 @@ namespace ShopHangTet.DTOs
     {
         public int B2cOrders { get; set; }
         public int B2bOrders { get; set; }
-
         public decimal B2cRevenue { get; set; }
         public decimal B2bRevenue { get; set; }
-
         public double B2cPercent { get; set; }
         public double B2bPercent { get; set; }
     }
@@ -916,32 +877,17 @@ namespace ShopHangTet.DTOs
 
     public class CreateReviewDto
     {
-        [Required]
-        public string OrderId { get; set; } = string.Empty;
-
-        [Required]
-        public string GiftBoxId { get; set; } = string.Empty;
-
-        [Required]
-        [Range(1, 5)]
-        public int Rating { get; set; }
-
+        [Required] public string OrderId { get; set; } = string.Empty;
+        [Required] public string GiftBoxId { get; set; } = string.Empty;
+        [Required] [Range(1, 5)] public int Rating { get; set; }
         public string Comment { get; set; } = string.Empty;
     }
 
-    // Customer-facing DTOs for Reviews
     public class CreateReviewDTO
     {
-        [Required]
-        public string OrderId { get; set; } = string.Empty;
-
-        [Required]
-        public string GiftBoxId { get; set; } = string.Empty;
-
-        [Required]
-        [Range(1, 5)]
-        public int Rating { get; set; }
-
+        [Required] public string OrderId { get; set; } = string.Empty;
+        [Required] public string GiftBoxId { get; set; } = string.Empty;
+        [Required] [Range(1, 5)] public int Rating { get; set; }
         public string Content { get; set; } = string.Empty;
     }
 
@@ -976,28 +922,21 @@ namespace ShopHangTet.DTOs
     public class UpdateReviewStatusDto
     {
         [Required]
-        public string Status { get; set; } = string.Empty; // APPROVED, HIDDEN
+        public string Status { get; set; } = string.Empty; // APPROVED | HIDDEN
     }
 
-    // ========== ADMIN REVIEW MODERATION DTOs ==========
     public class ReviewListItemDTO
     {
         public string Id { get; set; } = string.Empty;
-
         public string ReviewerName { get; set; } = string.Empty;
         public string ReviewerEmail { get; set; } = string.Empty;
         public string? ReviewerAvatar { get; set; }
-
         public string GiftBoxId { get; set; } = string.Empty;
         public string GiftBoxName { get; set; } = string.Empty;
         public string? GiftBoxImage { get; set; }
-
         public int Rating { get; set; }
-
         public string Content { get; set; } = string.Empty;
-
         public DateTime CreatedAt { get; set; }
-
         public string Status { get; set; } = string.Empty;
         public string StatusLabel { get; set; } = string.Empty;
     }
@@ -1005,23 +944,16 @@ namespace ShopHangTet.DTOs
     public class ReviewDetailDTO
     {
         public string Id { get; set; } = string.Empty;
-
         public string ReviewerName { get; set; } = string.Empty;
         public string ReviewerEmail { get; set; } = string.Empty;
         public string? ReviewerAvatar { get; set; }
-
         public string? OrderCode { get; set; }
-
         public string GiftBoxId { get; set; } = string.Empty;
         public string GiftBoxName { get; set; } = string.Empty;
         public string? GiftBoxImage { get; set; }
-
         public int Rating { get; set; }
-
         public string Content { get; set; } = string.Empty;
-
         public DateTime CreatedAt { get; set; }
-
         public string Status { get; set; } = string.Empty;
     }
 
@@ -1040,7 +972,7 @@ namespace ShopHangTet.DTOs
         public string Id { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
         public string? OrderCode { get; set; }
-        public string Status { get; set; } = string.Empty; // OPEN, CLOSED
+        public string Status { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public List<ChatMessageDto> Messages { get; set; } = new();
     }
@@ -1048,17 +980,16 @@ namespace ShopHangTet.DTOs
     public class ChatMessageDto
     {
         public string Id { get; set; } = string.Empty;
-        public string Sender { get; set; } = string.Empty; // BOT, STAFF, GUEST
+        public string Sender { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
     }
 
     public class StartChatDto
     {
-        [Required]
-        [EmailAddress]
+        [Required] [EmailAddress]
         public string Email { get; set; } = string.Empty;
-        
+
         public string? OrderCode { get; set; }
     }
 
@@ -1068,7 +999,6 @@ namespace ShopHangTet.DTOs
         public string Message { get; set; } = string.Empty;
     }
 
-    // ========== HELPER DTOs ==========
     public class PriceBreakdownDto
     {
         public decimal SubTotal { get; set; }
@@ -1080,67 +1010,43 @@ namespace ShopHangTet.DTOs
     // ========== SEPAY WEBHOOK DTOs ==========
     public class SePayWebhookDto
     {
-        [JsonPropertyName("id")]
-        public int Id { get; set; }
-
-        [JsonPropertyName("gateway")]
-        public string Gateway { get; set; } = string.Empty;
-
-        [JsonPropertyName("transactionDate")]
-        public string TransactionDate { get; set; } = string.Empty;
-
-        [JsonPropertyName("accountNumber")]
-        public string AccountNumber { get; set; } = string.Empty;
-
-        [JsonPropertyName("code")]
-        public string? Code { get; set; }
+        [JsonPropertyName("id")] public int Id { get; set; }
+        [JsonPropertyName("gateway")] public string Gateway { get; set; } = string.Empty;
+        [JsonPropertyName("transactionDate")] public string TransactionDate { get; set; } = string.Empty;
+        [JsonPropertyName("accountNumber")] public string AccountNumber { get; set; } = string.Empty;
+        [JsonPropertyName("code")] public string? Code { get; set; }
 
         /// Nội dung chuyển khoản — chứa mã đơn hàng (VD: "SHT2602261234")
-        [JsonPropertyName("content")]
-        public string? Content { get; set; }
+        [JsonPropertyName("content")] public string? Content { get; set; }
 
-        /// Số tiền khách chuyển (VND)
-        [JsonPropertyName("transferAmount")]
-        public decimal TransferAmount { get; set; }
-
-        [JsonPropertyName("accumulated")]
-        public decimal Accumulated { get; set; }
-
-        [JsonPropertyName("subAccount")]
-        public string? SubAccount { get; set; }
-
-        [JsonPropertyName("referenceCode")]
-        public string? ReferenceCode { get; set; }
+        [JsonPropertyName("transferAmount")] public decimal TransferAmount { get; set; }
+        [JsonPropertyName("accumulated")] public decimal Accumulated { get; set; }
+        [JsonPropertyName("subAccount")] public string? SubAccount { get; set; }
+        [JsonPropertyName("referenceCode")] public string? ReferenceCode { get; set; }
 
         /// "in" = tiền vào, "out" = tiền ra
-        [JsonPropertyName("transferType")]
-        public string TransferType { get; set; } = string.Empty;
+        [JsonPropertyName("transferType")] public string TransferType { get; set; } = string.Empty;
 
-        [JsonPropertyName("description")]
-        public string? Description { get; set; }
+        [JsonPropertyName("description")] public string? Description { get; set; }
     }
 
-    /// Response DTO cho kiểm tra trạng thái thanh toán
     public class PaymentStatusResponseDto
     {
         public string OrderCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string StatusLabel { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
         public bool IsPaid { get; set; }
+        public int SecondsRemaining { get; set; }  // Số giây còn lại trong cửa sổ 10 phút
     }
 
     // ========== GIFTBOX ADMIN DTOs ==========
-    /// Tạo GiftBox mới — Price sẽ được tính tự động từ collection rule
     public class CreateGiftBoxDto
     {
         [Required]
         public string Name { get; set; } = string.Empty;
-
         public string Description { get; set; } = string.Empty;
-
-        /// Nếu null/0, hệ thống sẽ tự tính giá từ collection pricing rule
         public decimal? PriceOverride { get; set; }
-
         public List<string> Images { get; set; } = new();
 
         [Required]
@@ -1148,20 +1054,15 @@ namespace ShopHangTet.DTOs
 
         public List<string> Tags { get; set; } = new();
 
-        [Required]
-        [MinLength(1)]
+        [Required] [MinLength(1)]
         public List<GiftBoxItemDto> Items { get; set; } = new();
     }
 
-    /// Cập nhật GiftBox — Price sẽ được tính lại nếu items thay đổi
     public class UpdateGiftBoxDto
     {
         public string? Name { get; set; }
         public string? Description { get; set; }
-
-        /// Nếu null, hệ thống sẽ tự tính lại giá từ collection pricing rule
         public decimal? PriceOverride { get; set; }
-
         public List<string>? Images { get; set; }
         public string? CollectionId { get; set; }
         public List<string>? Tags { get; set; }
@@ -1169,18 +1070,15 @@ namespace ShopHangTet.DTOs
         public bool? IsActive { get; set; }
     }
 
-    /// DTO riêng cho việc tính giá preview (không cần các trường văn trang trí)
     public class CalculateGiftBoxPriceDto
     {
         [Required]
         public string CollectionId { get; set; } = string.Empty;
 
-        [Required]
-        [MinLength(1)]
+        [Required] [MinLength(1)]
         public List<GiftBoxItemDto> Items { get; set; } = new();
     }
 
-    // ========== DELIVERY MANAGEMENT DTOs ==========
     public class UpdateDeliveryStatusDto
     {
         [Required]
@@ -1189,7 +1087,6 @@ namespace ShopHangTet.DTOs
         public string? FailureReason { get; set; }
     }
 
-    // ========== PAGINATION HELPERS ==========
     public class PagedResult<T>
     {
         public List<T> Data { get; set; } = new List<T>();
@@ -1199,7 +1096,6 @@ namespace ShopHangTet.DTOs
         public int TotalPages { get; set; }
     }
 
-    // ========== GIFTBOX ADMIN DTOs ==========
     public class GiftBoxListResponseDTO
     {
         public string Id { get; set; } = string.Empty;
@@ -1209,7 +1105,7 @@ namespace ShopHangTet.DTOs
         public string CollectionName { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;
         public bool Status { get; set; }
-        public string StatusLabel { get; set; } = string.Empty; // "ĐANG BÁN" | "TẠM ẨN"
+        public string StatusLabel { get; set; } = string.Empty;
         public string? Thumbnail { get; set; }
         public List<string> TagNames { get; set; } = new();
         public int ItemCount { get; set; }
@@ -1250,20 +1146,16 @@ namespace ShopHangTet.DTOs
     {
         [Required]
         public string Name { get; set; } = string.Empty;
-
         public string Description { get; set; } = string.Empty;
-
         public decimal Price { get; set; }
 
         [Required]
         public string CollectionId { get; set; } = string.Empty;
 
         public List<string> Images { get; set; } = new();
-
         public List<string> TagIds { get; set; } = new();
 
-        [Required]
-        [MinLength(1)]
+        [Required] [MinLength(1)]
         public List<CustomBoxItemDto> Items { get; set; } = new();
 
         public bool IsActive { get; set; } = true;
@@ -1271,22 +1163,15 @@ namespace ShopHangTet.DTOs
 
     public class GiftBoxUpdateDTO
     {
-        [Required]
-        public string Name { get; set; } = string.Empty;
-
+        [Required] public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
-
         public decimal Price { get; set; }
 
-        [Required]
-        public string CollectionId { get; set; } = string.Empty;
+        [Required] public string CollectionId { get; set; } = string.Empty;
 
         public List<string>? Images { get; set; }
-
         public List<string>? TagIds { get; set; }
-
         public List<CustomBoxItemDto>? Items { get; set; }
-
         public bool IsActive { get; set; }
     }
 
@@ -1295,7 +1180,6 @@ namespace ShopHangTet.DTOs
         public bool IsActive { get; set; }
     }
 
-    // Simple DTOs for dropdowns
     public class SimpleCollectionDTO
     {
         public string Id { get; set; } = string.Empty;
@@ -1328,7 +1212,7 @@ namespace ShopHangTet.DTOs
         public string CategoryLabel { get; set; } = string.Empty;
         public decimal Price { get; set; }
         public int StockQuantity { get; set; }
-        public string StockStatus { get; set; } = string.Empty; // IN_STOCK | LOW_STOCK | OUT_OF_STOCK
+        public string StockStatus { get; set; } = string.Empty;
         public string StockStatusLabel { get; set; } = string.Empty;
         public bool IsAlcohol { get; set; }
         public DateTime? LastUpdated { get; set; }
@@ -1390,16 +1274,9 @@ namespace ShopHangTet.DTOs
 
     public class InventoryAdjustRequestDTO
     {
-        [Required]
-        public string ItemId { get; set; } = string.Empty;
-
-        [Required]
-        public string AdjustType { get; set; } = string.Empty; // INCREASE | DECREASE
-
-        [Required]
-        [Range(1, int.MaxValue)]
-        public int Quantity { get; set; }
-
+        [Required] public string ItemId { get; set; } = string.Empty;
+        [Required] public string AdjustType { get; set; } = string.Empty; // INCREASE | DECREASE
+        [Required] [Range(1, int.MaxValue)] public int Quantity { get; set; }
         public string? Reason { get; set; }
     }
 
@@ -1416,13 +1293,10 @@ namespace ShopHangTet.DTOs
     {
         public decimal TotalRevenue { get; set; }
         public double RevenueGrowthPercent { get; set; }
-
         public int TotalOrders { get; set; }
         public double OrderGrowthPercent { get; set; }
-
         public double B2CPercent { get; set; }
         public double B2BPercent { get; set; }
-
         public ReportStatusSummaryDTO StatusSummary { get; set; } = new();
     }
 
@@ -1438,7 +1312,7 @@ namespace ShopHangTet.DTOs
 
     public class RevenueReportChartItemDTO
     {
-        public string Date { get; set; } = string.Empty; // YYYY-MM-DD or YYYY-MM
+        public string Date { get; set; } = string.Empty;
         public decimal Revenue { get; set; }
         public decimal LastYearRevenue { get; set; }
     }
@@ -1481,17 +1355,15 @@ namespace ShopHangTet.DTOs
         public decimal B2CRevenue { get; set; }
         public int B2COrders { get; set; }
         public decimal B2CAvgOrderValue { get; set; }
-
         public decimal B2BRevenue { get; set; }
         public int B2BOrders { get; set; }
         public int TotalGiftBoxes { get; set; }
-
         public List<B2cB2bMonthlyDTO> MonthlyOrdersChart { get; set; } = new();
     }
 
     public class B2cB2bMonthlyDTO
     {
-        public string Month { get; set; } = string.Empty; // YYYY-MM
+        public string Month { get; set; } = string.Empty;
         public int B2COrders { get; set; }
         public int B2BOrders { get; set; }
     }

@@ -1,228 +1,7 @@
 import { useState, useEffect } from "react";
-import { toast } from "react-toastify";
-import { adminService, type GiftBoxListItem, type GiftBoxDetail, type SimpleCollectionDto, type SimpleItemDto, type SimpleTagDto, type GiftBoxCreateDto, type GiftBoxUpdateDto } from "../../services/adminService";
+import { adminService, type GiftBoxListItem, type SimpleCollectionDto } from "../../services/adminService";
 
 function formatPrice(v: number) { return v.toLocaleString("vi-VN") + "₫"; }
-
-/* ═══════════════════ GIFT BOX FORM MODAL ═══════════════════ */
-
-interface GiftBoxFormProps {
-    editData?: GiftBoxDetail | null;
-    collections: SimpleCollectionDto[];
-    allItems: SimpleItemDto[];
-    allTags: SimpleTagDto[];
-    onClose: () => void;
-    onSaved: () => void;
-}
-
-interface FormItem { ItemId: string; ItemName: string; Quantity: number; ItemPrice: number; }
-
-function GiftBoxFormModal({ editData, collections, allItems, allTags, onClose, onSaved }: GiftBoxFormProps) {
-    const isEdit = !!editData;
-
-    const [name, setName] = useState(editData?.Name ?? "");
-    const [description, setDescription] = useState(editData?.Description ?? "");
-    const [priceOverride, setPriceOverride] = useState<string>(editData?.Price?.toString() ?? "");
-    const [collectionId, setCollectionId] = useState(editData?.CollectionId ?? (collections[0]?.Id ?? ""));
-    const [selectedTags, setSelectedTags] = useState<string[]>(editData?.Tags?.map(t => t.Id) ?? []);
-    const [items, setItems] = useState<FormItem[]>(
-        editData?.Items?.map(i => ({ ItemId: i.ItemId, ItemName: i.ItemName, Quantity: i.Quantity, ItemPrice: i.Price })) ?? []
-    );
-    const [imageUrls, setImageUrls] = useState<string>(editData?.Images?.join("\n") ?? "");
-    const [isActive, setIsActive] = useState<boolean>(editData?.IsActive ?? true);
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState("");
-
-    const toggleTag = (id: string) => {
-        setSelectedTags(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
-    };
-
-    const addItem = (item: SimpleItemDto) => {
-        if (items.find(i => i.ItemId === item.Id)) return;
-        setItems(prev => [...prev, { ItemId: item.Id, ItemName: item.Name, Quantity: 1, ItemPrice: item.Price }]);
-    };
-
-    const removeItem = (itemId: string) => {
-        setItems(prev => prev.filter(i => i.ItemId !== itemId));
-    };
-
-    const updateItemQty = (itemId: string, qty: number) => {
-        setItems(prev => prev.map(i => i.ItemId === itemId ? { ...i, Quantity: Math.max(1, qty) } : i));
-    };
-
-    const handleSubmit = async () => {
-        if (!name.trim()) { setError("Vui lòng nhập tên giỏ quà"); return; }
-        if (!collectionId) { setError("Vui lòng chọn bộ sưu tập"); return; }
-
-        setSaving(true);
-        setError("");
-
-        const images = imageUrls.split("\n").map(s => s.trim()).filter(Boolean);
-        const calcPrice = items.reduce((sum, item) => sum + item.ItemPrice * item.Quantity, 0);
-        const finalPrice = priceOverride ? Number(priceOverride) : calcPrice;
-
-        try {
-            if (isEdit) {
-                const dto: GiftBoxUpdateDto = {
-                    Name: name.trim(),
-                    Description: description.trim(),
-                    Price: finalPrice,
-                    CollectionId: collectionId,
-                    TagIds: selectedTags,
-                    Items: items.map(i => ({ ItemId: i.ItemId, ItemName: i.ItemName, Quantity: i.Quantity, ItemPrice: i.ItemPrice })),
-                    Images: images,
-                    IsActive: isActive,
-                };
-                await adminService.updateGiftBox(editData!.Id, dto);
-            } else {
-                const dto: GiftBoxCreateDto = {
-                    Name: name.trim(),
-                    Description: description.trim(),
-                    Price: finalPrice,
-                    CollectionId: collectionId,
-                    TagIds: selectedTags,
-                    Items: items.map(i => ({ ItemId: i.ItemId, ItemName: i.ItemName, Quantity: i.Quantity, ItemPrice: i.ItemPrice })),
-                    Images: images,
-                    IsActive: isActive,
-                };
-                await adminService.createGiftBox(dto);
-            }
-            onSaved();
-        } catch (err: any) {
-            setError(err?.message || err?.response?.data?.Message || "Đã xảy ra lỗi.");
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto mx-4" onClick={e => e.stopPropagation()}>
-                {/* Header */}
-                <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
-                    <h2 className="text-lg font-bold text-gray-900">{isEdit ? "Chỉnh sửa giỏ quà" : "Thêm giỏ quà mới"}</h2>
-                    <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 cursor-pointer">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    </button>
-                </div>
-
-                <div className="px-6 py-5 space-y-5">
-                    {/* Name & Collection */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Tên giỏ quà *</label>
-                            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="VD: Hộp quà Tết An Khang" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A]" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Bộ sưu tập *</label>
-                            <select value={collectionId} onChange={e => setCollectionId(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer">
-                                <option value="">— Chọn bộ sưu tập —</option>
-                                {collections.map(c => <option key={c.Id} value={c.Id}>{c.Name}</option>)}
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Mô tả</label>
-                        <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Mô tả giỏ quà..." className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A] resize-none" />
-                    </div>
-
-                    {/* Price Override */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Giá tùy chỉnh (để trống = tính tự động)</label>
-                        <input type="number" value={priceOverride} onChange={e => setPriceOverride(e.target.value)} placeholder="VD: 500000" className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A]" />
-                    </div>
-
-                    {/* Tags */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-2">Tags</label>
-                        <div className="flex flex-wrap gap-2">
-                            {allTags.map(tag => (
-                                <button key={tag.Id} type="button" onClick={() => toggleTag(tag.Id)}
-                                    className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors border ${selectedTags.includes(tag.Id) ? "bg-[#8B1A1A] text-white border-[#8B1A1A]" : "bg-white text-gray-600 border-gray-200 hover:border-[#8B1A1A] hover:text-[#8B1A1A]"}`}>
-                                    {tag.Name}
-                                </button>
-                            ))}
-                            {allTags.length === 0 && <span className="text-xs text-gray-400">Không có tags nào</span>}
-                        </div>
-                    </div>
-
-                    {/* Items */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-2">Sản phẩm trong giỏ</label>
-
-                        {/* Add item dropdown */}
-                        <select onChange={e => { const item = allItems.find(i => i.Id === e.target.value); if (item) addItem(item); e.target.value = ""; }} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer mb-3 text-gray-400" defaultValue="">
-                            <option value="" disabled>+ Thêm sản phẩm...</option>
-                            {allItems.filter(ai => !items.find(i => i.ItemId === ai.Id)).map(ai => (
-                                <option key={ai.Id} value={ai.Id}>{ai.Name} — {formatPrice(ai.Price)}</option>
-                            ))}
-                        </select>
-
-                        {/* Selected items list */}
-                        {items.length > 0 && (
-                            <div className="border rounded-lg overflow-hidden">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 text-xs text-gray-400">
-                                        <tr>
-                                            <th className="text-left px-3 py-2 font-medium">Sản phẩm</th>
-                                            <th className="text-right px-3 py-2 font-medium">Đơn giá</th>
-                                            <th className="text-center px-3 py-2 font-medium w-24">SL</th>
-                                            <th className="text-right px-3 py-2 font-medium w-14"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {items.map(item => (
-                                            <tr key={item.ItemId} className="border-t">
-                                                <td className="px-3 py-2 text-gray-900">{item.ItemName}</td>
-                                                <td className="px-3 py-2 text-right text-gray-500">{formatPrice(item.ItemPrice)}</td>
-                                                <td className="px-3 py-2 text-center">
-                                                    <input type="number" min={1} value={item.Quantity} onChange={e => updateItemQty(item.ItemId, parseInt(e.target.value) || 1)} className="w-16 px-2 py-1 border rounded text-sm text-center" />
-                                                </td>
-                                                <td className="px-3 py-2 text-right">
-                                                    <button onClick={() => removeItem(item.ItemId)} className="text-red-400 hover:text-red-600 cursor-pointer">
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-                        {items.length === 0 && <p className="text-xs text-gray-400 italic">Chưa có sản phẩm nào được thêm.</p>}
-                    </div>
-
-                    {/* Images */}
-                    <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">URL ảnh (mỗi dòng 1 URL)</label>
-                        <textarea value={imageUrls} onChange={e => setImageUrls(e.target.value)} rows={3} placeholder={"https://example.com/image1.jpg\nhttps://example.com/image2.jpg"} className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A] resize-none font-mono text-xs" />
-                    </div>
-
-                    {/* Status Toggle */}
-                    <div className="flex items-center gap-2">
-                        <input type="checkbox" checked={isActive} onChange={e => setIsActive(e.target.checked)} id="is-active" className="cursor-pointer" />
-                        <label htmlFor="is-active" className="text-sm text-gray-600 cursor-pointer">Hiển thị (Đang bán)</label>
-                    </div>
-
-                    {/* Error */}
-                    {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
-                </div>
-
-                {/* Footer */}
-                <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex items-center justify-end gap-3 rounded-b-2xl">
-                    <button onClick={onClose} className="px-5 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 cursor-pointer">Hủy</button>
-                    <button onClick={handleSubmit} disabled={saving} className="px-5 py-2 bg-[#8B1A1A] text-white rounded-lg text-sm font-bold hover:bg-[#701515] disabled:opacity-50 cursor-pointer">
-                        {saving ? "Đang lưu..." : (isEdit ? "Cập nhật" : "Tạo mới")}
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/* ═══════════════════ MAIN PAGE ═══════════════════ */
 
 export default function AdminGiftBoxesPage() {
     const [items, setItems] = useState<GiftBoxListItem[]>([]);
@@ -233,13 +12,6 @@ export default function AdminGiftBoxesPage() {
     const [statusFilter, setStatusFilter] = useState<string>("");
     const [collections, setCollections] = useState<SimpleCollectionDto[]>([]);
     const [loading, setLoading] = useState(true);
-
-    // Modal
-    const [showModal, setShowModal] = useState(false);
-    const [editDetail, setEditDetail] = useState<GiftBoxDetail | null>(null);
-    const [allItems, setAllItems] = useState<SimpleItemDto[]>([]);
-    const [allTags, setAllTags] = useState<SimpleTagDto[]>([]);
-    const [loadingModal, setLoadingModal] = useState(false);
 
     const pageSize = 20;
 
@@ -258,18 +30,7 @@ export default function AdminGiftBoxesPage() {
         finally { setLoading(false); }
     };
 
-    const loadFormOptions = async () => {
-        const [cols, its, tgs] = await Promise.all([
-            adminService.getGiftBoxCollections(),
-            adminService.getGiftBoxItems(),
-            adminService.getGiftBoxTags(),
-        ]);
-        setCollections(cols);
-        setAllItems(its);
-        setAllTags(tgs);
-    };
-
-    useEffect(() => { loadFormOptions(); }, []);
+    useEffect(() => { adminService.getGiftBoxCollections().then(setCollections).catch(() => {}); }, []);
     useEffect(() => { fetchData(); }, [page, keyword, collectionFilter, statusFilter]);
 
     const handleToggle = async (item: GiftBoxListItem) => {
@@ -278,34 +39,7 @@ export default function AdminGiftBoxesPage() {
 
     const handleDelete = async (item: GiftBoxListItem) => {
         if (!confirm(`Xóa giỏ quà "${item.Name}"?`)) return;
-        try { 
-            await adminService.deleteGiftBox(item.Id); 
-            toast.success("Đã xóa giỏ quà");
-            fetchData(); 
-        } catch (err: any) { 
-            toast.error(err?.response?.data?.Message || "Không thể xóa giỏ quà này");
-        }
-    };
-
-    const openCreate = () => {
-        setEditDetail(null);
-        setShowModal(true);
-    };
-
-    const openEdit = async (id: string) => {
-        setLoadingModal(true);
-        try {
-            const detail = await adminService.getGiftBoxById(id);
-            setEditDetail(detail);
-            setShowModal(true);
-        } catch { /* ignore */ }
-        finally { setLoadingModal(false); }
-    };
-
-    const handleSaved = () => {
-        setShowModal(false);
-        setEditDetail(null);
-        fetchData();
+        try { await adminService.deleteGiftBox(item.Id); fetchData(); } catch { /* ignore */ }
     };
 
     const totalPages = Math.ceil(total / pageSize);
@@ -317,10 +51,6 @@ export default function AdminGiftBoxesPage() {
                     <h1 className="text-2xl font-bold text-gray-900">Giỏ quà</h1>
                     <p className="text-sm text-gray-500">Quản lý danh sách giỏ quà Tết</p>
                 </div>
-                <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-[#8B1A1A] text-white text-sm font-semibold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Thêm giỏ quà
-                </button>
             </div>
 
             {/* Filters */}
@@ -387,14 +117,9 @@ export default function AdminGiftBoxesPage() {
                                     </button>
                                 </td>
                                 <td className="px-4 py-3 text-right">
-                                    <div className="flex items-center justify-end gap-1">
-                                        <button onClick={() => openEdit(item.Id)} className="p-1 text-gray-400 hover:text-[#8B1A1A] cursor-pointer" title="Chỉnh sửa">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
-                                        </button>
-                                        <button onClick={() => handleDelete(item)} className="p-1 text-gray-400 hover:text-red-600 cursor-pointer" title="Xóa">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
-                                        </button>
-                                    </div>
+                                    <button onClick={() => handleDelete(item)} className="p-1 text-gray-400 hover:text-red-600 cursor-pointer">
+                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                                    </button>
                                 </td>
                             </tr>
                         ))}
@@ -411,25 +136,6 @@ export default function AdminGiftBoxesPage() {
                     </div>
                 )}
             </div>
-
-            {/* Loading overlay for edit data */}
-            {loadingModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-                    <div className="bg-white px-6 py-4 rounded-xl shadow-lg text-sm text-gray-600">Đang tải dữ liệu...</div>
-                </div>
-            )}
-
-            {/* Create/Edit Modal */}
-            {showModal && (
-                <GiftBoxFormModal
-                    editData={editDetail}
-                    collections={collections}
-                    allItems={allItems}
-                    allTags={allTags}
-                    onClose={() => { setShowModal(false); setEditDetail(null); }}
-                    onSaved={handleSaved}
-                />
-            )}
         </div>
     );
 }

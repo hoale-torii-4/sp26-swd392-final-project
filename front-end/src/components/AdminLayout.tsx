@@ -4,12 +4,11 @@ import { authService } from "../services/authService";
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 
-function getRoleName(role: number | string): string {
-    if (role === 0 || role === "0" || role === "CUSTOMER") return "Khách hàng";
-    if (role === 1 || role === "1" || role === "STAFF") return "Staff";
-    if (role === 2 || role === "2" || role === "ADMIN") return "Admin";
-    return "User";
-}
+const ROLE_MAP: Record<number, string> = {
+    0: "Khách hàng",
+    1: "Staff",
+    2: "Admin",
+};
 
 function getInitials(name: string): string {
     return name
@@ -123,12 +122,8 @@ export default function AdminLayout() {
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     const user = authService.getUser();
-    const roleName = user ? getRoleName(user.Role) : "";
+    const roleName = user ? (ROLE_MAP[user.Role] ?? "User") : "";
     const userRole = user?.Role ?? 0;
-    
-    // Normalize role string to number if needed for NAV_ITEMS check
-    const normalizedRole = userRole === "ADMIN" || userRole === "2" || userRole === 2 ? 2 
-        : userRole === "STAFF" || userRole === "1" || userRole === 1 ? 1 : 0;
 
     const handleLogout = () => {
         authService.logout();
@@ -143,7 +138,7 @@ export default function AdminLayout() {
 
     // Filter items according to the user's role
     const filteredNavItems = NAV_ITEMS.filter(
-        (item) => !item.roles || item.roles.includes(normalizedRole)
+        (item) => !item.roles || item.roles.includes(userRole)
     );
 
     return (

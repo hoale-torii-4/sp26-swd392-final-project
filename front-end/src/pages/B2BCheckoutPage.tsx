@@ -338,7 +338,7 @@ export default function B2BCheckoutPage() {
                                     to={`/order-success?code=${orderCode}`}
                                     className="w-full py-3 bg-[#8B1A1A] hover:bg-[#701515] text-white text-sm font-bold rounded-xl transition-colors cursor-pointer text-center"
                                 >
-                                    Đã thanh toán xong
+                                    Đã thanh toán xong →
                                 </Link>
                                 <Link
                                     to={`/order-success?code=${orderCode}`}

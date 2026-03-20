@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { toast } from "react-toastify";
 import { adminService, type MixMatchItem, type MixMatchRule } from "../../services/adminService";
 
 function formatPrice(v: number) { return v.toLocaleString("vi-VN") + "₫"; }
@@ -36,45 +35,13 @@ export default function AdminMixMatchPage() {
     };
 
     useEffect(() => {
-        adminService.getMixMatchCategories()
-            .then((data: any) => {
-                const mapped = (data || []).map((c: any) => ({
-                    Id: c.Id ?? c.id ?? c.value ?? "",
-                    Name: c.Name ?? c.name ?? c.label ?? "",
-                })).filter((c: any) => c.Id && c.Name);
-                setCategories(mapped);
-            })
-            .catch(() => {});
+        adminService.getMixMatchCategories().then(setCategories).catch(() => {});
         adminService.getMixMatchRules().then(setRules).catch(() => {});
     }, []);
     useEffect(() => { fetchItems(); }, [page, search, categoryFilter]);
 
-    const openCreate = () => {
-        setEditing(null);
-        setForm({
-            Name: "",
-            Price: 0,
-            Category: categories[0]?.Id || "",
-            Image: "",
-            Description: "",
-            IsAlcohol: false,
-            IsActive: true,
-        });
-        setShowModal(true);
-    };
-    const openEdit = (item: MixMatchItem) => {
-        setEditing(item);
-        setForm({
-            Name: item.Name,
-            Price: item.Price,
-            Category: item.Category,
-            Image: item.Image,
-            Description: "",
-            IsAlcohol: item.IsAlcohol,
-            IsActive: item.IsActive,
-        });
-        setShowModal(true);
-    };
+    const openCreate = () => { setEditing(null); setForm({ Name: "", Price: 0, Category: categories[0]?.Id || "", Image: "", Description: "", IsAlcohol: false, IsActive: true }); setShowModal(true); };
+    const openEdit = (item: MixMatchItem) => { setEditing(item); setForm({ Name: item.Name, Price: item.Price, Category: item.Category, Image: item.Image, Description: "", IsAlcohol: item.IsAlcohol, IsActive: item.IsActive }); setShowModal(true); };
 
     const handleSave = async () => {
         setSaving(true);
@@ -92,13 +59,7 @@ export default function AdminMixMatchPage() {
 
     const handleDelete = async (item: MixMatchItem) => {
         if (!confirm(`Xóa "${item.Name}"?`)) return;
-        try { 
-            await adminService.deleteMixMatchItem(item.Id); 
-            toast.success("Đã xóa sản phẩm");
-            fetchItems(); 
-        } catch (err: any) { 
-            toast.error(err?.response?.data?.Message || "Không thể xóa sản phẩm này");
-        }
+        try { await adminService.deleteMixMatchItem(item.Id); fetchItems(); } catch { /* ignore */ }
     };
 
     const handleSaveRules = async () => {

@@ -7,14 +7,13 @@ import {
   TextInput,
   TouchableOpacity,
   Modal,
+  Alert,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import Toast from 'react-native-toast-message';
 import apiClient from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
-import ConfirmModal from '../components/ConfirmModal';
 
 interface Address {
   Id: string;
@@ -48,7 +47,6 @@ export default function AddressesScreen() {
   const [form, setForm] = useState<AddressForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
-  const [addressToDelete, setAddressToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -101,7 +99,6 @@ export default function AddressesScreen() {
       }
       setShowForm(false);
       fetchAddresses();
-      Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã lưu địa chỉ thành công.' });
     } catch {
       setFormError('Có lỗi xảy ra. Vui lòng thử lại.');
     } finally {
@@ -109,30 +106,30 @@ export default function AddressesScreen() {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!addressToDelete) return;
-    try {
-      await apiClient.delete(`/Address/${addressToDelete}`);
-      fetchAddresses();
-      Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã xoá địa chỉ.' });
-    } catch {
-      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Không thể xoá địa chỉ.' });
-    } finally {
-      setAddressToDelete(null);
-    }
-  };
-
   const handleDelete = (id: string) => {
-    setAddressToDelete(id);
+    Alert.alert('Xoá địa chỉ', 'Bạn có chắc muốn xoá địa chỉ này?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xoá',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await apiClient.delete(`/Address/${id}`);
+            fetchAddresses();
+          } catch {
+            Alert.alert('Lỗi', 'Không thể xoá địa chỉ.');
+          }
+        },
+      },
+    ]);
   };
 
   const handleSetDefault = async (id: string) => {
     try {
       await apiClient.patch(`/Address/${id}/set-default`);
       fetchAddresses();
-      Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã cập nhật địa chỉ mặc định.' });
     } catch {
-      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Không thể đặt mặc định.' });
+      Alert.alert('Lỗi', 'Không thể đặt mặc định.');
     }
   };
 
@@ -245,16 +242,6 @@ export default function AddressesScreen() {
       </Modal>
 
       <View style={{ height: 40 }} />
-      <ConfirmModal
-        visible={!!addressToDelete}
-        title="Xác nhận xóa"
-        message="Bạn có chắc chắn muốn xóa địa chỉ này không?"
-        confirmText="Xóa"
-        cancelText="Hủy"
-        onConfirm={confirmDelete}
-        onCancel={() => setAddressToDelete(null)}
-        isDestructive={true}
-      />
     </ScrollView>
   );
 }

@@ -271,10 +271,7 @@ export default function HomeScreen() {
             </View>
           ))}
         </View>
-        <TouchableOpacity 
-          style={styles.ctaButton}
-          onPress={() => router.push('/mix-match' as any)}
-        >
+        <TouchableOpacity style={styles.ctaButton}>
           <Text style={styles.ctaButtonText}>Bắt đầu tạo giỏ quà →</Text>
         </TouchableOpacity>
       </View>

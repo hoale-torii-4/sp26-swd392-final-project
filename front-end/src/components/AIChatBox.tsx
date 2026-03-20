@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useLocation } from "react-router-dom";
 import { chatService, type ChatMessagePayload } from "../services/chatService";
 import { authService } from "../services/authService";
 
@@ -18,7 +17,6 @@ const WELCOME_MSG: Message = {
 };
 
 export default function AIChatBox() {
-    const location = useLocation();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([WELCOME_MSG]);
     const [input, setInput] = useState("");
@@ -167,11 +165,6 @@ export default function AIChatBox() {
 
     // Hover state for extra interactions
     const [isHovered, setIsHovered] = useState(false);
-
-    // Hide chatbox on admin pages
-    if (location.pathname.startsWith("/admin")) {
-        return null;
-    }
 
     return (
         <>

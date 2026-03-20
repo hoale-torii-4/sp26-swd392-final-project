@@ -163,7 +163,7 @@ export default function ForgotPasswordSuccessPage() {
 
             {/* ───── Footer ───── */}
             <p className="relative z-10 mt-8 text-xs text-gray-400">
-                © 2026 LỘC XUÂN — QUÀ TẾT CAO CẤP. ALL RIGHTS RESERVED.
+                © 2024 LỘC XUÂN — QUÀ TẾT CAO CẤP. ALL RIGHTS RESERVED.
             </p>
         </div>
     );

@@ -204,7 +204,7 @@ export default function ForgotPasswordPage() {
 
             {/* ───── Footer ───── */}
             <p className="relative z-10 mt-8 text-xs text-gray-400">
-                © 2026 LỘC XUÂN — BẢN QUYỀN THUỘC VỀ LỘC XUÂN
+                © 2024 LỘC XUÂN — BẢN QUYỀN THUỘC VỀ LỘC XUÂN
             </p>
         </div>
     );

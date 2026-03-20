@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import {
     View, Text, TextInput, TouchableOpacity, StyleSheet,
-    KeyboardAvoidingView, Platform, ScrollView,
+    KeyboardAvoidingView, Platform, ScrollView, Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import Toast from 'react-native-toast-message';
 import { authService } from '../services/authService';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
 
@@ -34,12 +33,9 @@ export default function ResetPasswordScreen() {
                 newPassword,
             });
             if (res.Success) {
-                Toast.show({
-                    type: 'success',
-                    text1: 'Thành công',
-                    text2: 'Mật khẩu đã được đặt lại.'
-                });
-                setTimeout(() => router.replace('/login' as any), 1500);
+                Alert.alert('Thành công', 'Mật khẩu đã được đặt lại. Vui lòng đăng nhập.', [
+                    { text: 'Đăng nhập', onPress: () => router.replace('/login' as any) },
+                ]);
             } else {
                 setError(res.Message || 'Đặt lại mật khẩu thất bại.');
             }

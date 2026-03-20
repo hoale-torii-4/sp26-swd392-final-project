@@ -22,7 +22,7 @@ public class AdminOrdersController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await _orderService.GetAllOrdersAsync(status, orderType, keyword, page, pageSize);
+        var result = await _orderService.GetStaffOrdersAsync(page, pageSize, status, orderType, keyword);
         return Ok(result);
     }
 }

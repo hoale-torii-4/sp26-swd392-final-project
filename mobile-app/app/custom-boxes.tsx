@@ -11,12 +11,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import Toast from 'react-native-toast-message';
 import { AppColors } from '../constants/theme';
 import { mixMatchService, type CustomBoxResponse } from '../services/mixMatchService';
 import { cartService, type AddToCartRequest } from '../services/cartService';
-import ConfirmModal from '../components/ConfirmModal';
 
 const formatPrice = (value: number) => value.toLocaleString('vi-VN') + '\u20AB';
 
@@ -69,28 +66,31 @@ export default function CustomBoxesScreen() {
     setSelectedIds((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const [boxToDelete, setBoxToDelete] = useState<string | null>(null);
-
-  const confirmDelete = async () => {
-    if (!boxToDelete) return;
-    try {
-      await mixMatchService.deleteCustomBox(boxToDelete);
-      setBoxes((prev) => prev.filter((b) => b.Id !== boxToDelete));
-      setSelectedIds((prev) => {
-        const next = { ...prev };
-        delete next[boxToDelete];
-        return next;
-      });
-      Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã xóa giỏ quà.' });
-    } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Lỗi', text2: err?.response?.data || err?.message || 'Không thể xóa giỏ quà.' });
-    } finally {
-      setBoxToDelete(null);
-    }
-  };
-
   const handleDelete = (boxId: string) => {
-    setBoxToDelete(boxId);
+    Alert.alert('Xác nhận xóa', 'Bạn có chắc chắn muốn xóa giỏ quà này không?', [
+      { text: 'Hủy', style: 'cancel' },
+      {
+        text: 'Xóa',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await mixMatchService.deleteCustomBox(boxId);
+            setBoxes((prev) => prev.filter((b) => b.Id !== boxId));
+            setSelectedIds((prev) => {
+              const next = { ...prev };
+              delete next[boxId];
+              return next;
+            });
+            Alert.alert('Thành công', 'Đã xóa giỏ quà.');
+          } catch (err: any) {
+            Alert.alert(
+              'Lỗi',
+              err?.response?.data || err?.message || 'Không thể xóa giỏ quà.',
+            );
+          }
+        },
+      },
+    ]);
   };
 
   const handleEdit = (box: CustomBoxResponse) => {
@@ -109,7 +109,7 @@ export default function CustomBoxesScreen() {
       .map(([id]) => id);
 
     if (selected.length === 0) {
-      Toast.show({ type: 'info', text1: 'Thông báo', text2: 'Vui lòng chọn ít nhất một giỏ quà custom.' });
+      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một giỏ quà custom.');
       return;
     }
 
@@ -129,9 +129,9 @@ export default function CustomBoxesScreen() {
         });
         return next;
       });
-      Toast.show({ type: 'success', text1: 'Thành công', text2: `Đã thêm ${selected.length} giỏ quà vào giỏ hàng.` });
+      Alert.alert('Thành công', 'Đã thêm ' + selected.length + ' giỏ quà vào giỏ hàng.');
     } catch (err: any) {
-      Toast.show({ type: 'error', text1: 'Lỗi', text2: err?.message ?? 'Không thể thêm vào giỏ hàng.' });
+      Alert.alert('Lỗi', err?.message ?? 'Không thể thêm vào giỏ hàng.');
     } finally {
       setSubmitting(false);
     }
@@ -222,11 +222,7 @@ export default function CustomBoxesScreen() {
           {boxes.map((box) => (
             <View key={box.Id} style={[styles.card, selectedIds[box.Id] && styles.cardSelected]}>
               {/* Card header */}
-              <TouchableOpacity 
-                style={styles.cardHeader}
-                activeOpacity={0.7}
-                onPress={() => router.push(`/custom-box/${box.Id}` as any)}
-              >
+              <View style={styles.cardHeader}>
                 <TouchableOpacity onPress={() => toggleSelect(box.Id)} style={styles.checkbox}>
                   <Ionicons
                     name={selectedIds[box.Id] ? 'checkbox' : 'square-outline'}
@@ -244,34 +240,20 @@ export default function CustomBoxesScreen() {
                     ? new Date(box.CreatedAt).toLocaleDateString('vi-VN')
                     : '--'}
                 </Text>
-              </TouchableOpacity>
+              </View>
 
               {/* Items list */}
               <View style={styles.itemsGrid}>
                 {box.Items.map((item) => (
-                  <TouchableOpacity 
-                    key={box.Id + '-' + item.ItemId} 
-                    style={styles.itemCard}
-                    activeOpacity={0.7}
-                    onPress={() => router.push({ pathname: '/product/[id]', params: { id: item.ItemId, type: 'item' } })}
-                  >
-                    <View style={styles.itemImageContainer}>
-                      {item.ImageUrl ? (
-                        <Image source={{ uri: item.ImageUrl }} style={styles.itemImage} contentFit="cover" />
-                      ) : (
-                        <Ionicons name="image-outline" size={24} color={AppColors.border} />
-                      )}
-                    </View>
-                    <View style={{ flex: 1, justifyContent: 'center' }}>
-                      <Text style={styles.itemName} numberOfLines={2}>
-                        {item.Name}
-                      </Text>
-                      <Text style={styles.itemMeta}>
-                        SL: {item.Quantity} x {formatPrice(item.Price)}
-                      </Text>
-                      <Text style={styles.itemSubtotal}>{formatPrice(item.Subtotal)}</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <View key={box.Id + '-' + item.ItemId} style={styles.itemCard}>
+                    <Text style={styles.itemName} numberOfLines={2}>
+                      {item.Name}
+                    </Text>
+                    <Text style={styles.itemMeta}>
+                      SL: {item.Quantity} x {formatPrice(item.Price)}
+                    </Text>
+                    <Text style={styles.itemSubtotal}>{formatPrice(item.Subtotal)}</Text>
+                  </View>
                 ))}
               </View>
 
@@ -291,16 +273,6 @@ export default function CustomBoxesScreen() {
           ))}
         </ScrollView>
       )}
-      <ConfirmModal
-        visible={!!boxToDelete}
-        title="Xác nhận xóa"
-        message="Bạn có chắc chắn muốn xóa giỏ quà này không?"
-        confirmText="Xóa"
-        cancelText="Hủy"
-        onConfirm={confirmDelete}
-        onCancel={() => setBoxToDelete(null)}
-        isDestructive={true}
-      />
     </View>
   );
 }
@@ -379,33 +351,18 @@ const styles = StyleSheet.create({
   cardDate: { fontSize: 11, color: AppColors.textMuted },
 
   itemsGrid: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
     marginBottom: 12,
   },
   itemCard: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#F9F9F5',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#EFEFEA',
-  },
-  itemImageContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-  },
-  itemImage: {
-    width: '100%',
-    height: '100%',
+    width: '48%' as any,
   },
   itemName: {
     fontSize: 13,
@@ -413,11 +370,12 @@ const styles = StyleSheet.create({
     color: AppColors.text,
     marginBottom: 4,
   },
-  itemMeta: { fontSize: 12, color: AppColors.textMuted, marginBottom: 4 },
+  itemMeta: { fontSize: 11, color: AppColors.textMuted },
   itemSubtotal: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     color: AppColors.primary,
+    marginTop: 6,
   },
 
   cardActions: {

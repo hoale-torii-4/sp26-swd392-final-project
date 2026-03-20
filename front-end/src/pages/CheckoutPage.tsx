@@ -12,8 +12,8 @@ function formatPrice(v: number) {
     return v.toLocaleString("vi-VN") + "₫";
 }
 
-function getTypeBadge(type: number | string) {
-    return (type === 0 || type === "READY_MADE")
+function getTypeBadge(type: number) {
+    return type === 0
         ? { label: "GIỎ QUÀ CÓ SẴN", bg: "bg-teal-700" }
         : { label: "TÙY CHỈNH RIÊNG", bg: "bg-amber-600" };
 }
@@ -365,7 +365,7 @@ function OrderItemCard({ item }: { item: CartItemDto }) {
                             alt={item.Name || "Sản phẩm"}
                             className="w-full h-full object-cover"
                         />
-                    ) : (item.Type === 1 || item.Type === "MIX_MATCH") ? (
+                    ) : item.Type === 1 ? (
                         <img
                             src={mixMatchDefault}
                             alt="Giỏ quà Mix & Match"

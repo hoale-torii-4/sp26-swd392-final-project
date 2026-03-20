@@ -57,6 +57,7 @@ export default function CustomBoxPage() {
     const [selectedBoxIds, setSelectedBoxIds] = useState<Record<string, boolean>>({});
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!authService.isAuthenticated()) {
@@ -65,7 +66,7 @@ export default function CustomBoxPage() {
         }
         const loadCustomBoxes = async () => {
             setLoading(true);
-            setLoading(true);
+            setError(null);
             try {
                 const res = await mixMatchService.getMyCustomBoxes();
                 const payload = res?.Data ?? res?.data ?? res ?? [];
@@ -80,7 +81,7 @@ export default function CustomBoxPage() {
                 if (err?.status === 404) {
                     setCustomBoxes([]);
                 } else {
-                    toast.error(err?.message ?? "Không thể tải giỏ quà custom.");
+                    setError(err?.message ?? "Không thể tải giỏ quà custom.");
                 }
             } finally {
                 setLoading(false);
@@ -125,11 +126,12 @@ export default function CustomBoxPage() {
             .map(([id]) => id);
 
         if (selectedIds.length === 0) {
-            toast.error("Vui lòng chọn ít nhất một giỏ quà custom để thêm vào giỏ hàng.");
+            setError("Vui lòng chọn ít nhất một giỏ quà custom để thêm vào giỏ hàng.");
             return;
         }
 
         setSubmitting(true);
+        setError(null);
         try {
             await cartService.addToCartBatch(
                 selectedIds.map((id) => ({
@@ -146,7 +148,7 @@ export default function CustomBoxPage() {
                 return next;
             });
         } catch (err: any) {
-            toast.error(err?.message ?? "Không thể thêm giỏ quà vào giỏ hàng.");
+            setError(err?.message ?? "Không thể thêm giỏ quà vào giỏ hàng.");
         } finally {
             setSubmitting(false);
         }
@@ -234,6 +236,10 @@ export default function CustomBoxPage() {
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
                             </div>
+                        ) : error ? (
+                            <div className="bg-white rounded-2xl p-8 shadow-sm">
+                                <p className="text-sm text-red-600">{error}</p>
+                            </div>
                         ) : customBoxes.length === 0 ? (
                             <div className="bg-white rounded-2xl p-12 shadow-sm text-center">
                                 <svg className="w-16 h-16 mx-auto text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -298,38 +304,16 @@ export default function CustomBoxPage() {
                                             </div>
 
                                             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {(customBox.Items ?? customBox.items ?? []).map((item: any) => {
-                                                    const itemId = item.ItemId ?? item.itemId;
-                                                    const imageUrl = item.ImageUrl ?? item.imageUrl;
-                                                    return (
-                                                        <Link 
-                                                            to={`/gift-boxes/${itemId}?type=item`}
-                                                            key={`${boxId}-${itemId}`} 
-                                                            className="flex items-center gap-4 bg-gray-50 rounded-xl p-4 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all cursor-pointer"
-                                                        >
-                                                            <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-200 border border-gray-100 flex-shrink-0 flex items-center justify-center">
-                                                                {imageUrl ? (
-                                                                    <img src={imageUrl} alt={item.Name ?? item.name} className="w-full h-full object-cover" />
-                                                                ) : (
-                                                                    <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                    </svg>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <p className="text-sm font-semibold text-gray-900 mb-1 line-clamp-2">{item.Name ?? item.name}</p>
-                                                                <div className="flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
-                                                                    <span>SL: {item.Quantity ?? item.quantity}</span>
-                                                                    <span>×</span>
-                                                                    <span>{(item.Price ?? item.price ?? 0).toLocaleString("vi-VN")}₫</span>
-                                                                </div>
-                                                                <p className="text-sm font-semibold text-[#8B1A1A] mt-1">
-                                                                    {(item.Subtotal ?? item.subtotal ?? 0).toLocaleString("vi-VN")}₫
-                                                                </p>
-                                                            </div>
-                                                        </Link>
-                                                    );
-                                                })}
+                                                {(customBox.Items ?? customBox.items ?? []).map((item: any) => (
+                                                    <div key={`${boxId}-${item.ItemId ?? item.itemId}`} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                                                        <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name ?? item.name}</p>
+                                                        <p className="text-xs text-gray-500">Số lượng: {item.Quantity ?? item.quantity}</p>
+                                                        <p className="text-xs text-gray-500">Đơn giá: {(item.Price ?? item.price ?? 0).toLocaleString("vi-VN")}₫</p>
+                                                        <p className="text-sm font-semibold text-[#8B1A1A] mt-2">
+                                                            {(item.Subtotal ?? item.subtotal ?? 0).toLocaleString("vi-VN")}₫
+                                                        </p>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     );

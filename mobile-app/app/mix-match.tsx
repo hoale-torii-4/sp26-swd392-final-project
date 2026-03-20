@@ -6,7 +6,6 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import Toast from 'react-native-toast-message';
 import { mixMatchService, type MixMatchItem, type CustomBoxItemResponse } from '../services/mixMatchService';
 import { cartService } from '../services/cartService';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
@@ -82,48 +81,17 @@ export default function MixMatchScreen() {
         return slots.map((id) => items.find((entry) => entry.Id === id) ?? null);
     }, [slots, items]);
 
-    // --- Validation matching backend MixMatchValidationResult ---
-    const validation = useMemo(() => {
-        const filledSlots = slotItems.filter(Boolean) as MixMatchItem[];
-        const totalItems = filledSlots.length;
-        const totalPrice = filledSlots.reduce((sum, item) => sum + (item?.Price ?? 0), 0);
-
-        // Count by category
-        const drinkCount = filledSlots.filter(i => i.Category === 'DRINK').length;
-        const alcoholCount = filledSlots.filter(i => i.Category === 'ALCOHOL' || i.IsAlcohol).length;
-        const beverageCount = drinkCount + alcoholCount;
-        const foodCount = filledSlots.filter(i => i.Category === 'FOOD').length;
-        const nutCount = filledSlots.filter(i => i.Category === 'NUT').length;
-        const snackCount = foodCount + nutCount;
-        const savoryCount = filledSlots.filter(i => i.Category === 'SAVORY').length;
-
-        // Chivas rules
-        const hasChivas21 = filledSlots.some(i => i.Name?.toLowerCase().includes('chivas 21') || i.Name?.toLowerCase().includes('chivas21'));
-        const hasChivas12 = filledSlots.some(i => i.Name?.toLowerCase().includes('chivas 12') || i.Name?.toLowerCase().includes('chivas12'));
-        const maxItemsForChivas = hasChivas21 ? 4 : hasChivas12 ? 5 : 6;
-
-        const errors: string[] = [];
-        if (totalItems < 4) errors.push(`Cần tối thiểu 4 món (hiện có ${totalItems})`);
-        if (totalItems > 6) errors.push(`Tối đa 6 món (hiện có ${totalItems})`);
-        if (totalItems >= 4 && beverageCount < 1) errors.push('Cần ít nhất 1 đồ uống (Trà hoặc Rượu)');
-        if (totalItems >= 4 && snackCount < 2) errors.push(`Cần ít nhất 2 snack/hạt (hiện có ${snackCount})`);
-        if (savoryCount > 2) errors.push(`Đặc sản mặn tối đa 2 (hiện có ${savoryCount})`);
-        if (hasChivas21 && totalItems > 4) errors.push('Có Chivas 21: tối đa 4 món');
-        if (hasChivas12 && !hasChivas21 && totalItems > 5) errors.push('Có Chivas 12: tối đa 5 món');
-
-        const isValid = totalItems >= 4 && totalItems <= 6 && errors.length === 0;
-
-        return { totalItems, totalPrice, isValid, errors, beverageCount, snackCount, savoryCount, maxItemsForChivas };
-    }, [slotItems]);
+    const totals = useMemo(() => {
+        const totalItems = slots.filter(Boolean).length;
+        const totalPrice = slotItems.reduce((sum: number, item: MixMatchItem | null) => sum + (item?.Price ?? 0), 0);
+        const isValid = totalItems >= 4 && totalItems <= 6;
+        return { totalItems, totalPrice, isValid };
+    }, [slots, slotItems]);
 
     const handleAddItem = (itemId: string) => {
         const firstEmptyIndex = slots.findIndex((s) => s === null);
         if (firstEmptyIndex === -1) {
-            Toast.show({
-                type: 'info',
-                text1: 'Hộp quà đã đầy',
-                text2: 'Tối đa 6 sản phẩm.'
-            });
+            Alert.alert('Thông báo', 'Hộp quà đã đầy (tối đa 6 sản phẩm).');
             return;
         }
         setSlots((prev) => {
@@ -153,13 +121,8 @@ export default function MixMatchScreen() {
     };
 
     const handleAddToCart = async () => {
-        if (!validation.isValid) {
-            Toast.show({
-                type: 'error',
-                text1: 'Chưa đạt yêu cầu',
-                text2: validation.errors[0], 
-                visibilityTime: 4000
-            });
+        if (totals.totalItems < 4) {
+            Alert.alert('Thông báo', 'Hộp quà cần tối thiểu 4 sản phẩm.');
             return;
         }
         setSubmitting(true);
@@ -179,16 +142,49 @@ export default function MixMatchScreen() {
                 ]);
             }
         } catch (err: any) {
-            Toast.show({
-                type: 'error',
-                text1: 'Lỗi',
-                text2: err.message || 'Không thể lưu giỏ quà.'
-            });
+            Alert.alert('Lỗi', err.message || 'Không thể lưu giỏ quà.');
         } finally {
             setSubmitting(false);
         }
     };
 
+    const handleBuyNow = async () => {
+        if (totals.totalItems < 4) {
+            Alert.alert('Thông báo', 'Hộp quà cần tối thiểu 4 sản phẩm.');
+            return;
+        }
+        setSubmitting(true);
+        try {
+            const itemsPayload = buildItemsPayload();
+            let customBoxId = params.editBoxId;
+            
+            if (isEditMode && customBoxId) {
+                await mixMatchService.updateCustomBox(customBoxId, itemsPayload);
+            } else {
+                customBoxId = await mixMatchService.createCustomBox(itemsPayload);
+            }
+            
+            // Go to checkout-payment directly, passing the custom box details 
+            // instead of adding it to cart and dumping the user in checkout
+            router.push({
+                pathname: '/checkout',
+                params: {
+                    buyNowItems: JSON.stringify([{
+                        Id: `TEMP-${Date.now()}`, // Temporary cart-item like ID
+                        Quantity: 1,
+                        UnitPrice: totals.totalPrice, // We pass the subtotal here
+                        Type: 1, // MIX_MATCH
+                        CustomBoxId: customBoxId,
+                        Name: 'Giỏ quà tự chọn'
+                    }])
+                }
+            });
+        } catch (err: any) {
+            Alert.alert('Lỗi', err.message || 'Không thể tiến hành thanh toán.');
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     const renderItemCard = ({ item }: { item: MixMatchItem }) => (
         <TouchableOpacity 
@@ -229,7 +225,7 @@ export default function MixMatchScreen() {
 
             {/* Custom Box Slots (Fixed) */}
             <View style={styles.slotsSection}>
-                <Text style={styles.sectionTitle}>Hộp quà của bạn ({validation.totalItems}/{validation.maxItemsForChivas})</Text>
+                <Text style={styles.sectionTitle}>Hộp quà của bạn ({totals.totalItems}/6)</Text>
                 <View style={styles.slotsGrid}>
                     {slotItems.map((slotItem, index) => (
                         <TouchableOpacity 
@@ -295,37 +291,29 @@ export default function MixMatchScreen() {
                 <View style={styles.totalRow}>
                     <View>
                         <Text style={styles.totalLabel}>Tổng tiền</Text>
-                        <Text style={styles.totalValue}>{formatPrice(validation.totalPrice)}</Text>
+                        <Text style={styles.totalValue}>{formatPrice(totals.totalPrice)}</Text>
                     </View>
-                    <Text style={[styles.itemCount, { color: validation.totalItems >= 4 ? AppColors.success : AppColors.error }]}>
-                        {validation.totalItems}/{validation.maxItemsForChivas} món
+                    <Text style={[styles.itemCount, { color: totals.totalItems >= 4 ? AppColors.success : AppColors.error }]}>
+                        {totals.totalItems}/6 món
                     </Text>
                 </View>
 
-                {/* Validation errors */}
-                {validation.errors.length > 0 && validation.totalItems > 0 && (
-                    <View style={styles.validationBox}>
-                        {validation.errors.map((err, idx) => (
-                            <View key={idx} style={styles.validationRow}>
-                                <Ionicons name="alert-circle" size={14} color={AppColors.error} />
-                                <Text style={styles.validationText}>{err}</Text>
-                            </View>
-                        ))}
-                    </View>
-                )}
-
-                <TouchableOpacity 
-                    style={[styles.addToCartBtn, (!validation.isValid || submitting) && styles.btnDisabled]}
-                    disabled={!validation.isValid || submitting}
-                    onPress={handleAddToCart}
-                >
-                    {submitting 
-                        ? <ActivityIndicator color="#FFF" /> 
-                        : <Text style={styles.addToCartBtnText}>
-                            {isEditMode ? 'Cập nhật giỏ quà' : 'Thêm vào giỏ hàng'}
-                          </Text>
-                    }
-                </TouchableOpacity>
+                <View style={styles.actionBtns}>
+                    <TouchableOpacity 
+                        style={[styles.cartBtn, (totals.totalItems < 4 || submitting) && styles.btnDisabled]}
+                        disabled={totals.totalItems < 4 || submitting}
+                        onPress={handleAddToCart}
+                    >
+                        {submitting ? <ActivityIndicator color={AppColors.primary} /> : <Text style={styles.cartBtnText}>Thêm vào giỏ</Text>}
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                        style={[styles.buyBtn, (totals.totalItems < 4 || submitting) && styles.btnDisabled]}
+                        disabled={totals.totalItems < 4 || submitting}
+                        onPress={handleBuyNow}
+                    >
+                        {submitting ? <ActivityIndicator color="#FFF" /> : <Text style={styles.buyBtnText}>Mua ngay</Text>}
+                    </TouchableOpacity>
+                </View>
             </View>
         </View>
     );
@@ -397,15 +385,16 @@ const styles = StyleSheet.create({
     totalLabel: { fontSize: 12, color: AppColors.textSecondary, marginBottom: 2 },
     totalValue: { fontSize: 20, fontWeight: '900', color: AppColors.primary },
     itemCount: { fontSize: 13, fontWeight: '700' },
-    validationBox: {
-        backgroundColor: '#FEF2F2', borderRadius: 8, padding: 10, marginBottom: 12, gap: 4,
+    actionBtns: { flexDirection: 'row', gap: 10 },
+    cartBtn: {
+        flex: 1, paddingVertical: 14, borderRadius: BorderRadius.md,
+        borderWidth: 1.5, borderColor: AppColors.primary, alignItems: 'center',
     },
-    validationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    validationText: { fontSize: 12, color: AppColors.error, flex: 1 },
-    addToCartBtn: {
-        paddingVertical: 14, borderRadius: BorderRadius.md,
+    cartBtnText: { color: AppColors.primary, fontWeight: '800', fontSize: 14 },
+    buyBtn: {
+        flex: 1.5, paddingVertical: 14, borderRadius: BorderRadius.md,
         backgroundColor: AppColors.primary, alignItems: 'center',
     },
-    addToCartBtnText: { color: '#FFF', fontWeight: '800', fontSize: 15 },
-    btnDisabled: { opacity: 0.5, backgroundColor: AppColors.textMuted },
+    buyBtnText: { color: '#FFF', fontWeight: '800', fontSize: 14 },
+    btnDisabled: { opacity: 0.5, backgroundColor: AppColors.textMuted, borderColor: AppColors.textMuted },
 });

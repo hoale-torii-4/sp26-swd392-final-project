@@ -19,16 +19,10 @@ export default function AdminRoute({ allowedRoles }: { allowedRoles?: number[] }
     }
 
     const user = authService.getUser();
-    if (allowedRoles && user) {
-        const userRole = user.Role;
-        const normalizedRole = userRole === "ADMIN" || userRole === "2" || userRole === 2 ? 2 
-            : userRole === "STAFF" || userRole === "1" || userRole === 1 ? 1 : 0;
-            
-        if (!allowedRoles.includes(normalizedRole)) {
-            // Logged in, is admin/staff, but does not have the specific required role
-            // Redirect them to a safe page (e.g. Orders) instead of letting them see unauthorized pages
-            return <Navigate to="/admin/orders" replace />;
-        }
+    if (allowedRoles && user && !allowedRoles.includes(user.Role)) {
+        // Logged in, is admin/staff, but does not have the specific required role
+        // Redirect them to a safe page (e.g. Orders) instead of letting them see unauthorized pages
+        return <Navigate to="/admin/orders" replace />;
     }
 
     // Authorized -> render nested routes

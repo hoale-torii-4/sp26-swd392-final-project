@@ -7,7 +7,7 @@ import type { ApiResponse } from "../types/auth";
 
 export interface CartItemDto {
     Id: string;
-    Type: number | string;   // 0 = READY_MADE, 1 = MIX_MATCH or "READY_MADE", "MIX_MATCH"
+    Type: number;            // 0 = READY_MADE, 1 = MIX_MATCH
     ProductId: string;
     Quantity: number;
     UnitPrice: number;
@@ -27,7 +27,7 @@ export interface CartDto {
 }
 
 export interface AddToCartRequest {
-    Type: number | string;   // 0 = READY_MADE, 1 = MIX_MATCH or "READY_MADE", "MIX_MATCH"
+    Type: number;            // 0 = READY_MADE, 1 = MIX_MATCH
     GiftBoxId?: string;
     CustomBoxId?: string;
     Quantity: number;
@@ -135,11 +135,11 @@ export const cartService = {
 
     updateCustomBox: async (boxId: string, items: { ItemId: string, Quantity: number }[]) => {
         const payload = { Items: items };
-        const res = await apiClient.put(`/mix-match/custom-box/${boxId}`, payload);
+        const res = await apiClient.put(`/api/mix-match/custom-box/${boxId}`, payload);
         return res.data;
     },
 
     deleteCustomBox: async (boxId: string) => {
-        await apiClient.delete(`/mix-match/custom-box/${boxId}`);
+        await apiClient.delete(`/api/mix-match/custom-box/${boxId}`);
     }
 };

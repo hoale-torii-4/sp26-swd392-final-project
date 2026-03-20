@@ -87,7 +87,7 @@ export default function HomePage() {
                     {/* Text */}
                     <div className="flex-1 px-8 lg:px-16 py-20 lg:py-0 z-10">
                         <span className="inline-block px-5 py-2 rounded-full border border-[#C0A062]/40 text-xs font-semibold tracking-[0.15em] text-[#C0A062] uppercase mb-8">
-                            Mừng Xuân Giáp Thìn 2026
+                            Mừng Xuân Giáp Thìn 2024
                         </span>
                         <h1 className="text-4xl sm:text-5xl lg:text-6xl font-serif font-bold text-white leading-tight mb-2">
                             Trao Lộc Đầu Xuân,
@@ -137,7 +137,7 @@ export default function HomePage() {
                             <span className="h-px w-12 bg-[#C0A062]" />
                         </div>
                         <h2 className="text-3xl lg:text-4xl font-serif font-bold text-gray-900 mb-4">
-                            Bộ Sưu Tập Quà Tết 2026
+                            Bộ Sưu Tập Quà Tết 2024
                         </h2>
                         <p className="text-gray-500 max-w-2xl mx-auto leading-relaxed">
                             Mỗi bộ sưu tập là một câu chuyện về văn hóa truyền thống, nơi những thức

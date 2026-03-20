@@ -5,15 +5,6 @@ import Footer from "../components/Footer";
 import { cartService, type CartDto, type CartItemDto } from "../services/cartService";
 import { orderService, type CreateOrderB2CDto, OrderItemType } from "../services/orderService";
 import { authService } from "../services/authService";
-import apiClient from "../services/apiClient";
-
-interface Address {
-    Id: string;
-    ReceiverName: string;
-    ReceiverPhone: string;
-    FullAddress: string;
-    IsDefault: boolean;
-}
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 
@@ -32,9 +23,6 @@ export default function CheckoutPaymentPage() {
     const [error, setError] = useState<string | null>(null);
     const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
     const [qrLoading, setQrLoading] = useState(false);
-    const [qrRemainingSeconds, setQrRemainingSeconds] = useState<number | null>(null);
-    const [qrExpired, setQrExpired] = useState(false);
-    const qrCountdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     // ── Form state ──
     const [receiverName, setReceiverName] = useState("");
@@ -45,11 +33,6 @@ export default function CheckoutPaymentPage() {
     const [addressDetail, setAddressDetail] = useState("");
     const [greetingMessage, setGreetingMessage] = useState("");
     const [deliveryDate, setDeliveryDate] = useState("");
-
-    // ── Address Book state ──
-    const [addresses, setAddresses] = useState<Address[]>([]);
-    const [selectedAddressId, setSelectedAddressId] = useState<string>("new");
-    const [addressesLoading, setAddressesLoading] = useState(false);
 
     // ── Customer info (from auth or manual) ──
     const user = authService.getUser?.() ?? null;
@@ -86,27 +69,9 @@ export default function CheckoutPaymentPage() {
             .finally(() => setLoading(false));
     }, [isBuyNow, isSelectedCheckout]);
 
-    // Fetch user addresses if logged in
-    useEffect(() => {
-        if (user) {
-            setAddressesLoading(true);
-            apiClient.get("/Address")
-                .then(r => {
-                    const data = r.data?.Data ?? r.data ?? [];
-                    setAddresses(data);
-                    if (data.length > 0) {
-                        const def = data.find((a: any) => a.IsDefault);
-                        setSelectedAddressId(def ? def.Id : data[0].Id);
-                    }
-                })
-                .catch(() => {})
-                .finally(() => setAddressesLoading(false));
-        }
-    }, [user?.Id]);
-
     // ── Auto-polling: check payment status every 3 sec when QR is shown ──
     useEffect(() => {
-        if (!qrImageUrl || !orderCode || qrExpired) return;
+        if (!qrImageUrl || !orderCode) return;
 
         const apiBase = import.meta.env.VITE_API_BASE_URL || "https://shophangtet-api.onrender.com";
 
@@ -119,7 +84,6 @@ export default function CheckoutPaymentPage() {
                 if (isPaid) {
                     setPaymentDetected(true);
                     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                    if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
                     setTimeout(() => navigate(`/order-success?code=${orderCode}`), 1500);
                 }
             } catch {
@@ -132,34 +96,7 @@ export default function CheckoutPaymentPage() {
         return () => {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
         };
-    }, [qrImageUrl, orderCode, navigate, qrExpired]);
-
-    useEffect(() => {
-        if (!qrImageUrl || !orderCode) return;
-
-        const countdownMinutes = Number(import.meta.env.VITE_QR_TIMEOUT_MINUTES ?? 10);
-        const totalSeconds = Math.max(1, Math.round(countdownMinutes * 60));
-        setQrExpired(false);
-        setQrRemainingSeconds(totalSeconds);
-
-        if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
-        qrCountdownRef.current = setInterval(() => {
-            setQrRemainingSeconds((prev) => {
-                if (prev === null) return prev;
-                if (prev <= 1) {
-                    if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
-                    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
-                    setQrExpired(true);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => {
-            if (qrCountdownRef.current) clearInterval(qrCountdownRef.current);
-        };
-    }, [qrImageUrl, orderCode]);
+    }, [qrImageUrl, orderCode, navigate]);
 
 
     const items = isBuyNow
@@ -174,29 +111,9 @@ export default function CheckoutPaymentPage() {
             : cart?.TotalAmount ?? 0;
 
     // ── Submit order ──
-    const formatCountdown = (seconds: number | null) => {
-        if (seconds === null) return "";
-        const mm = Math.floor(seconds / 60);
-        const ss = seconds % 60;
-        return `${mm.toString().padStart(2, "0")}:${ss.toString().padStart(2, "0")}`;
-    };
-
     const handleSubmit = async () => {
-        let finalReceiverName = receiverName;
-        let finalReceiverPhone = receiverPhone;
-        let finalDeliveryAddress = [addressDetail, ward, district, province].filter(Boolean).join(", ");
-
-        if (user && selectedAddressId !== "new") {
-            const addr = addresses.find((a) => a.Id === selectedAddressId);
-            if (addr) {
-                finalReceiverName = addr.ReceiverName;
-                finalReceiverPhone = addr.ReceiverPhone;
-                finalDeliveryAddress = addr.FullAddress;
-            }
-        }
-
-        if (!finalReceiverName || !finalReceiverPhone || !finalDeliveryAddress || !deliveryDate) {
-            setError("Vui lòng điền đầy đủ thông tin người nhận, địa chỉ và ngày giao hàng.");
+        if (!receiverName || !receiverPhone || !addressDetail || !deliveryDate) {
+            setError("Vui lòng điền đầy đủ thông tin người nhận và ngày giao hàng.");
             return;
         }
         if (!customerEmail) {
@@ -207,6 +124,8 @@ export default function CheckoutPaymentPage() {
         setSubmitting(true);
         setError(null);
         try {
+            const fullAddress = [addressDetail, ward, district, province].filter(Boolean).join(", ");
+
             const orderData: CreateOrderB2CDto = {
                 UserId: user?.Id,
                 CustomerEmail: customerEmail,
@@ -219,9 +138,9 @@ export default function CheckoutPaymentPage() {
                     Price: item.UnitPrice,
                     Name: item.Name ?? undefined,
                 })),
-                ReceiverName: finalReceiverName,
-                ReceiverPhone: finalReceiverPhone,
-                DeliveryAddress: finalDeliveryAddress,
+                ReceiverName: receiverName,
+                ReceiverPhone: receiverPhone,
+                DeliveryAddress: fullAddress,
                 GreetingMessage: greetingMessage || undefined,
                 DeliveryDate: new Date(deliveryDate).toISOString(),
             };
@@ -229,9 +148,6 @@ export default function CheckoutPaymentPage() {
             const result = await orderService.createB2COrder(orderData);
             setOrderCode(result.orderCode);
             sessionStorage.setItem("last_order_code", result.orderCode);
-            setPaymentDetected(false);
-            setQrExpired(false);
-            setQrRemainingSeconds(null);
 
             if (!isBuyNow && !isSelectedCheckout) {
                 await cartService.clearCart();
@@ -368,30 +284,15 @@ export default function CheckoutPaymentPage() {
                                     Tổng thanh toán: <span className="font-bold text-gray-800">{formatPrice(totalAmount + 35000)}</span>
                                 </p>
 
-                                <div className="flex items-center justify-between w-full text-xs">
-                                    <div className="flex items-center gap-2 text-gray-400">
-                                        <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                                        Đang tự động kiểm tra thanh toán...
-                                    </div>
-                                    {qrRemainingSeconds !== null && (
-                                        <span className={`font-semibold ${qrRemainingSeconds <= 30 ? "text-red-600" : "text-gray-500"}`}>
-                                            Hết hạn sau: {formatCountdown(qrRemainingSeconds)}
-                                        </span>
-                                    )}
+                                {/* Polling status */}
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                    Đang tự động kiểm tra thanh toán...
                                 </div>
-
-                                {qrExpired && (
-                                    <div className="w-full text-center text-xs text-red-600 font-semibold bg-red-50 border border-red-200 rounded-lg py-2">
-                                        Mã QR đã hết hạn. Vui lòng tạo lại để thanh toán.
-                                    </div>
-                                )}
 
                                 <Link
                                     to={`/order-success?code=${orderCode}`}
-                                    className={`w-full py-3 text-white text-sm font-bold rounded-xl transition-colors cursor-pointer text-center ${qrExpired ? "bg-gray-400 cursor-not-allowed" : "bg-[#8B1A1A] hover:bg-[#701515]"}`}
-                                    onClick={(event) => {
-                                        if (qrExpired) event.preventDefault();
-                                    }}
+                                    className="w-full py-3 bg-[#8B1A1A] hover:bg-[#701515] text-white text-sm font-bold rounded-xl transition-colors cursor-pointer text-center"
                                 >
                                     Đã thanh toán xong →
                                 </Link>
@@ -473,89 +374,63 @@ export default function CheckoutPaymentPage() {
                                 Thông tin người nhận
                             </h2>
 
-                            {/* Address Book Selection for logged in users */}
-                            {user && addresses.length > 0 && !addressesLoading && (
-                                <div className="space-y-3 mb-6">
-                                    {addresses.map((addr) => (
-                                        <label key={addr.Id} className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAddressId === addr.Id ? "border-[#8B1A1A] bg-[#8B1A1A]/5" : "border-gray-200 hover:border-gray-300"}`}>
-                                            <input type="radio" checked={selectedAddressId === addr.Id} onChange={() => setSelectedAddressId(addr.Id)} className="mt-0.5 w-4 h-4 accent-[#8B1A1A]" />
-                                            <div>
-                                                <p className="text-sm font-bold text-gray-900">{addr.ReceiverName} <span className="text-gray-400 font-normal ml-2">({addr.ReceiverPhone})</span></p>
-                                                <p className="text-xs text-gray-500 mt-1">{addr.FullAddress}</p>
-                                            </div>
-                                        </label>
-                                    ))}
-                                    <label className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedAddressId === "new" ? "border-[#8B1A1A] bg-[#8B1A1A]/5" : "border-gray-200 hover:border-gray-300"}`}>
-                                        <input type="radio" checked={selectedAddressId === "new"} onChange={() => setSelectedAddressId("new")} className="mt-0.5 w-4 h-4 accent-[#8B1A1A]" />
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-900">Giao đến địa chỉ khác</p>
-                                            <p className="text-xs text-gray-500 mt-1">Nhập thông tin địa chỉ mới phía dưới</p>
-                                        </div>
-                                    </label>
-                                </div>
-                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                                <input
+                                    type="text"
+                                    placeholder="Họ tên người nhận"
+                                    value={receiverName}
+                                    onChange={(e) => setReceiverName(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
+                                />
+                                <input
+                                    type="tel"
+                                    placeholder="Số điện thoại"
+                                    value={receiverPhone}
+                                    onChange={(e) => setReceiverPhone(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
+                                />
+                            </div>
 
-                            {(!user || selectedAddressId === "new" || addresses.length === 0) && (
-                                <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                                        <input
-                                            type="text"
-                                            placeholder="Họ tên người nhận"
-                                            value={receiverName}
-                                            onChange={(e) => setReceiverName(e.target.value)}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
-                                        />
-                                        <input
-                                            type="tel"
-                                            placeholder="Số điện thoại"
-                                            value={receiverPhone}
-                                            onChange={(e) => setReceiverPhone(e.target.value)}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
-                                        />
-                                    </div>
+                            {/* Address dropdowns */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                                <select
+                                    value={province}
+                                    onChange={(e) => setProvince(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
+                                >
+                                    <option value="">Tỉnh / Thành phố</option>
+                                    <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
+                                    <option value="Hà Nội">Hà Nội</option>
+                                    <option value="Đà Nẵng">Đà Nẵng</option>
+                                </select>
+                                <select
+                                    value={district}
+                                    onChange={(e) => setDistrict(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
+                                >
+                                    <option value="">Quận / Huyện</option>
+                                    <option value="Quận 1">Quận 1</option>
+                                    <option value="Quận 3">Quận 3</option>
+                                    <option value="Quận 7">Quận 7</option>
+                                </select>
+                                <select
+                                    value={ward}
+                                    onChange={(e) => setWard(e.target.value)}
+                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
+                                >
+                                    <option value="">Phường / Xã</option>
+                                    <option value="Phường Bến Nghé">Phường Bến Nghé</option>
+                                    <option value="Phường Bến Thành">Phường Bến Thành</option>
+                                </select>
+                            </div>
 
-                                    {/* Address dropdowns */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                                        <select
-                                            value={province}
-                                            onChange={(e) => setProvince(e.target.value)}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Tỉnh / Thành phố</option>
-                                            <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                                            <option value="Hà Nội">Hà Nội</option>
-                                            <option value="Đà Nẵng">Đà Nẵng</option>
-                                        </select>
-                                        <select
-                                            value={district}
-                                            onChange={(e) => setDistrict(e.target.value)}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Quận / Huyện</option>
-                                            <option value="Quận 1">Quận 1</option>
-                                            <option value="Quận 3">Quận 3</option>
-                                            <option value="Quận 7">Quận 7</option>
-                                        </select>
-                                        <select
-                                            value={ward}
-                                            onChange={(e) => setWard(e.target.value)}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Phường / Xã</option>
-                                            <option value="Phường Bến Nghé">Phường Bến Nghé</option>
-                                            <option value="Phường Bến Thành">Phường Bến Thành</option>
-                                        </select>
-                                    </div>
-
-                                    <textarea
-                                        placeholder="Số nhà, tên đường, phường/xã..."
-                                        value={addressDetail}
-                                        onChange={(e) => setAddressDetail(e.target.value)}
-                                        rows={2}
-                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all resize-none"
-                                    />
-                                </>
-                            )}
+                            <textarea
+                                placeholder="Số nhà, tên đường, phường/xã..."
+                                value={addressDetail}
+                                onChange={(e) => setAddressDetail(e.target.value)}
+                                rows={2}
+                                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all resize-none"
+                            />
 
                             {/* Decorative delivery illustration */}
                             <div className="mt-5 rounded-xl overflow-hidden bg-gradient-to-r from-[#f0e6d4] to-[#e8dcc8] flex items-center gap-4 p-4">

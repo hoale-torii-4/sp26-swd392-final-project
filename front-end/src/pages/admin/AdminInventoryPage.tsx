@@ -19,12 +19,6 @@ export default function AdminInventoryPage() {
     const [adjustNote, setAdjustNote] = useState("");
     const [adjusting, setAdjusting] = useState(false);
 
-    // Create modal
-    const [showCreate, setShowCreate] = useState(false);
-    const [createData, setCreateData] = useState({ Name: "", Category: "FOOD", Price: "", Image: "", InitialStock: "", IsAlcohol: false, IsActive: true });
-    const [creating, setCreating] = useState(false);
-    const [createError, setCreateError] = useState("");
-
     const pageSize = 20;
 
     const fetchItems = async () => {
@@ -56,55 +50,18 @@ export default function AdminInventoryPage() {
         if (!adjustItem || adjustQty === 0) return;
         setAdjusting(true);
         try {
-            await adminService.adjustInventory({
-                ItemId: adjustItem.Id,
-                AdjustType: adjustQty > 0 ? "INCREASE" : "DECREASE",
-                Quantity: Math.abs(adjustQty),
-                Reason: adjustNote || undefined,
-            });
+            await adminService.adjustInventory({ ItemId: adjustItem.Id, QuantityChange: adjustQty, Note: adjustNote || undefined });
             setAdjustItem(null); setAdjustQty(0); setAdjustNote("");
             fetchItems(); fetchSummary();
         } catch { /* ignore */ }
         finally { setAdjusting(false); }
     };
 
-    const handleCreate = async () => {
-        if (!createData.Name.trim() || !createData.Price || !createData.InitialStock) {
-            setCreateError("Vui lòng nhập tên, giá và số lượng ban đầu");
-            return;
-        }
-        setCreating(true); setCreateError("");
-        try {
-            await adminService.createInventoryItem({
-                Name: createData.Name.trim(),
-                Category: createData.Category,
-                Price: Number(createData.Price),
-                Image: createData.Image.trim() || undefined,
-                IsAlcohol: createData.IsAlcohol,
-                InitialStock: Number(createData.InitialStock),
-                IsActive: createData.IsActive
-            });
-            setShowCreate(false);
-            setCreateData({ Name: "", Category: "FOOD", Price: "", Image: "", InitialStock: "", IsAlcohol: false, IsActive: true });
-            fetchItems(); fetchSummary();
-            setTab("items");
-            setPage(1);
-        } catch (err: any) {
-            setCreateError(err?.response?.data?.message || err.message || "Lỗi tạo sản phẩm");
-        } finally { setCreating(false); }
-    };
-
     const totalPages = Math.ceil(total / pageSize);
 
     return (
         <div className="p-6 space-y-6">
-            <div className="flex items-center justify-between">
-                <h1 className="text-2xl font-bold text-gray-900">Kho hàng</h1>
-                <button onClick={() => { setShowCreate(true); setCreateError(""); }} className="px-4 py-2 bg-[#8B1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Thêm sản phẩm
-                </button>
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Kho hàng</h1>
 
             {/* Summary cards */}
             {summary && (
@@ -135,9 +92,8 @@ export default function AdminInventoryPage() {
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm min-w-[800px]">
-                                <thead className="bg-gray-50 border-b">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 border-b">
                                 <tr className="text-left text-xs text-gray-400 uppercase">
                                     <th className="px-4 py-3 font-medium">Sản phẩm</th>
                                     <th className="px-4 py-3 font-medium">Danh mục</th>
@@ -174,16 +130,14 @@ export default function AdminInventoryPage() {
                                     </tr>
                                 ))}
                             </tbody>
-                            </table>
-                        </div>
+                        </table>
                         {totalPages > 1 && <Pagination page={page} totalPages={totalPages} total={total} label="sản phẩm" onPageChange={setPage} />}
                     </div>
                 </>
             ) : (
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm min-w-[800px]">
-                            <thead className="bg-gray-50 border-b">
+                    <table className="w-full text-sm">
+                        <thead className="bg-gray-50 border-b">
                             <tr className="text-left text-xs text-gray-400 uppercase">
                                 <th className="px-4 py-3 font-medium">Thời gian</th>
                                 <th className="px-4 py-3 font-medium">Sản phẩm</th>
@@ -203,18 +157,17 @@ export default function AdminInventoryPage() {
                                 <tr key={log.Id} className="border-b border-gray-50">
                                     <td className="px-4 py-3 text-gray-400 text-xs">{new Date(log.CreatedAt).toLocaleString("vi-VN")}</td>
                                     <td className="px-4 py-3 font-medium text-gray-900">{log.ItemName}</td>
-                                    <td className="px-4 py-3 text-gray-500">{log.ChangeTypeLabel || log.ChangeType}</td>
+                                    <td className="px-4 py-3 text-gray-500">{log.ChangeType}</td>
                                     <td className={`px-4 py-3 text-right font-bold ${log.QuantityChange > 0 ? "text-emerald-600" : "text-red-600"}`}>
                                         {log.QuantityChange > 0 ? "+" : ""}{log.QuantityChange}
                                     </td>
-                                    <td className="px-4 py-3 text-right text-gray-400">{log.PreviousStock}</td>
-                                    <td className="px-4 py-3 text-right text-gray-900">{log.NewStock}</td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs">{log.Reason || "—"}</td>
+                                    <td className="px-4 py-3 text-right text-gray-400">{log.PreviousQuantity}</td>
+                                    <td className="px-4 py-3 text-right text-gray-900">{log.NewQuantity}</td>
+                                    <td className="px-4 py-3 text-gray-500 text-xs">{log.Note || "—"}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    </div>
                     {totalPages > 1 && <Pagination page={page} totalPages={totalPages} total={total} label="bản ghi" onPageChange={setPage} />}
                 </div>
             )}
@@ -238,66 +191,6 @@ export default function AdminInventoryPage() {
                         <div className="flex gap-3 mt-6">
                             <button onClick={() => setAdjustItem(null)} className="flex-1 px-4 py-2 border rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">Hủy</button>
                             <button onClick={handleAdjust} disabled={adjusting || adjustQty === 0} className="flex-1 px-4 py-2 bg-[#8B1A1A] text-white rounded-lg text-sm font-bold hover:bg-[#701515] disabled:opacity-50 cursor-pointer">{adjusting ? "Đang lưu..." : "Xác nhận"}</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Create modal */}
-            {showCreate && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !creating && setShowCreate(false)}>
-                    <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-xl" onClick={e => e.stopPropagation()}>
-                        <h2 className="text-lg font-bold text-gray-900 mb-4">Thêm sản phẩm mới</h2>
-
-                        {createError && <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg">{createError}</div>}
-
-                        <div className="grid grid-cols-2 gap-4 mb-4">
-                            <div className="col-span-2">
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Tên sản phẩm *</label>
-                                <input type="text" value={createData.Name} onChange={e => setCreateData({ ...createData, Name: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Nhập tên sản phẩm" />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Danh mục *</label>
-                                <select value={createData.Category} onChange={e => setCreateData({ ...createData, Category: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer">
-                                    <option value="FOOD">Snack / Đồ ăn nhẹ</option>
-                                    <option value="NUT">Các loại hạt</option>
-                                    <option value="DRINK">Trà / Đồ uống mềm</option>
-                                    <option value="ALCOHOL">Rượu</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Giá bán (VNĐ) *</label>
-                                <input type="number" min="0" value={createData.Price} onChange={e => setCreateData({ ...createData, Price: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="VD: 50000" />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Số lượng ban đầu *</label>
-                                <input type="number" min="0" value={createData.InitialStock} onChange={e => setCreateData({ ...createData, InitialStock: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="VD: 100" />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Link ảnh (URL)</label>
-                                <input type="text" value={createData.Image} onChange={e => setCreateData({ ...createData, Image: e.target.value })} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="https://..." />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4 mb-6">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={createData.IsAlcohol} onChange={e => setCreateData({ ...createData, IsAlcohol: e.target.checked })} className="w-4 h-4 text-[#8B1A1A] rounded focus:ring-[#8B1A1A]" />
-                                <span className="text-sm font-medium text-gray-700">Là đồ uống có cồn</span>
-                            </label>
-
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={createData.IsActive} onChange={e => setCreateData({ ...createData, IsActive: e.target.checked })} className="w-4 h-4 text-[#8B1A1A] rounded focus:ring-[#8B1A1A]" />
-                                <span className="text-sm font-medium text-gray-700">Đang bật (Active)</span>
-                            </label>
-                        </div>
-
-                        <div className="flex gap-3">
-                            <button onClick={() => setShowCreate(false)} disabled={creating} className="flex-1 px-4 py-2 border rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 cursor-pointer disabled:opacity-50">Hủy</button>
-                            <button onClick={handleCreate} disabled={creating} className="flex-1 px-4 py-2 bg-[#8B1A1A] text-white rounded-lg text-sm font-bold hover:bg-[#701515] disabled:opacity-50 cursor-pointer">{creating ? "Đang tạo..." : "Tạo sản phẩm"}</button>
                         </div>
                     </div>
                 </div>

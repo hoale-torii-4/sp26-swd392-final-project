@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, StyleSheet,
-    RefreshControl, ScrollView, Platform,
+    RefreshControl, Alert, Platform,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Swipeable } from 'react-native-gesture-handler';
-import Toast from 'react-native-toast-message';
 import { cartService, cartEvents, type CartDto, type CartItemDto } from '../../services/cartService';
 import { mixMatchService } from '../../services/mixMatchService';
 import { AppColors, Spacing, BorderRadius } from '../../constants/theme';
 import LoadingSpinner from '../../components/LoadingSpinner';
-import ConfirmModal from '../../components/ConfirmModal';
 
 const EMPTY_ITEMS: CartItemDto[] = [];
 
@@ -33,8 +30,6 @@ export default function CartScreen() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [selectionTouched, setSelectionTouched] = useState(false);
     const [activeCustomBoxIds, setActiveCustomBoxIds] = useState<Set<string>>(new Set());
-    const [customBoxesMap, setCustomBoxesMap] = useState<Record<string, any>>({});
-    const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
     const fetchCart = useCallback(async () => {
         try {
@@ -47,10 +42,7 @@ export default function CartScreen() {
             
             const boxData = Array.isArray(boxes) ? boxes : (boxes as any)?.Data ?? [];
             const ids = new Set<string>(boxData.map((b: any) => b.Id));
-            const map: Record<string, any> = {};
-            boxData.forEach((b: any) => { map[b.Id] = b; });
             setActiveCustomBoxIds(ids);
-            setCustomBoxesMap(map);
         } catch {
             setError('Không thể tải giỏ hàng.');
         } finally {
@@ -82,59 +74,25 @@ export default function CartScreen() {
     };
 
     const handleRemove = (itemId: string) => {
-        setItemToDelete(itemId);
+        Alert.alert(
+            'Xóa sản phẩm',
+            'Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?',
+            [
+                { text: 'Hủy', style: 'cancel' },
+                {
+                    text: 'Xóa', style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await cartService.removeItem(itemId);
+                            await fetchCart();
+                        } catch { /* silently fail */ }
+                    },
+                },
+            ],
+        );
     };
 
-    const confirmRemove = async () => {
-        if (!itemToDelete) return;
-        try {
-            await cartService.removeItem(itemToDelete);
-            await fetchCart();
-            Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã xóa sản phẩm khỏi giỏ hàng.' });
-        } catch {
-            Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Không thể xóa sản phẩm.' });
-        } finally {
-            setItemToDelete(null);
-        }
-    };
-
-    const directRemove = async (itemId: string) => {
-        if (!cart) return;
-        const previousItems = cart.Items;
-        const nextItems = previousItems.filter((item) => item.Id !== itemId);
-        setCart({ ...cart, Items: nextItems, TotalAmount: nextItems.reduce((sum, item) => sum + item.UnitPrice * item.Quantity, 0) });
-
-        try {
-            await cartService.removeItem(itemId);
-            Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã xóa sản phẩm khỏi giỏ hàng.' });
-        } catch {
-            setCart({ ...cart, Items: previousItems });
-            Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Không thể xóa sản phẩm.' });
-        }
-    };
-
-    const items = useMemo(() => {
-        const cartItems = cart?.Items ?? EMPTY_ITEMS;
-        
-        return cartItems.map((item) => {
-            const isCustomBox = item.Type === 1 || String(item.Type) === '1' || (item.Type as any) === 'MIX_MATCH' || (item.Type as any) === 'MixMatch';
-            
-            // The backend maps CustomBoxId into ProductId for CartItemDto
-            const actualCustomBoxId = item.ProductId || item.CustomBoxId || item.GiftBoxId;
-            const targetBox = actualCustomBoxId ? customBoxesMap[actualCustomBoxId] : null;
-
-            if (isCustomBox && targetBox) {
-                const updatedPrice = targetBox.TotalPrice;
-                return { ...item, UnitPrice: updatedPrice, CustomBoxId: actualCustomBoxId };
-            }
-            
-            if (isCustomBox && actualCustomBoxId) {
-                return { ...item, CustomBoxId: actualCustomBoxId };
-            }
-            
-            return item;
-        });
-    }, [cart?.Items, customBoxesMap]);
+    const items = useMemo(() => cart?.Items ?? EMPTY_ITEMS, [cart?.Items]);
 
     const selectableItems = useMemo(() => {
         return items.filter(i => !(i.Type === 1 && i.CustomBoxId && !activeCustomBoxIds.has(i.CustomBoxId)));
@@ -182,8 +140,8 @@ export default function CartScreen() {
     };
 
     const renderRightActions = (itemId: string) => (
-        <View style={[styles.swipeActions, { width: 100 }]}>
-            <TouchableOpacity onPress={() => directRemove(itemId)} style={styles.swipeDeleteBtn}>
+        <View style={styles.swipeActions}>
+            <TouchableOpacity onPress={() => handleRemove(itemId)} style={styles.swipeDeleteBtn}>
                 <Ionicons name="trash-outline" size={20} color="#FFF" />
                 <Text style={styles.swipeDeleteText}>Xóa</Text>
             </TouchableOpacity>
@@ -193,23 +151,11 @@ export default function CartScreen() {
     if (loading) return <LoadingSpinner />;
 
     const renderCartItem = ({ item }: { item: CartItemDto }) => {
-        const isCustomBox = item.Type === 1 || String(item.Type) === '1' || (item.Type as any) === 'MIX_MATCH' || (item.Type as any) === 'MixMatch';
-        const isReadyMade = item.Type === 0 || String(item.Type) === '0' || (item.Type as any) === 'READY_MADE' || (item.Type as any) === 'ReadyMade';
+        const isCustomBox = item.Type === 1;
         const isDisabledCustomBox = Boolean(isCustomBox && item.CustomBoxId && !activeCustomBoxIds.has(item.CustomBoxId));
 
         return (
-        <Swipeable 
-            renderRightActions={() => renderRightActions(item.Id)} 
-            overshootRight={false}
-            friction={1.1}
-            rightThreshold={50}
-            useNativeAnimations
-            onSwipeableOpen={(direction) => {
-                if (direction === 'right') {
-                    directRemove(item.Id);
-                }
-            }}
-        >
+        <Swipeable renderRightActions={() => renderRightActions(item.Id)} overshootRight={false}>
             <View style={[styles.cartItem, isDisabledCustomBox && { opacity: 0.5 }]}>
                 <TouchableOpacity 
                     onPress={() => !isDisabledCustomBox && toggleSelectItem(item.Id)} 
@@ -222,70 +168,56 @@ export default function CartScreen() {
                         color={isDisabledCustomBox ? AppColors.border : (selectedIds.has(item.Id) ? AppColors.primary : AppColors.textMuted)}
                     />
                 </TouchableOpacity>
-
+                <View style={styles.cartItemLeft}>
+                    <View style={styles.itemImagePlaceholder}>
+                        <Ionicons name="gift-outline" size={28} color={AppColors.primary} />
+                    </View>
+                </View>
                 <TouchableOpacity 
-                    style={{ flex: 1, flexDirection: 'row' }}
-                    activeOpacity={0.7}
+                    style={styles.cartItemRight}
+                    activeOpacity={isCustomBox && !isDisabledCustomBox ? 0.7 : 1}
+                    disabled={isDisabledCustomBox}
                     onPress={() => {
-                        if (isCustomBox && item.CustomBoxId) {
-                            router.push(`/custom-box/${item.CustomBoxId}` as any);
-                        } else if (isCustomBox) {
+                        if (isCustomBox && !isDisabledCustomBox) {
+                            // The user asked to be able to view details, we can navigate to custom-boxes
                             router.push('/custom-boxes' as any);
-                        } else if (isReadyMade && item.ProductId) {
-                            router.push(`/product/${item.ProductId}` as any);
                         }
                     }}
                 >
-                    <View style={styles.cartItemLeft}>
-                        {isCustomBox ? (
-                            <View style={[styles.itemImagePlaceholder, { backgroundColor: '#FDF3E7' }]}>
-                                <Ionicons name="gift" size={32} color="#D97706" />
-                            </View>
-                        ) : item.ImageUrl ? (
-                            <Image source={{ uri: item.ImageUrl }} style={styles.itemImagePlaceholder} contentFit="cover" />
-                        ) : (
-                            <View style={styles.itemImagePlaceholder}>
-                                <Ionicons name="gift-outline" size={28} color={AppColors.primary} />
-                            </View>
-                        )}
-                    </View>
-                    
-                    <View style={styles.cartItemRight}>
-                        <View style={styles.itemHeader}>
-                            <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={styles.itemName} numberOfLines={2}>
-                                        {item.Name || 'Sản phẩm'} {isDisabledCustomBox && '(Đã Xoá)'}
-                                    </Text>
-                                    <View style={[styles.typeBadge, { backgroundColor: isReadyMade ? '#0F766E' : '#D97706' }]}>
-                                        <Text style={styles.typeBadgeText}>{isReadyMade ? 'GIỎ QUÀ CÓ SẴN' : 'TỰ CHỈNH RIÊNG'}</Text>
-                                    </View>
+                    <View style={styles.itemHeader}>
+                        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                            <View style={{ flex: 1 }}>
+                                <Text style={styles.itemName} numberOfLines={2}>
+                                    {item.Name || 'Sản phẩm'} {isDisabledCustomBox && '(Đã Xoá)'}
+                                </Text>
+                                <View style={[styles.typeBadge, { backgroundColor: item.Type === 0 ? '#0F766E' : '#D97706' }]}>
+                                    <Text style={styles.typeBadgeText}>{getTypeLabel(item.Type)}</Text>
                                 </View>
-                                {isCustomBox && (
-                                    <Ionicons name="chevron-forward" size={16} color={AppColors.textMuted} />
-                                )}
                             </View>
+                            {item.Type === 1 && (
+                                <Ionicons name="chevron-forward" size={16} color={AppColors.textMuted} />
+                            )}
                         </View>
-                        <Text style={styles.unitPrice}>Đơn giá: {formatPrice(item.UnitPrice)}</Text>
-                        <View style={styles.itemFooter}>
-                            <View style={styles.qtyControl}>
-                                <TouchableOpacity
-                                    style={[styles.qtyBtn, item.Quantity <= 1 && styles.qtyBtnDisabled]}
-                                    onPress={() => handleQuantityChange(item.Id, item.Quantity, -1)}
-                                    disabled={item.Quantity <= 1}
-                                >
-                                    <Ionicons name="remove" size={16} color={item.Quantity <= 1 ? AppColors.textMuted : AppColors.text} />
-                                </TouchableOpacity>
-                                <Text style={styles.qtyText}>{item.Quantity}</Text>
-                                <TouchableOpacity
-                                    style={styles.qtyBtn}
-                                    onPress={() => handleQuantityChange(item.Id, item.Quantity, 1)}
-                                >
-                                    <Ionicons name="add" size={16} color={AppColors.text} />
-                                </TouchableOpacity>
-                            </View>
-                            <Text style={styles.itemTotal}>{formatPrice(item.UnitPrice * item.Quantity)}</Text>
+                    </View>
+                    <Text style={styles.unitPrice}>Đơn giá: {formatPrice(item.UnitPrice)}</Text>
+                    <View style={styles.itemFooter}>
+                        <View style={styles.qtyControl}>
+                            <TouchableOpacity
+                                style={[styles.qtyBtn, item.Quantity <= 1 && styles.qtyBtnDisabled]}
+                                onPress={() => handleQuantityChange(item.Id, item.Quantity, -1)}
+                                disabled={item.Quantity <= 1}
+                            >
+                                <Ionicons name="remove" size={16} color={item.Quantity <= 1 ? AppColors.textMuted : AppColors.text} />
+                            </TouchableOpacity>
+                            <Text style={styles.qtyText}>{item.Quantity}</Text>
+                            <TouchableOpacity
+                                style={styles.qtyBtn}
+                                onPress={() => handleQuantityChange(item.Id, item.Quantity, 1)}
+                            >
+                                <Ionicons name="add" size={16} color={AppColors.text} />
+                            </TouchableOpacity>
                         </View>
+                        <Text style={styles.itemTotal}>{formatPrice(item.UnitPrice * item.Quantity)}</Text>
                     </View>
                 </TouchableOpacity>
             </View>
@@ -304,40 +236,35 @@ export default function CartScreen() {
             </View>
 
             {error ? (
-                <ScrollView 
-                    contentContainerStyle={styles.centerContainer}
-                    refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppColors.primary} />}
-                >
+                <View style={styles.centerContainer}>
                     <Ionicons name="alert-circle-outline" size={48} color={AppColors.error} style={{ marginBottom: 10 }} />
                     <Text style={styles.errorText}>{error}</Text>
                     <TouchableOpacity onPress={() => { setLoading(true); fetchCart(); }} style={styles.retryBtn}>
                         <Text style={styles.retryText}>Thử lại</Text>
                     </TouchableOpacity>
-                </ScrollView>
+                </View>
+            ) : items.length === 0 ? (
+                <View style={styles.centerContainer}>
+                    <Ionicons name="cart-outline" size={64} color={AppColors.border} style={{ marginBottom: 12 }} />
+                    <Text style={styles.emptyTitle}>Giỏ hàng trống</Text>
+                    <Text style={styles.emptyDesc}>Hãy khám phá bộ sưu tập quà Tết sang trọng!</Text>
+                    <TouchableOpacity
+                        style={styles.exploreBtnContainer}
+                        onPress={() => router.push('/(tabs)/gift-boxes' as any)}
+                    >
+                        <Text style={styles.exploreBtnText}>Khám phá giỏ quà →</Text>
+                    </TouchableOpacity>
+                </View>
             ) : (
                 <>
                     <FlatList
-                        style={{ flex: 1 }}
                         data={items}
                         renderItem={renderCartItem}
                         keyExtractor={(item) => item.Id}
-                        contentContainerStyle={[styles.listContent, items.length === 0 && { flex: 1, justifyContent: 'center' }]}
+                        contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
                         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={AppColors.primary} />}
-                        ListEmptyComponent={(
-                            <View style={styles.centerContainer}>
-                                <Ionicons name="cart-outline" size={64} color={AppColors.border} style={{ marginBottom: 12 }} />
-                                <Text style={styles.emptyTitle}>Giỏ hàng trống</Text>
-                                <Text style={styles.emptyDesc}>Hãy khám phá bộ sưu tập quà Tết sang trọng!</Text>
-                                <TouchableOpacity
-                                    style={styles.exploreBtnContainer}
-                                    onPress={() => router.push('/(tabs)/gift-boxes' as any)}
-                                >
-                                    <Text style={styles.exploreBtnText}>Khám phá giỏ quà →</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-                        ListHeaderComponent={items.length > 0 ? (
+                        ListHeaderComponent={(
                             <View style={styles.selectAllRow}>
                                 <TouchableOpacity onPress={toggleSelectAll} style={styles.selectAllLeft}>
                                     <Ionicons
@@ -349,56 +276,43 @@ export default function CartScreen() {
                                 </TouchableOpacity>
                                 <Text style={styles.selectedCountText}>Đã chọn {selectedCount}/{items.length}</Text>
                             </View>
-                        ) : null}
+                        )}
                     />
 
                     {/* Sticky Footer */}
-                    {items.length > 0 && (
-                        <View style={styles.footer}>
-                            <View style={styles.footerRow}>
-                                <Text style={styles.footerLabel}>Giá trị quà tặng ({selectedCount})</Text>
-                                <Text style={styles.footerValue}>{formatPrice(selectedTotalAmount)}</Text>
-                            </View>
-                            <View style={styles.footerRow}>
-                                <Text style={styles.footerLabel}>Phí đóng gói & Trang trí</Text>
-                                <Text style={[styles.footerValue, { color: AppColors.success }]}>Miễn phí</Text>
-                            </View>
-                            <View style={styles.footerDivider} />
-                            <View style={styles.footerRow}>
-                                <Text style={styles.footerTotalLabel}>Tổng giá trị</Text>
-                                <Text style={styles.footerTotalValue}>{formatPrice(selectedTotalAmount)}</Text>
-                            </View>
-                            <TouchableOpacity
-                                style={[styles.checkoutBtn, selectedCount === 0 && styles.checkoutBtnDisabled]}
-                                onPress={() => {
-                                    if (selectedCount === 0) return;
-                                    router.push({
-                                        pathname: '/checkout' as any,
-                                        params: {
-                                            selectedItems: JSON.stringify(selectedItems),
-                                        },
-                                    });
-                                }}
-                                disabled={selectedCount === 0}
-                            >
-                                <Text style={styles.checkoutBtnText}>Thanh toán</Text>
-                                <Ionicons name="arrow-forward" size={16} color="#FFF" />
-                            </TouchableOpacity>
+                    <View style={styles.footer}>
+                        <View style={styles.footerRow}>
+                            <Text style={styles.footerLabel}>Giá trị quà tặng ({selectedCount})</Text>
+                            <Text style={styles.footerValue}>{formatPrice(selectedTotalAmount)}</Text>
                         </View>
-                    )}
+                        <View style={styles.footerRow}>
+                            <Text style={styles.footerLabel}>Phí đóng gói & Trang trí</Text>
+                            <Text style={[styles.footerValue, { color: AppColors.success }]}>Miễn phí</Text>
+                        </View>
+                        <View style={styles.footerDivider} />
+                        <View style={styles.footerRow}>
+                            <Text style={styles.footerTotalLabel}>Tổng giá trị</Text>
+                            <Text style={styles.footerTotalValue}>{formatPrice(selectedTotalAmount)}</Text>
+                        </View>
+                        <TouchableOpacity
+                            style={[styles.checkoutBtn, selectedCount === 0 && styles.checkoutBtnDisabled]}
+                            onPress={() => {
+                                if (selectedCount === 0) return;
+                                router.push({
+                                    pathname: '/checkout' as any,
+                                    params: {
+                                        selectedItems: JSON.stringify(selectedItems),
+                                    },
+                                });
+                            }}
+                            disabled={selectedCount === 0}
+                        >
+                            <Text style={styles.checkoutBtnText}>Thanh toán</Text>
+                            <Ionicons name="arrow-forward" size={16} color="#FFF" />
+                        </TouchableOpacity>
+                    </View>
                 </>
             )}
-            
-            <ConfirmModal
-                visible={!!itemToDelete}
-                title="Xóa sản phẩm"
-                message="Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?"
-                confirmText="Xóa"
-                cancelText="Hủy"
-                onConfirm={confirmRemove}
-                onCancel={() => setItemToDelete(null)}
-                isDestructive={true}
-            />
         </View>
     );
 }
@@ -472,14 +386,12 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'flex-end',
         paddingRight: Spacing.lg,
-        height: '100%',
     },
     swipeDeleteBtn: {
         backgroundColor: AppColors.error,
         borderRadius: BorderRadius.sm,
         paddingHorizontal: 16,
         paddingVertical: 10,
-        height: '80%',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 4,

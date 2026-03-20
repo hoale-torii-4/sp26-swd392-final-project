@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { productService, type GiftBoxDetailDto } from '../../services/productService';
-import { cartService, cartEvents } from '../../services/cartService';
+import { cartService } from '../../services/cartService';
 import { AppColors, Spacing, BorderRadius } from '../../constants/theme';
 import LoadingSpinner from '../../components/LoadingSpinner';
 
@@ -18,7 +18,7 @@ function formatPrice(v: number) {
 }
 
 export default function ProductDetailScreen() {
-    const { id, type } = useLocalSearchParams<{ id: string; type?: string }>();
+    const { id } = useLocalSearchParams<{ id: string }>();
     const router = useRouter();
 
     const [product, setProduct] = useState<GiftBoxDetailDto | null>(null);
@@ -26,7 +26,6 @@ export default function ProductDetailScreen() {
     const [error, setError] = useState<string | null>(null);
     const [selectedImage, setSelectedImage] = useState(0);
     const [quantity, setQuantity] = useState(1);
-    const [cartQuantity, setCartQuantity] = useState(0);
     const [addingToCart, setAddingToCart] = useState(false);
     const [cartMsg, setCartMsg] = useState<string | null>(null);
     const [cartMsgSuccess, setCartMsgSuccess] = useState(false);
@@ -36,43 +35,12 @@ export default function ProductDetailScreen() {
     useEffect(() => {
         if (!id) return;
         setLoading(true);
-        const fetcher = type === 'item' ? productService.getItemByIdAsProduct : productService.getGiftBoxById;
-        fetcher(id)
+        productService
+            .getGiftBoxById(id)
             .then((data) => { setProduct(data); setSelectedImage(0); })
             .catch(() => setError('Không tìm thấy sản phẩm.'))
             .finally(() => setLoading(false));
-    }, [id, type]);
-
-    useEffect(() => {
-        if (!id || type === 'item') return;
-
-        const syncCartQuantity = async () => {
-            try {
-                const cart = await cartService.getCart();
-                const matched = cart.Items.find((item) =>
-                    item.Type === 0 && (item.GiftBoxId === id || item.ProductId === id || item.Id === id)
-                );
-                if (matched) {
-                    setCartQuantity(matched.Quantity);
-                    setQuantity(matched.Quantity);
-                } else {
-                    setCartQuantity(0);
-                    setQuantity(1);
-                }
-            } catch {
-                // ignore cart sync errors
-            }
-        };
-
-        syncCartQuantity();
-        const stop = cartEvents.subscribe(() => {
-            syncCartQuantity();
-        });
-
-        return () => {
-            stop();
-        };
-    }, [id, type]);
+    }, [id]);
 
     const handleAddToCart = async () => {
         if (!product || addingToCart) return;
@@ -184,32 +152,23 @@ export default function ProductDetailScreen() {
                     <View style={styles.divider} />
 
                     {/* Quantity */}
-                    {type !== 'item' && (
-                        <View>
-                            <View style={styles.qtyHeaderRow}>
-                                <Text style={styles.qtyLabel}>Số lượng</Text>
-                                {cartQuantity > 0 && (
-                                    <Text style={styles.qtyInCart}>Đã có {cartQuantity} trong giỏ hàng</Text>
-                                )}
-                            </View>
-                            <View style={styles.qtyControl}>
-                                <TouchableOpacity
-                                    style={[styles.qtyBtn, quantity <= 1 && styles.qtyBtnDisabled]}
-                                    onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-                                    disabled={quantity <= 1}
-                                >
-                                    <Ionicons name="remove" size={18} color={quantity <= 1 ? AppColors.textMuted : AppColors.text} />
-                                </TouchableOpacity>
-                                <Text style={styles.qtyText}>{quantity}</Text>
-                                <TouchableOpacity
-                                    style={styles.qtyBtn}
-                                    onPress={() => setQuantity((q) => q + 1)}
-                                >
-                                    <Ionicons name="add" size={18} color={AppColors.text} />
-                                </TouchableOpacity>
-                            </View>
-                        </View>
-                    )}
+                    <Text style={styles.qtyLabel}>Số lượng</Text>
+                    <View style={styles.qtyControl}>
+                        <TouchableOpacity
+                            style={[styles.qtyBtn, quantity <= 1 && styles.qtyBtnDisabled]}
+                            onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+                            disabled={quantity <= 1}
+                        >
+                            <Ionicons name="remove" size={18} color={quantity <= 1 ? AppColors.textMuted : AppColors.text} />
+                        </TouchableOpacity>
+                        <Text style={styles.qtyText}>{quantity}</Text>
+                        <TouchableOpacity
+                            style={styles.qtyBtn}
+                            onPress={() => setQuantity((q) => q + 1)}
+                        >
+                            <Ionicons name="add" size={18} color={AppColors.text} />
+                        </TouchableOpacity>
+                    </View>
 
                     {/* Cart message */}
                     {cartMsg && (
@@ -268,25 +227,20 @@ export default function ProductDetailScreen() {
                 </View>
             </ScrollView>
 
-            {/* Sticky info & add to cart */}
-            {type !== 'item' && (
-                <View style={[styles.stickyFooter, { paddingBottom: Platform.OS === 'ios' ? 34 : 16 }]}>
-                    <TouchableOpacity
-                        style={[styles.addToCartBtn, addingToCart && styles.btnDisabled]}
-                        disabled={addingToCart}
-                        onPress={handleAddToCart}
-                    >
-                        {addingToCart ? (
-                            <LoadingSpinner />
-                        ) : (
-                            <>
-                                <Ionicons name="cart-outline" size={20} color="#FFF" />
-                                <Text style={styles.addToCartText}>Thêm vào giỏ hàng • {formatPrice(product.Price * quantity)}</Text>
-                            </>
-                        )}
-                    </TouchableOpacity>
-                </View>
-            )}
+            {/* Sticky Add to Cart */}
+            <View style={styles.stickyFooter}>
+                <TouchableOpacity
+                    style={[styles.addToCartBtn, addingToCart && styles.btnDisabled]}
+                    onPress={handleAddToCart}
+                    disabled={addingToCart}
+                    activeOpacity={0.85}
+                >
+                    <Ionicons name="cart" size={20} color="#FFF" />
+                    <Text style={styles.addToCartText}>
+                        {addingToCart ? 'Đang thêm...' : 'Thêm vào giỏ'}
+                    </Text>
+                </TouchableOpacity>
+            </View>
         </View>
     );
 }
@@ -355,20 +309,9 @@ const styles = StyleSheet.create({
     description: { fontSize: 14, color: AppColors.textSecondary, lineHeight: 22, marginBottom: 16 },
     divider: { height: 1, backgroundColor: AppColors.border, marginVertical: 16 },
 
-    qtyHeaderRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        marginBottom: 8,
-    },
     qtyLabel: {
         fontSize: 11, fontWeight: '700', color: AppColors.textMuted,
-        textTransform: 'uppercase', letterSpacing: 1,
-    },
-    qtyInCart: {
-        fontSize: 11,
-        color: AppColors.primary,
-        fontWeight: '600',
+        textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8,
     },
     qtyControl: {
         flexDirection: 'row', alignItems: 'center', borderWidth: 1,

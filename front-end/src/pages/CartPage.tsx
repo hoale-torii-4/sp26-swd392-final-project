@@ -12,12 +12,12 @@ function formatPrice(v: number) {
     return v.toLocaleString("vi-VN") + "₫";
 }
 
-function getTypeLabel(type: number | string): string {
-    return (type === 0 || type === "READY_MADE") ? "GIỎ QUÀ CÓ SẴN" : "TỰ CHỈNH RIÊNG";
+function getTypeLabel(type: number): string {
+    return type === 0 ? "GIỎ QUÀ CÓ SẴN" : "TỰ CHỈNH RIÊNG";
 }
 
-function getTypeColor(type: number | string): string {
-    return (type === 0 || type === "READY_MADE") ? "bg-teal-700" : "bg-amber-600";
+function getTypeColor(type: number): string {
+    return type === 0 ? "bg-teal-700" : "bg-amber-600";
 }
 
 /* ═══════════════════ COMPONENT ═══════════════════ */
@@ -350,14 +350,14 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                     />
                 </div>
                 {/* Product placeholder image */}
-                <Link to={(item.Type === 0 || item.Type === "READY_MADE") ? `/gift-boxes/${item.ProductId || item.Id}` : '/custom-box'} className={`w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 hover:opacity-80 transition-opacity ${isInactive ? "grayscale" : ""}`}>
+                <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-gray-100 shrink-0 flex items-center justify-center text-gray-300 ${isInactive ? "grayscale" : ""}`}>
                     {item.ImageUrl ? (
                         <img
                             src={item.ImageUrl}
                             alt={item.Name ?? "Giỏ quà"}
                             className="w-full h-full object-cover"
                         />
-                    ) : (item.Type === 1 || item.Type === "MIX_MATCH") ? (
+                    ) : item.Type === 1 ? (
                         <img
                             src={mixMatchDefault}
                             alt="Giỏ quà Mix & Match"
@@ -368,15 +368,15 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
                         </svg>
                     )}
-                </Link>
+                </div>
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-start">
                         <div>
-                            <Link to={(item.Type === 0 || item.Type === "READY_MADE") ? `/gift-boxes/${item.ProductId || item.Id}` : '/custom-box'} className="font-bold text-gray-900 text-base mb-1.5 hover:text-[#8B1A1A] transition-colors line-clamp-2">
+                            <h3 className="font-bold text-gray-900 text-base mb-1.5">
                                 {item.Name || "Sản phẩm"}
-                            </Link>
+                            </h3>
                             {/* Type tag */}
                             <div className="flex flex-wrap gap-1.5 mb-2">
                                 <span className={`px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-white rounded ${getTypeColor(item.Type)}`}>
