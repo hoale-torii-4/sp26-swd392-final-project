@@ -113,6 +113,50 @@ export default function MixMatchPage() {
         });
     };
 
+    const validateMixMatchRules = (): string | null => {
+        const validItems = slotItems.filter(Boolean);
+        const totalItems = validItems.length;
+
+        if (totalItems < 4 || totalItems > 6) {
+            return "Mix & Match phải có tổng từ 4 đến 6 món.";
+        }
+
+        let drinkCount = 0;
+        let alcoholCount = 0;
+        let nutCount = 0;
+        let foodCount = 0;
+        let savoryCount = 0;
+        let hasChivas21 = false;
+
+        const savoryNames = ["Khô gà lá chanh", "Khô bò", "Chà bông cá hồi", "Lạp xưởng tươi"];
+
+        validItems.forEach(item => {
+            if (!item) return;
+
+            if (item.Category === "DRINK") drinkCount++;
+            if (item.Category === "ALCOHOL") alcoholCount++;
+            if (item.Category === "NUT") nutCount++;
+            if (item.Category === "FOOD") foodCount++;
+
+            if (savoryNames.includes(item.Name)) savoryCount++;
+            if (item.Name.toLowerCase().includes("chivas 21")) hasChivas21 = true;
+        });
+
+        const snackCount = nutCount + foodCount;
+
+        if (drinkCount + alcoholCount < 1) {
+            return "Mix & Match phải có ít nhất 1 sản phẩm nhóm đồ uống (Trà hoặc Rượu).";
+        }
+        if (snackCount < 2) {
+            return "Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo).";
+        }
+        if (hasChivas21 && savoryCount > 1) {
+            return "Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn.";
+        }
+
+        return null;
+    };
+
     const buildItemsPayload = () => {
         const payload = slots
             .filter(Boolean)
@@ -125,6 +169,12 @@ export default function MixMatchPage() {
     };
 
     const handleCreateCustomBox = async () => {
+        const validationError = validateMixMatchRules();
+        if (validationError) {
+            toast.error(validationError);
+            return;
+        }
+
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
@@ -146,6 +196,12 @@ export default function MixMatchPage() {
     };
 
     const handleAddToCart = async () => {
+        const validationError = validateMixMatchRules();
+        if (validationError) {
+            toast.error(validationError);
+            return;
+        }
+
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {
@@ -168,6 +224,12 @@ export default function MixMatchPage() {
     };
 
     const handleBuyNow = async () => {
+        const validationError = validateMixMatchRules();
+        if (validationError) {
+            toast.error(validationError);
+            return;
+        }
+
         setIsSubmitting(true);
         const itemsPayload = buildItemsPayload();
         try {

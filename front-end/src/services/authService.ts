@@ -102,7 +102,11 @@ export const authService = {
         if (!authService.isAuthenticated()) return false;
         try {
             const user = authService.getUser();
-            if (user && (user.Role === 1 || user.Role === 2)) return true;
+            if (user && (
+                user.Role === 1 || user.Role === 2 || 
+                user.Role === "ADMIN" || user.Role === "STAFF" || 
+                user.Role === "1" || user.Role === "2"
+            )) return true;
 
             const token = localStorage.getItem(TOKEN_KEY);
             if (!token) return false;

@@ -6,10 +6,8 @@ using System.Security.Claims;
 
 namespace ShopHangTet.Controllers
 {
-    // ════════════════════════════════════════════════════════════════════
     // ADMIN — quản lý item và cấu hình rules
     // Route: /api/admin/mix-match/...
-    // ════════════════════════════════════════════════════════════════════
     [ApiController]
     [Route("api/admin/mix-match")]
     [Authorize(Roles = "ADMIN")]
@@ -23,7 +21,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── Items ────────────────────────────────────────────────────────
-
         /// GET /api/admin/mix-match/items?search=&category=&isActive=&page=1&pageSize=20
         [HttpGet("items")]
         public async Task<IActionResult> GetItems(
@@ -102,6 +99,10 @@ namespace ShopHangTet.Controllers
                 await _service.DeleteItemAsync(id);
                 return Ok(ApiResponse<object>.SuccessResult(new { id }, "Item deleted"));
             }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+            }
             catch (Exception ex)
             {
                 return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
@@ -109,7 +110,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── Categories ───────────────────────────────────────────────────
-
         /// GET /api/admin/mix-match/categories
         [HttpGet("categories")]
         public async Task<IActionResult> GetCategories()
@@ -119,7 +119,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── Rules ────────────────────────────────────────────────────────
-
         /// GET /api/admin/mix-match/rules
         [HttpGet("rules")]
         public async Task<IActionResult> GetRules()
@@ -144,10 +143,8 @@ namespace ShopHangTet.Controllers
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
     // CUSTOMER — browse items, build custom box, validate
     // Route: /api/mix-match/...
-    // ════════════════════════════════════════════════════════════════════
     [ApiController]
     [Route("api/mix-match")]
     public class MixMatchController : ControllerBase
@@ -167,7 +164,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── Public endpoints (không cần login) ──────────────────────────
-
         /// Lấy danh sách item để khách chọn — chỉ trả item IsActive=true
         /// GET /api/mix-match/items?category=DRINK&page=1&pageSize=50
         [HttpGet("items")]
@@ -202,7 +198,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── Custom Box — Guest và Member ─────────────────────────────────
-
         /// Tạo custom box mới
         /// POST /api/mix-match/custom-box
         /// Guest: userId lấy từ body (session-based), Member: từ JWT
@@ -260,7 +255,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── Custom Box — Member only ──────────────────────────────────────
-
         /// Custom box mới nhất của user đang login
         /// GET /api/mix-match/custom-box/me
         [Authorize]

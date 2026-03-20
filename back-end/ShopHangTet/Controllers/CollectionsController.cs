@@ -5,10 +5,8 @@ using ShopHangTet.Services;
 
 namespace ShopHangTet.Controllers
 {
-    // ════════════════════════════════════════════════════════════════════
     // ADMIN Collection Management
     // Route: /api/admin/collections/...
-    // ════════════════════════════════════════════════════════════════════
     [ApiController]
     [Route("api/admin/collections")]
     [Authorize(Roles = "ADMIN")]
@@ -22,7 +20,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── List & Detail ────────────────────────────────────────────────
-
         /// GET /api/admin/collections
         [HttpGet]
         public async Task<IActionResult> Get()
@@ -42,7 +39,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── CRUD ─────────────────────────────────────────────────────────
-
         /// POST /api/admin/collections
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CollectionCreateDTO dto)
@@ -90,7 +86,6 @@ namespace ShopHangTet.Controllers
                 return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
             }
         }
-
         /// DELETE /api/admin/collections/{id}
         /// Không được xóa nếu còn GiftBox liên kết
         [HttpDelete("{id}")]
@@ -101,6 +96,10 @@ namespace ShopHangTet.Controllers
                 await _service.DeleteCollectionAsync(id);
                 return Ok(ApiResponse<object>.SuccessResult(new { id }, "Collection deleted"));
             }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+            }
             catch (Exception ex)
             {
                 return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
@@ -108,7 +107,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── Reorder ───────────────────────────────────────────────────────
-
         /// PUT /api/admin/collections/reorder
         /// Body: [{ "id": "...", "displayOrder": 1 }, ...]
         /// Dùng PUT thay PATCH vì gửi toàn bộ danh sách thứ tự mới

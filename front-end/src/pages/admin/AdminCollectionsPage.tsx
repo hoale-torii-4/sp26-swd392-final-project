@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { toast } from "react-toastify";
 import { adminService, type CollectionResponse } from "../../services/adminService";
 
 export default function AdminCollectionsPage() {
@@ -37,7 +38,13 @@ export default function AdminCollectionsPage() {
 
     const handleDelete = async (c: CollectionResponse) => {
         if (!confirm(`Xóa bộ sưu tập "${c.Name}"?`)) return;
-        try { await adminService.deleteCollection(c.Id); fetch(); } catch { /* ignore */ }
+        try { 
+            await adminService.deleteCollection(c.Id); 
+            toast.success("Đã xóa bộ sưu tập");
+            fetch(); 
+        } catch (err: any) { 
+            toast.error(err?.response?.data?.Message || "Không thể xóa bộ sưu tập này");
+        }
     };
 
     return (

@@ -7,6 +7,7 @@ export interface MixMatchItem {
     Category?: string;
     CategoryLabel?: string;
     Price?: number;
+    IsAlcohol?: boolean;
 }
 
 export interface CustomBoxItemPayload {
@@ -20,6 +21,7 @@ export interface CustomBoxItemResponse {
     Price: number;
     Quantity: number;
     Subtotal: number;
+    ImageUrl?: string;
 }
 
 export interface CustomBoxResponse {

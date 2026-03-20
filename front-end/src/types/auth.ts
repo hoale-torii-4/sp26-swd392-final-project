@@ -23,8 +23,8 @@ export interface User {
     Email: string;
     FullName: string;
     Phone: string;
-    Role: number;
-    Status: number;
+    Role: number | string;
+    Status: number | string;
     CreatedAt: string;
 }
 

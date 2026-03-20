@@ -5,10 +5,8 @@ using ShopHangTet.Services;
 
 namespace ShopHangTet.Controllers
 {
-    // ════════════════════════════════════════════════════════════════════
     // ADMIN GiftBox Management
     // Route: /api/admin/giftboxes/...
-    // ════════════════════════════════════════════════════════════════════
     [ApiController]
     [Route("api/admin/giftboxes")]
     [Authorize(Roles = "ADMIN")]
@@ -22,7 +20,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── List & Detail ────────────────────────────────────────────────
-
         /// GET /api/admin/giftboxes?collectionId=&keyword=&status=true&page=1&pageSize=20
         [HttpGet]
         public async Task<IActionResult> Get(
@@ -47,7 +44,6 @@ namespace ShopHangTet.Controllers
         }
 
         // ── CRUD ─────────────────────────────────────────────────────────
-
         /// POST /api/admin/giftboxes
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] GiftBoxCreateDTO dto)
@@ -104,6 +100,10 @@ namespace ShopHangTet.Controllers
             {
                 await _service.DeleteGiftBoxAsync(id);
                 return Ok(ApiResponse<object>.SuccessResult(new { id }, "Gift box deleted"));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
             }
             catch (Exception ex)
             {

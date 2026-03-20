@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { adminService, type OrderStatusSummary } from "../../services/adminService";
+import { adminService, type OrderStatusSummary, type AdminOrderListItem } from "../../services/adminService";
 
 const STATUS_CONFIG: { key: keyof OrderStatusSummary; label: string; color: string; bgColor: string }[] = [
     { key: "PendingPayment", label: "Chờ thanh toán", color: "text-amber-700", bgColor: "bg-amber-500" },
@@ -11,22 +11,56 @@ const STATUS_CONFIG: { key: keyof OrderStatusSummary; label: string; color: stri
     { key: "Cancelled", label: "Đã hủy", color: "text-gray-700", bgColor: "bg-gray-500" },
 ];
 
-// Status update modal
 const ALL_STATUSES = [
-    { value: "PENDING_PAYMENT", label: "Chờ thanh toán" },
+    { value: "", label: "Tất cả trạng thái" },
+    { value: "PAYMENT_CONFIRMING", label: "Chờ thanh toán" },
+    { value: "PREPARING", label: "Đang chuẩn bị" },
+    { value: "SHIPPING", label: "Đang giao" },
+    { value: "COMPLETED", label: "Hoàn tất" },
+    { value: "CANCELLED", label: "Đã hủy" },
+    { value: "DELIVERY_FAILED", label: "Giao thất bại" },
+    { value: "PARTIAL_DELIVERY", label: "Giao một phần" },
+];
+
+const STATUS_UPDATE_OPTIONS = [
     { value: "PREPARING", label: "Đang chuẩn bị" },
     { value: "SHIPPING", label: "Đang giao" },
     { value: "COMPLETED", label: "Hoàn tất" },
     { value: "CANCELLED", label: "Đã hủy" },
 ];
 
+const STATUS_BADGE: Record<string, { text: string; cls: string }> = {
+    PAYMENT_CONFIRMING: { text: "Chờ thanh toán", cls: "bg-amber-100 text-amber-700" },
+    PREPARING: { text: "Đang chuẩn bị", cls: "bg-blue-100 text-blue-700" },
+    SHIPPING: { text: "Đang giao", cls: "bg-indigo-100 text-indigo-700" },
+    PARTIAL_DELIVERY: { text: "Giao một phần", cls: "bg-orange-100 text-orange-700" },
+    DELIVERY_FAILED: { text: "Giao thất bại", cls: "bg-red-100 text-red-700" },
+    COMPLETED: { text: "Hoàn tất", cls: "bg-emerald-100 text-emerald-700" },
+    CANCELLED: { text: "Đã hủy", cls: "bg-gray-100 text-gray-600" },
+    PAYMENT_EXPIRED_INTERNAL: { text: "Hết hạn TT", cls: "bg-gray-100 text-gray-500" },
+};
+
+function formatPrice(v: number) { return v.toLocaleString("vi-VN") + "₫"; }
+function formatDate(d: string) { return new Date(d).toLocaleString("vi-VN"); }
+function getStatusInfo(s: string) { return STATUS_BADGE[s] ?? { text: s, cls: "bg-gray-100 text-gray-600" }; }
+
 export default function AdminOrdersPage() {
     const [statusSummary, setStatusSummary] = useState<OrderStatusSummary | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [summaryLoading, setSummaryLoading] = useState(true);
 
-    // Status update form
+    // Order list
+    const [orders, setOrders] = useState<AdminOrderListItem[]>([]);
+    const [totalOrders, setTotalOrders] = useState(0);
+    const [totalPages, setTotalPages] = useState(0);
+    const [page, setPage] = useState(1);
+    const [keyword, setKeyword] = useState("");
+    const [statusFilter, setStatusFilter] = useState("");
+    const [typeFilter, setTypeFilter] = useState("");
+    const [listLoading, setListLoading] = useState(true);
+
+    // Status update modal
     const [showUpdate, setShowUpdate] = useState(false);
-    const [orderId, setOrderId] = useState("");
+    const [selectedOrder, setSelectedOrder] = useState<AdminOrderListItem | null>(null);
     const [newStatus, setNewStatus] = useState("PREPARING");
     const [statusNote, setStatusNote] = useState("");
     const [updating, setUpdating] = useState(false);
@@ -39,35 +73,59 @@ export default function AdminOrdersPage() {
     const [failureReason, setFailureReason] = useState("");
     const [updatingDelivery, setUpdatingDelivery] = useState(false);
 
-    const fetchData = async () => {
-        setLoading(true);
+    const pageSize = 20;
+
+    const fetchSummary = async () => {
+        setSummaryLoading(true);
         try {
             const res = await adminService.getOrderStatusSummary();
             setStatusSummary(res);
         } catch { setStatusSummary(null); }
-        finally { setLoading(false); }
+        finally { setSummaryLoading(false); }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    const fetchOrders = async () => {
+        setListLoading(true);
+        try {
+            const res = await adminService.getAdminOrders({
+                status: statusFilter || undefined,
+                orderType: typeFilter || undefined,
+                keyword: keyword || undefined,
+                page,
+                pageSize,
+            });
+            setOrders(res.Data);
+            setTotalOrders(res.TotalItems);
+            setTotalPages(res.TotalPages);
+        } catch { setOrders([]); }
+        finally { setListLoading(false); }
+    };
 
-    const totalOrders = statusSummary
-        ? Object.values(statusSummary).reduce((sum: number, v) => sum + (typeof v === "number" ? v : 0), 0)
-        : 0;
+    useEffect(() => { fetchSummary(); }, []);
+    useEffect(() => { fetchOrders(); }, [page, keyword, statusFilter, typeFilter]);
+
+
+    const openUpdateForOrder = (order: AdminOrderListItem) => {
+        setSelectedOrder(order);
+        setNewStatus("PREPARING");
+        setStatusNote("");
+        setUpdateResult(null);
+        setShowUpdate(true);
+        setShowDelivery(false);
+    };
 
     const handleUpdateStatus = async () => {
-        if (!orderId.trim()) return;
+        if (!selectedOrder) return;
         setUpdating(true);
         setUpdateResult(null);
         try {
-            await adminService.updateOrderStatus(orderId.trim(), newStatus, statusNote || undefined);
-            setUpdateResult({ success: true, message: `Đã cập nhật đơn hàng thành công!` });
-            setOrderId("");
-            setStatusNote("");
-            fetchData(); // refresh summary
+            await adminService.updateOrderStatus(selectedOrder.Id, newStatus, statusNote || undefined);
+            setUpdateResult({ success: true, message: "Đã cập nhật thành công!" });
+            fetchOrders();
+            fetchSummary();
         } catch (err: any) {
-            setUpdateResult({ success: false, message: err?.response?.data?.message || "Cập nhật thất bại. Kiểm tra lại mã đơn hàng." });
-        }
-        finally { setUpdating(false); }
+            setUpdateResult({ success: false, message: err?.response?.data?.message || err?.message || "Cập nhật thất bại." });
+        } finally { setUpdating(false); }
     };
 
     const handleUpdateDelivery = async () => {
@@ -82,176 +140,227 @@ export default function AdminOrdersPage() {
             setShowDelivery(false);
             setDeliveryId("");
             setFailureReason("");
-            fetchData();
+            fetchOrders();
+            fetchSummary();
         } catch { /* ignore */ }
         finally { setUpdatingDelivery(false); }
     };
 
     return (
         <div className="p-6 space-y-6">
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Quản lý đơn hàng</h1>
-                    <p className="text-sm text-gray-500">Tổng quan trạng thái và cập nhật đơn hàng</p>
+                    <p className="text-sm text-gray-500">Danh sách đơn hàng, trạng thái và cập nhật</p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={() => { setShowDelivery(true); setShowUpdate(false); }} className="px-4 py-2 border border-[#8B1A1A] text-[#8B1A1A] text-sm font-semibold rounded-lg hover:bg-[#8B1A1A]/5 transition-colors cursor-pointer">
-                        Cập nhật giao hàng
-                    </button>
-                    <button onClick={() => { setShowUpdate(true); setShowDelivery(false); }} className="flex items-center gap-2 px-4 py-2 bg-[#8B1A1A] text-white text-sm font-semibold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
-                        Cập nhật trạng thái
-                    </button>
-                </div>
+                <button onClick={() => { setShowDelivery(true); setShowUpdate(false); }} className="px-4 py-2 border border-[#8B1A1A] text-[#8B1A1A] text-sm font-semibold rounded-lg hover:bg-[#8B1A1A]/5 transition-colors cursor-pointer">
+                    Cập nhật giao hàng
+                </button>
             </div>
 
-            {/* Total orders card */}
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-                <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm text-gray-500">Tổng đơn hàng</p>
-                    <button onClick={fetchData} className="text-xs text-gray-400 hover:text-[#8B1A1A] cursor-pointer">Làm mới</button>
-                </div>
-                <p className="text-3xl font-bold text-gray-900">{loading ? "..." : totalOrders}</p>
-            </div>
-
-            {/* Status breakdown grid */}
-            {loading ? (
-                <div className="text-center py-8 text-gray-400">Đang tải...</div>
-            ) : statusSummary ? (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Status summary cards */}
+            {summaryLoading ? (
+                <div className="text-center py-4 text-gray-400 text-sm">Đang tải tổng quan...</div>
+            ) : statusSummary && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
                     {STATUS_CONFIG.map(({ key, label, color, bgColor }) => {
                         const count = statusSummary[key] ?? 0;
-                        const pct = totalOrders > 0 ? (count / totalOrders * 100) : 0;
                         return (
-                            <div key={key} className="bg-white rounded-xl p-5 shadow-sm">
-                                <div className="flex items-center justify-between mb-3">
-                                    <span className="text-xs text-gray-400 uppercase tracking-wider">{label}</span>
-                                    <div className={`w-3 h-3 rounded-full ${bgColor}`} />
+                            <div key={key} className="bg-white rounded-xl p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onClick={() => { setStatusFilter(key === "PendingPayment" ? "PAYMENT_CONFIRMING" : key === "DeliveryFailed" ? "DELIVERY_FAILED" : key === "PartiallyDelivered" ? "PARTIAL_DELIVERY" : key.toUpperCase()); setPage(1); }}>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <div className={`w-2.5 h-2.5 rounded-full ${bgColor}`} />
+                                    <span className="text-[10px] text-gray-400 uppercase tracking-wider">{label}</span>
                                 </div>
-                                <p className={`text-2xl font-bold ${color}`}>{count}</p>
-                                <div className="mt-3">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-[10px] text-gray-400">{pct.toFixed(1)}%</span>
-                                    </div>
-                                    <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                        <div className={`${bgColor} h-1.5 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
-                                    </div>
-                                </div>
+                                <p className={`text-xl font-bold ${color}`}>{count}</p>
                             </div>
                         );
                     })}
                 </div>
-            ) : (
-                <div className="text-center py-8 text-gray-400">Không thể tải dữ liệu</div>
             )}
 
-            {/* Visual bar chart */}
-            {statusSummary && totalOrders > 0 && (
-                <div className="bg-white rounded-xl p-5 shadow-sm">
-                    <h3 className="text-sm font-bold text-gray-900 mb-4">Phân bổ trạng thái</h3>
-                    <div className="flex rounded-lg overflow-hidden h-10">
-                        {STATUS_CONFIG.map(({ key, label, bgColor }) => {
-                            const count = statusSummary[key] ?? 0;
-                            const pct = totalOrders > 0 ? (count / totalOrders * 100) : 0;
-                            if (pct === 0) return null;
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 items-center">
+                <input type="text" placeholder="Tìm mã đơn, tên, email..." value={keyword} onChange={(e) => { setKeyword(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A]" />
+                <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm cursor-pointer">
+                    {ALL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                </select>
+                <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }} className="px-3 py-2 border border-gray-200 rounded-lg text-sm cursor-pointer">
+                    <option value="">Tất cả loại</option>
+                    <option value="B2C">B2C</option>
+                    <option value="B2B">B2B</option>
+                </select>
+                {(statusFilter || typeFilter || keyword) && (
+                    <button onClick={() => { setStatusFilter(""); setTypeFilter(""); setKeyword(""); setPage(1); }} className="text-xs text-[#8B1A1A] hover:underline cursor-pointer">
+                        Xóa bộ lọc
+                    </button>
+                )}
+                <span className="ml-auto text-xs text-gray-400">{totalOrders} đơn hàng</span>
+            </div>
+
+            {/* Orders table */}
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[800px]">
+                        <thead className="bg-gray-50 border-b">
+                        <tr className="text-left text-xs text-gray-400 uppercase">
+                            <th className="px-4 py-3 font-medium">Mã đơn</th>
+                            <th className="px-4 py-3 font-medium">Khách hàng</th>
+                            <th className="px-4 py-3 font-medium">Loại</th>
+                            <th className="px-4 py-3 font-medium">Trạng thái</th>
+                            <th className="px-4 py-3 font-medium text-right">Tổng tiền</th>
+                            <th className="px-4 py-3 font-medium text-center">SP</th>
+                            <th className="px-4 py-3 font-medium">Ngày tạo</th>
+                            <th className="px-4 py-3 font-medium text-right">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {listLoading ? (
+                            <tr><td colSpan={8} className="text-center py-8 text-gray-400">Đang tải...</td></tr>
+                        ) : orders.length === 0 ? (
+                            <tr><td colSpan={8} className="text-center py-8 text-gray-400">Không có đơn hàng nào</td></tr>
+                        ) : orders.map((order) => {
+                            const badge = getStatusInfo(order.Status);
                             return (
-                                <div
-                                    key={key}
-                                    className={`${bgColor} flex items-center justify-center transition-all duration-500`}
-                                    style={{ width: `${pct}%` }}
-                                    title={`${label}: ${count} (${pct.toFixed(1)}%)`}
-                                >
-                                    {pct > 8 && <span className="text-[10px] font-bold text-white">{count}</span>}
-                                </div>
+                                <tr key={order.Id} className="border-b border-gray-50 hover:bg-gray-50/50">
+                                    <td className="px-4 py-3">
+                                        <span className="font-mono font-medium text-[#8B1A1A] text-xs">{order.OrderCode}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <div>
+                                            <p className="font-medium text-gray-900 text-sm">{order.CustomerName}</p>
+                                            <p className="text-[11px] text-gray-400">{order.CustomerEmail}</p>
+                                        </div>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${order.OrderType === "B2B" ? "bg-purple-100 text-purple-700" : "bg-sky-100 text-sky-700"}`}>{order.OrderType}</span>
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${badge.cls}`}>{badge.text}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-bold text-gray-900">{formatPrice(order.TotalAmount)}</td>
+                                    <td className="px-4 py-3 text-center">
+                                        <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full text-xs font-medium">{order.TotalItems}</span>
+                                    </td>
+                                    <td className="px-4 py-3 text-xs text-gray-500">{formatDate(order.CreatedAt)}</td>
+                                    <td className="px-4 py-3 text-right">
+                                        <button onClick={() => openUpdateForOrder(order)} className="p-1 text-gray-400 hover:text-[#8B1A1A] cursor-pointer" title="Cập nhật trạng thái">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+                                        </button>
+                                    </td>
+                                </tr>
                             );
                         })}
-                    </div>
-                    <div className="flex flex-wrap gap-3 mt-3">
-                        {STATUS_CONFIG.map(({ key, label, bgColor }) => {
-                            const count = statusSummary[key] ?? 0;
-                            if (count === 0) return null;
-                            return (
-                                <div key={key} className="flex items-center gap-1.5">
-                                    <div className={`w-2.5 h-2.5 rounded ${bgColor}`} />
-                                    <span className="text-[10px] text-gray-500">{label} ({count})</span>
-                                </div>
-                            );
-                        })}
-                    </div>
+                    </tbody>
+                    </table>
                 </div>
-            )}
 
-            {/* Update Status Panel */}
-            {showUpdate && (
-                <div className="bg-white rounded-xl p-5 shadow-sm border-2 border-[#8B1A1A]/20">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold text-gray-900">Cập nhật trạng thái đơn hàng</h3>
-                        <button onClick={() => { setShowUpdate(false); setUpdateResult(null); }} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Mã đơn hàng (Order ID)</label>
-                            <input type="text" value={orderId} onChange={e => setOrderId(e.target.value)} placeholder="Nhập Order ID..." className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A]" />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái mới</label>
-                            <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer">
-                                {ALL_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Ghi chú</label>
-                            <input type="text" value={statusNote} onChange={e => setStatusNote(e.target.value)} placeholder="Tùy chọn..." className="w-full px-3 py-2 border rounded-lg text-sm" />
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between px-4 py-3 border-t">
+                        <span className="text-xs text-gray-400">Trang {page} / {totalPages} ({totalOrders} đơn hàng)</span>
+                        <div className="flex gap-1">
+                            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1} className="px-3 py-1 rounded border text-xs disabled:opacity-30 cursor-pointer">Trước</button>
+                            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="px-3 py-1 rounded border text-xs disabled:opacity-30 cursor-pointer">Sau</button>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-4">
-                        <button onClick={handleUpdateStatus} disabled={updating || !orderId.trim()} className="px-5 py-2 bg-[#8B1A1A] text-white rounded-lg text-sm font-bold hover:bg-[#701515] disabled:opacity-50 cursor-pointer">
-                            {updating ? "Đang cập nhật..." : "Cập nhật"}
-                        </button>
-                        {updateResult && (
-                            <span className={`text-sm font-medium ${updateResult.success ? "text-emerald-600" : "text-red-600"}`}>
-                                {updateResult.message}
-                            </span>
-                        )}
-                    </div>
-                </div>
-            )}
+                )}
+            </div>
 
-            {/* Update Delivery Panel */}
-            {showDelivery && (
-                <div className="bg-white rounded-xl p-5 shadow-sm border-2 border-indigo-200">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-bold text-gray-900">Cập nhật trạng thái giao hàng</h3>
-                        <button onClick={() => setShowDelivery(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Delivery ID</label>
-                            <input type="text" value={deliveryId} onChange={e => setDeliveryId(e.target.value)} placeholder="Nhập Delivery ID..." className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400" />
+            {/* Update Status Modal */}
+            {showUpdate && selectedOrder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => { setShowUpdate(false); setUpdateResult(null); }}>
+                    <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold text-gray-900">
+                                Cập nhật trạng thái — <span className="text-[#8B1A1A] font-mono">{selectedOrder.OrderCode}</span>
+                            </h3>
+                            <button onClick={() => { setShowUpdate(false); setUpdateResult(null); }} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
                         </div>
-                        <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái</label>
-                            <select value={deliveryStatus} onChange={e => setDeliveryStatus(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer">
-                                <option value="SHIPPING">Đang giao</option>
-                                <option value="DELIVERED">Đã giao</option>
-                                <option value="FAILED">Giao thất bại</option>
-                                <option value="RESHIP">Giao lại</option>
-                            </select>
+                        <p className="text-sm text-gray-500 mb-4">Khách hàng: <span className="font-semibold">{selectedOrder.CustomerName}</span></p>
+
+                        <div className="flex items-center gap-2 mb-6">
+                            <span className="text-sm font-medium text-gray-600">Trạng thái hiện tại:</span>
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${getStatusInfo(selectedOrder.Status).cls}`}>{getStatusInfo(selectedOrder.Status).text}</span>
                         </div>
-                        {deliveryStatus === "FAILED" && (
+
+                        <div className="space-y-4">
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Lý do thất bại</label>
-                                <input type="text" value={failureReason} onChange={e => setFailureReason(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái mới</label>
+                                <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20">
+                                    {STATUS_UPDATE_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Ghi chú (Tùy chọn)</label>
+                                <textarea rows={2} value={statusNote} onChange={e => setStatusNote(e.target.value)} placeholder="Nhập thêm ghi chú với khách hàng hoặc nhân viên..." className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20" />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 mt-8">
+                            <button onClick={() => { setShowUpdate(false); setUpdateResult(null); }} className="flex-1 px-4 py-2 border rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">
+                                Hủy
+                            </button>
+                            <button onClick={handleUpdateStatus} disabled={updating} className="flex-1 px-4 py-2 bg-[#8B1A1A] text-white rounded-lg text-sm font-bold hover:bg-[#701515] disabled:opacity-50 cursor-pointer">
+                                {updating ? "Đang cập nhật..." : "Cập nhật"}
+                            </button>
+                        </div>
+
+                        {updateResult && (
+                            <div className={`mt-4 p-3 rounded-lg text-sm font-medium text-center ${updateResult.success ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                                {updateResult.message}
                             </div>
                         )}
                     </div>
-                    <button onClick={handleUpdateDelivery} disabled={updatingDelivery || !deliveryId.trim()} className="mt-4 px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">
-                        {updatingDelivery ? "Đang cập nhật..." : "Cập nhật giao hàng"}
-                    </button>
+                </div>
+            )}
+
+            {/* Update Delivery Modal */}
+            {showDelivery && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowDelivery(false)}>
+                    <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-bold text-gray-900">Cập nhật Giao Hàng</h3>
+                            <button onClick={() => setShowDelivery(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Mã vận đơn (Delivery ID)</label>
+                                <input type="text" value={deliveryId} onChange={e => setDeliveryId(e.target.value)} placeholder="GHTK... VNPOST..." className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400" />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Trạng thái vận chuyển</label>
+                                <select value={deliveryStatus} onChange={e => setDeliveryStatus(e.target.value)} className="w-full px-4 py-2 border rounded-lg text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400">
+                                    <option value="SHIPPING">Đang giao</option>
+                                    <option value="DELIVERED">Đã giao tận nơi</option>
+                                    <option value="FAILED">Giao thất bại</option>
+                                    <option value="RESHIP">Yêu cầu Giao lại</option>
+                                </select>
+                            </div>
+
+                            {deliveryStatus === "FAILED" && (
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Lý do thất bại / Hoàn hàng</label>
+                                    <textarea rows={2} value={failureReason} onChange={e => setFailureReason(e.target.value)} placeholder="Khách không nghe máy, sai địa chỉ..." className="w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400" />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-3 mt-8">
+                            <button onClick={() => setShowDelivery(false)} className="flex-1 px-4 py-2 border rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 cursor-pointer">
+                                Hủy
+                            </button>
+                            <button onClick={handleUpdateDelivery} disabled={updatingDelivery || !deliveryId.trim()} className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 cursor-pointer">
+                                {updatingDelivery ? "Đang xử lý..." : "Cập nhật"}
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

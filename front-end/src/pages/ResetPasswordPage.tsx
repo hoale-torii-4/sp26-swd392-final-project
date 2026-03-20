@@ -345,7 +345,7 @@ export default function ResetPasswordPage() {
 
             {/* ───── Footer ───── */}
             <p className="relative z-10 mt-8 text-xs text-gray-400">
-                © 2024 LỘC XUÂN — MÓN QUÀ GỬI TRAO TỪ CÔNG THỨC QUÀ.
+                © 2026 LỘC XUÂN — MÓN QUÀ GỬI TRAO TỪ CÔNG THỨC QUÀ.
             </p>
         </div>
     );

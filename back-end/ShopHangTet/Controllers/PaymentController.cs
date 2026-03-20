@@ -31,6 +31,8 @@ public class PaymentController : ControllerBase
 
     // ════════════════════════════════════════════════════════════════════
     // SEPAY WEBHOOK
+    // Chỉ nhận transferAmount và orderCode, gọi ConfirmPaymentAsync với
+    // signature gốc — không thêm params mới để tránh break interface.
     // ════════════════════════════════════════════════════════════════════
 
     [HttpPost("webhook")]
@@ -58,8 +60,8 @@ public class PaymentController : ControllerBase
         try
         {
             _logger.LogInformation(
-                "SePay webhook received: Type={Type}, Amount={Amount}, Content={Content}",
-                data.TransferType, data.TransferAmount, data.Content);
+                "SePay webhook received: Id={Id}, Type={Type}, Amount={Amount}, Content={Content}",
+                data.Id, data.TransferType, data.TransferAmount, data.Content);
 
             if (!string.Equals(data.TransferType, "in", StringComparison.OrdinalIgnoreCase))
             {
@@ -77,6 +79,7 @@ public class PaymentController : ControllerBase
             _logger.LogInformation("Found order code: {Code}, Amount: {Amount}",
                 orderCode, data.TransferAmount);
 
+            // Gọi đúng signature gốc — không thêm params
             var result = await _orderService.ConfirmPaymentAsync(orderCode, data.TransferAmount);
 
             if (result)
@@ -84,6 +87,7 @@ public class PaymentController : ControllerBase
             else
                 _logger.LogWarning("Payment confirmation failed for order: {Code}", orderCode);
 
+            // Luôn trả 200 để SePay dừng retry
             return Ok(new { success = true, status = 200 });
         }
         catch (Exception ex)
@@ -97,7 +101,7 @@ public class PaymentController : ControllerBase
     // TẠO QR
     // ════════════════════════════════════════════════════════════════════
 
-    /// Tạo QR SePay cho đơn hàng — trả về URL ảnh QR và thông tin bank
+    /// Tạo QR SePay cho đơn hàng — trả về URL ảnh QR, thông tin bank và countdown
     [HttpGet("create-qr/{orderCode}")]
     public async Task<IActionResult> CreateQr(string orderCode)
     {
@@ -132,7 +136,7 @@ public class PaymentController : ControllerBase
             bankAccount,
             bankName,
             qrUrl,
-            secondsRemaining  // Frontend dùng để hiển thị countdown
+            secondsRemaining
         }, "Tạo QR thành công"));
     }
 
@@ -140,8 +144,7 @@ public class PaymentController : ControllerBase
     // POLLING TRẠNG THÁI THANH TOÁN
     // ════════════════════════════════════════════════════════════════════
 
-    /// Frontend polling mỗi 3-5 giây để kiểm tra SePay đã xác nhận chưa
-    /// GET /api/payment/check-status/{orderCode}
+    /// Frontend polling mỗi 3-5 giây kiểm tra SePay đã xác nhận chưa
     [HttpGet("check-status/{orderCode}")]
     public async Task<IActionResult> CheckPaymentStatus(string orderCode)
     {

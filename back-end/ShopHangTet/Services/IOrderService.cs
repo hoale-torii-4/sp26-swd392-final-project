@@ -22,11 +22,9 @@ namespace ShopHangTet.Services
         Task<bool> ConfirmDeliveryReceivedByCustomerAsync(string deliveryId, string email);
 
         // ── My Orders (Member) ───────────────────────────────────────────────
-        /// <param name="statusFilter">null = tất cả, hoặc tên enum VD: "PREPARING"</param>
         Task<List<MyOrderResponseDto>> GetMyOrdersAsync(string userId, int skip, int take, string? statusFilter = null);
 
         // ── Staff Order List ─────────────────────────────────────────────────
-        /// Lấy danh sách đơn cho Staff dashboard với filter và phân trang
         Task<StaffOrderListResponseDto> GetStaffOrdersAsync(
             int page, int pageSize,
             string? statusFilter,
@@ -37,7 +35,7 @@ namespace ShopHangTet.Services
         Task<OrderModel> UpdateStatusAsync(string orderId, OrderStatus status, string updatedBy, string? notes = null);
 
         // ── Thanh toán ───────────────────────────────────────────────────────
-        /// Xác nhận thanh toán từ SePay webhook (tự động)
+        /// Xác nhận thanh toán từ SePay webhook (tự động) — signature gốc, không thêm params
         Task<bool> ConfirmPaymentAsync(string orderCode, decimal amountPaid);
 
         /// Xác nhận thanh toán thủ công bởi Staff
@@ -47,7 +45,6 @@ namespace ShopHangTet.Services
         Task<OrderModel?> GetOrderByCodeAsync(string orderCode);
 
         // ── Inventory ────────────────────────────────────────────────────────
-        /// Release reserved inventory khi cancel / expire
         Task ReleaseInventoryReservationAsync(OrderModel order, string updatedBy);
 
         // ── Delivery (B2B) ───────────────────────────────────────────────────

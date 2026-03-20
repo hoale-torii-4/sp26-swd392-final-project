@@ -274,6 +274,47 @@ namespace ShopHangTet.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task<string> CreateItemAsync(InventoryCreateRequestDTO dto)
+        {
+            var item = new Item
+            {
+                Name = dto.Name,
+                Category = Enum.Parse<ItemCategory>(dto.Category),
+                Price = dto.Price,
+                IsAlcohol = dto.IsAlcohol,
+                Images = string.IsNullOrWhiteSpace(dto.Image) ? new List<string>() : new List<string> { dto.Image },
+                StockQuantity = dto.InitialStock,
+                IsActive = dto.IsActive
+            };
+
+            await _context.Items.AddAsync(item);
+            await _context.SaveChangesAsync();
+
+            if (dto.InitialStock > 0)
+            {
+                var log = new InventoryLog
+                {
+                    OrderId = string.Empty,
+                    ItemId = item.Id,
+                    Quantity = dto.InitialStock,
+                    Action = "INITIAL",
+                    ItemName = item.Name,
+                    Sku = item.Id,
+                    ChangeType = "INITIAL",
+                    QuantityChange = dto.InitialStock,
+                    PreviousStock = 0,
+                    NewStock = dto.InitialStock,
+                    Source = "Admin",
+                    Reason = "Khởi tạo hệ thống",
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.InventoryLogs.Add(log);
+                await _context.SaveChangesAsync();
+            }
+
+            return item.Id;
+        }
+
         public async Task<InventorySummaryDTO> GetInventorySummaryAsync()
         {
             var total = await _context.Items.CountAsync();

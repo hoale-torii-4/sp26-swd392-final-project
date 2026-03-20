@@ -295,6 +295,7 @@ namespace ShopHangTet.DTOs
         public decimal Price { get; set; }
         public int Quantity { get; set; }
         public decimal Subtotal { get; set; }
+        public string? ImageUrl { get; set; }
     }
 
     public class CustomBoxResponseDTO
@@ -1231,6 +1232,29 @@ namespace ShopHangTet.DTOs
         public string Source { get; set; } = string.Empty;
         public string? Reason { get; set; }
         public DateTime CreatedAt { get; set; }
+    }
+
+    public class InventoryCreateRequestDTO
+    {
+        [Required]
+        public string Name { get; set; } = string.Empty;
+
+        [Required]
+        public string Category { get; set; } = string.Empty; // DRINK, FOOD, NUT, ALCOHOL
+
+        [Required]
+        [Range(0, double.MaxValue)]
+        public decimal Price { get; set; }
+
+        public string? Image { get; set; }
+
+        public bool IsAlcohol { get; set; }
+
+        [Required]
+        [Range(0, int.MaxValue)]
+        public int InitialStock { get; set; }
+
+        public bool IsActive { get; set; } = true;
     }
 
     public class InventoryAdjustRequestDTO

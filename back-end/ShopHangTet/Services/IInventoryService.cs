@@ -9,5 +9,6 @@ namespace ShopHangTet.Services
         Task<PagedResult<InventoryLogDTO>> GetInventoryLogsAsync(string? search, string? changeType, string? source, DateTime? date, int page, int pageSize);
         Task AdjustInventoryAsync(InventoryAdjustRequestDTO dto);
         Task<InventorySummaryDTO> GetInventorySummaryAsync();
+        Task<string> CreateItemAsync(InventoryCreateRequestDTO dto);
     }
 }
