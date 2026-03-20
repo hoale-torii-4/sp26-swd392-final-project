@@ -4,7 +4,7 @@ using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 using System.Text.RegularExpressions;
 using System.Net;
-using System.Globalization;
+using System.Text.Json;
 
 namespace ShopHangTet.Controllers;
 
@@ -78,7 +78,13 @@ public class PaymentController : ControllerBase
             _logger.LogInformation("Found order code: {Code}, Amount: {Amount}",
                 orderCode, data.TransferAmount);
 
-            var result = await _orderService.ConfirmPaymentAsync(orderCode, data.TransferAmount);
+            var rawWebhookData = JsonSerializer.Serialize(data);
+            var result = await _orderService.ConfirmPaymentAsync(
+                orderCode,
+                data.TransferAmount,
+                data.ReferenceCode,
+                data.Gateway,
+                rawWebhookData);
 
             if (result)
                 _logger.LogInformation("Payment confirmed for order: {Code}", orderCode);
@@ -161,6 +167,7 @@ public class PaymentController : ControllerBase
             {
                 OrderCode = order.OrderCode,
                 Status = order.Status.ToString(),
+                StatusLabel = GetStatusLabel(order.Status),
                 TotalAmount = order.TotalAmount,
                 IsPaid = order.Status is OrderStatus.PREPARING
                     or OrderStatus.SHIPPING
@@ -204,4 +211,17 @@ public class PaymentController : ControllerBase
         if (!string.IsNullOrWhiteSpace(envValue)) return envValue;
         return _configuration[key];
     }
+
+    private static string GetStatusLabel(OrderStatus status) => status switch
+    {
+        OrderStatus.PAYMENT_CONFIRMING => "Đang xác nhận thanh toán",
+        OrderStatus.PREPARING => "Đang chuẩn bị",
+        OrderStatus.SHIPPING => "Đang được giao",
+        OrderStatus.PARTIAL_DELIVERY => "Đang được giao",
+        OrderStatus.DELIVERY_FAILED => "Đang được giao",
+        OrderStatus.PAYMENT_EXPIRED_INTERNAL => "Đang xác nhận thanh toán",
+        OrderStatus.COMPLETED => "Hoàn thành",
+        OrderStatus.CANCELLED => "Đã hủy",
+        _ => status.ToString()
+    };
 }

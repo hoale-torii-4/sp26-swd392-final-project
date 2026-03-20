@@ -28,9 +28,7 @@ namespace ShopHangTet.Services
             _ordersCollection = mongoDatabase.GetCollection<OrderModel>("Orders");
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // TRA CỨU ĐƠN HÀNG
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<OrderTrackingResult?> TrackOrderAsync(string orderCode, string email)
         {
@@ -42,7 +40,8 @@ namespace ShopHangTet.Services
             return new OrderTrackingResult
             {
                 OrderCode = order.OrderCode,
-                Status = MapClientTrackingStatus(order.Status),
+                Status = order.Status.ToString(),
+                StatusLabel = GetStatusLabel(order.Status),
                 CreatedAt = order.CreatedAt,
                 DeliveryDate = order.DeliveryDate,
                 TotalAmount = order.TotalAmount,
@@ -53,7 +52,14 @@ namespace ShopHangTet.Services
                     Name = i.ProductName,
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
-                    TotalPrice = i.TotalPrice
+                    TotalPrice = i.TotalPrice,
+                    SnapshotItems = i.SnapshotItems.Select(s => new OrderItemSnapshotResponseDto
+                    {
+                        ItemId = s.ItemId,
+                        ItemName = s.ItemName,
+                        Quantity = s.Quantity,
+                        UnitPrice = s.UnitPrice
+                    }).ToList()
                 }).ToList(),
                 StatusHistory = order.StatusHistory.Select(x => new OrderStatusHistoryDto
                 {
@@ -104,9 +110,7 @@ namespace ShopHangTet.Services
             return await BuildOrderDetailDtoAsync(order);
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // MY ORDERS (Member)
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<List<MyOrderResponseDto>> GetMyOrdersAsync(
             string userId, int skip, int take, string? statusFilter = null)
@@ -132,6 +136,7 @@ namespace ShopHangTet.Services
                 OrderCode = o.OrderCode,
                 OrderType = o.OrderType,
                 Status = o.Status,
+                StatusLabel = GetStatusLabel(o.Status),
                 TotalAmount = o.TotalAmount,
                 CreatedAt = o.CreatedAt,
                 DeliveryDate = o.DeliveryDate,
@@ -142,14 +147,19 @@ namespace ShopHangTet.Services
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
                     TotalPrice = i.TotalPrice,
-                    Type = i.Type
+                    Type = i.Type,
+                    SnapshotItems = i.SnapshotItems.Select(s => new OrderItemSnapshotResponseDto
+                    {
+                        ItemId = s.ItemId,
+                        ItemName = s.ItemName,
+                        Quantity = s.Quantity,
+                        UnitPrice = s.UnitPrice
+                    }).ToList()
                 }).ToList()
             }).ToList();
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // STAFF ORDER LIST
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<StaffOrderListResponseDto> GetStaffOrdersAsync(
             int page, int pageSize, string? statusFilter, string? typeFilter, string? search)
@@ -229,9 +239,7 @@ namespace ShopHangTet.Services
             _ => status.ToString()
         };
 
-        // ════════════════════════════════════════════════════════════════════
         // CẬP NHẬT TRẠNG THÁI
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<OrderModel> UpdateStatusAsync(
             string orderId, OrderStatus status, string updatedBy, string? notes = null)
@@ -283,12 +291,15 @@ namespace ShopHangTet.Services
             return order;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // THANH TOÁN
-        // ════════════════════════════════════════════════════════════════════
 
         /// Xác nhận thanh toán tự động từ SePay webhook
-        public async Task<bool> ConfirmPaymentAsync(string orderCode, decimal amountPaid)
+        public async Task<bool> ConfirmPaymentAsync(
+            string orderCode,
+            decimal amountPaid,
+            string? transactionReference = null,
+            string? paymentGateway = null,
+            string? rawWebhookData = null)
         {
             var order = await _context.Orders.FirstOrDefaultAsync(o => o.OrderCode == orderCode);
 
@@ -326,6 +337,13 @@ namespace ShopHangTet.Services
                 order.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 return false;
+            }
+
+            order.TransactionReference = transactionReference;
+            order.PaymentGateway = paymentGateway;
+            if (!string.IsNullOrWhiteSpace(rawWebhookData))
+            {
+                order.RawWebhookData = rawWebhookData;
             }
 
             if (amountPaid < order.TotalAmount)
@@ -395,9 +413,7 @@ namespace ShopHangTet.Services
         public async Task<OrderModel?> GetOrderByCodeAsync(string orderCode)
             => await _context.Orders.FirstOrDefaultAsync(o => o.OrderCode == orderCode);
 
-        // ════════════════════════════════════════════════════════════════════
         // CONFIRM RECEIVED (Customer)
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<bool> ConfirmReceivedByCustomerAsync(string orderCode, string email)
         {
@@ -459,9 +475,7 @@ namespace ShopHangTet.Services
             return true;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // DELIVERY (B2B)
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<OrderStatus> AggregateDeliveryStatusAsync(string orderId)
         {
@@ -564,9 +578,7 @@ namespace ShopHangTet.Services
             return true;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // ĐẶT HÀNG B2C
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<OrderModel> PlaceB2COrderAsync(CreateOrderB2CDto dto)
         {
@@ -629,9 +641,7 @@ namespace ShopHangTet.Services
             return order;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // ĐẶT HÀNG B2B
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<OrderModel> PlaceB2BOrderAsync(CreateOrderB2BDto dto)
         {
@@ -668,7 +678,9 @@ namespace ShopHangTet.Services
                 CustomerPhone = dto.CustomerPhone,
                 Items = orderItems,
                 DeliveryAddress = null, // B2B dùng OrderDelivery table
-                DeliveryDate = dto.DeliveryAllocations.Min(a => a.DeliveryDate).Date, // Ngày giao sớm nhất
+                DeliveryDate = dto.DeliveryAllocations
+                    .Select(a => (a.DeliveryDate ?? dto.DeliveryDate).Date)
+                    .Min(), // Ngày giao sớm nhất
                 GreetingMessage = dto.GreetingMessage,
                 GreetingCardUrl = dto.GreetingCardUrl,
                 SubTotal = orderItems.Sum(x => x.TotalPrice),
@@ -697,11 +709,12 @@ namespace ShopHangTet.Services
             // Tạo OrderDelivery per địa chỉ — mỗi địa chỉ có DeliveryDate riêng
             foreach (var allocation in dto.DeliveryAllocations)
             {
+                var effectiveDeliveryDate = (allocation.DeliveryDate ?? dto.DeliveryDate).Date;
                 var orderDelivery = new OrderDelivery
                 {
                     OrderId = order.Id.ToString(),
                     AddressId = allocation.AddressId,
-                    DeliveryDate = allocation.DeliveryDate.Date,
+                    DeliveryDate = effectiveDeliveryDate,
                     Status = "PENDING",
                     CreatedAt = DateTime.UtcNow
                 };
@@ -734,9 +747,7 @@ namespace ShopHangTet.Services
             return order;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // VALIDATION
-        // ════════════════════════════════════════════════════════════════════
 
         public async Task<OrderValidationResult> ValidateB2COrderAsync(CreateOrderB2CDto dto)
         {
@@ -799,9 +810,14 @@ namespace ShopHangTet.Services
             // Kiểm tra từng địa chỉ có deliveryDate hợp lệ
             var vnNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
                 TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+
+            if (dto.DeliveryDate.Date < vnNow.Date)
+                result.Errors.Add("Ngày giao hàng không được trong quá khứ");
+
             foreach (var alloc in dto.DeliveryAllocations)
             {
-                if (alloc.DeliveryDate.Date < vnNow.Date)
+                var effectiveDeliveryDate = (alloc.DeliveryDate ?? dto.DeliveryDate).Date;
+                if (effectiveDeliveryDate < vnNow.Date)
                     result.Errors.Add($"Ngày giao hàng cho địa chỉ {alloc.AddressId} không được trong quá khứ");
             }
 
@@ -831,10 +847,7 @@ namespace ShopHangTet.Services
             return result;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // MIX & MATCH VALIDATION (đã bỏ rule Chivas)
-        // ════════════════════════════════════════════════════════════════════
-
         public async Task<MixMatchValidationResult> ValidateMixMatchRulesAsync(string customBoxId)
         {
             var result = new MixMatchValidationResult { IsValid = true };
@@ -916,10 +929,7 @@ namespace ShopHangTet.Services
             return result;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // BUILD ORDER DETAIL DTO
-        // ════════════════════════════════════════════════════════════════════
-
         private async Task<OrderDto> BuildOrderDetailDtoAsync(OrderModel order)
         {
             var result = new OrderDto
@@ -930,6 +940,7 @@ namespace ShopHangTet.Services
                 Email = order.CustomerEmail,
                 OrderType = order.OrderType,
                 Status = order.Status,
+                StatusLabel = GetStatusLabel(order.Status),
                 TotalAmount = order.TotalAmount,
                 DeliveryDate = order.DeliveryDate == default ? null : order.DeliveryDate,
                 GreetingMessage = order.GreetingMessage,
@@ -942,7 +953,14 @@ namespace ShopHangTet.Services
                     Name = i.ProductName,
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
-                    TotalPrice = i.TotalPrice
+                    TotalPrice = i.TotalPrice,
+                    SnapshotItems = i.SnapshotItems.Select(s => new OrderItemSnapshotResponseDto
+                    {
+                        ItemId = s.ItemId,
+                        ItemName = s.ItemName,
+                        Quantity = s.Quantity,
+                        UnitPrice = s.UnitPrice
+                    }).ToList()
                 }).ToList()
             };
 
@@ -1056,10 +1074,7 @@ namespace ShopHangTet.Services
             return result;
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // INVENTORY HELPERS
-        // ════════════════════════════════════════════════════════════════════
-
         private async Task ReserveInventoryAsync(OrderModel order, string updatedBy)
         {
             foreach (var orderItem in order.Items)
@@ -1211,10 +1226,7 @@ namespace ShopHangTet.Services
             });
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // BUILD ORDER ITEMS
-        // ════════════════════════════════════════════════════════════════════
-
         private async Task<List<OrderItem>> BuildOrderItemsAsync(List<OrderItemDto> items)
         {
             if (items == null || !items.Any())
@@ -1320,9 +1332,7 @@ namespace ShopHangTet.Services
             }).ToList();
         }
 
-        // ════════════════════════════════════════════════════════════════════
         // HELPERS
-        // ════════════════════════════════════════════════════════════════════
 
         private string GenerateOrderCode()
         {

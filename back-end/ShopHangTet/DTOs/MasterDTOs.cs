@@ -541,6 +541,10 @@ namespace ShopHangTet.DTOs
         [Required] [MinLength(1)]
         public List<OrderItemDto> Items { get; set; } = new();
 
+        /// Ngày giao hàng mặc định
+        [Required]
+        public DateTime DeliveryDate { get; set; }
+
         /// Phân bổ giao hàng theo địa chỉ — tối thiểu 1 địa chỉ
         [Required] [MinLength(1)]
         public List<B2BDeliveryAllocationDto> DeliveryAllocations { get; set; } = new();
@@ -556,9 +560,8 @@ namespace ShopHangTet.DTOs
         [Required]
         public string AddressId { get; set; } = string.Empty;
 
-        /// Ngày giao riêng cho địa chỉ này (mỗi địa chỉ có thể khác nhau)
-        [Required]
-        public DateTime DeliveryDate { get; set; }
+
+        public DateTime? DeliveryDate { get; set; }
 
         [Required] [MinLength(1)]
         public List<OrderItemAllocationDto> ItemAllocations { get; set; } = new();
@@ -630,6 +633,7 @@ namespace ShopHangTet.DTOs
         public string Email { get; set; } = string.Empty;
         public OrderType OrderType { get; set; }
         public OrderStatus Status { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
         public DateTime? DeliveryDate { get; set; }
         public string? GreetingMessage { get; set; }
@@ -648,6 +652,15 @@ namespace ShopHangTet.DTOs
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
+        public List<OrderItemSnapshotResponseDto> SnapshotItems { get; set; } = new();
+    }
+
+    public class OrderItemSnapshotResponseDto
+    {
+        public string ItemId { get; set; } = string.Empty;
+        public string ItemName { get; set; } = string.Empty;
+        public int Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
     }
 
     public class CreateOrderResponseDto
@@ -656,6 +669,7 @@ namespace ShopHangTet.DTOs
         public string OrderCode { get; set; } = string.Empty;
         public OrderType OrderType { get; set; }
         public OrderStatus Status { get; set; }
+        public string StatusLabel { get; set; } = string.Empty;
         public decimal SubTotal { get; set; }
         public decimal ShippingFee { get; set; }
         public decimal TotalAmount { get; set; }
@@ -1020,6 +1034,7 @@ namespace ShopHangTet.DTOs
     {
         public string OrderCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string StatusLabel { get; set; } = string.Empty;
         public decimal TotalAmount { get; set; }
         public bool IsPaid { get; set; }
         public int SecondsRemaining { get; set; }  // Số giây còn lại trong cửa sổ 10 phút

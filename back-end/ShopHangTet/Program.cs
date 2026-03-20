@@ -37,6 +37,7 @@ Console.WriteLine($"[Startup] Mongo database in use: {mongoDatabaseName}");
 builder.Services.AddControllers()
     .AddJsonOptions(options => {
         options.JsonSerializerOptions.PropertyNamingPolicy = null; // Giữ nguyên tên thuộc tính như trong C#
+        // Cho phép FE gửi enum dạng string
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
