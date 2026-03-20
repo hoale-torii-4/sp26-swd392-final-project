@@ -115,7 +115,7 @@ namespace ShopHangTet.Services
         {
             if (!ObjectId.TryParse(userId, out var userObjectId))
             {
-                _logger.LogWarning("GetMyOrdersAsync received invalid user id claim: {UserId}", userId);
+                _logger.LogWarning("GetMyOrdersAsync: invalid userId claim: {UserId}", userId);
                 return new List<MyOrderResponseDto>();
             }
 
@@ -192,14 +192,12 @@ namespace ShopHangTet.Services
             }
 
             var totalItems = await query.CountAsync();
-
             var safePage = Math.Max(1, page);
             var safeSize = Math.Clamp(pageSize, 1, 100);
-            var skip = (safePage - 1) * safeSize;
 
             var orders = await query
                 .OrderByDescending(o => o.CreatedAt)
-                .Skip(skip)
+                .Skip((safePage - 1) * safeSize)
                 .Take(safeSize)
                 .ToListAsync();
 
@@ -231,14 +229,14 @@ namespace ShopHangTet.Services
 
         private static string GetStatusLabel(OrderStatus status) => status switch
         {
-            OrderStatus.PAYMENT_CONFIRMING => "Đang xác nhận thanh toán",
-            OrderStatus.PREPARING => "Đang chuẩn bị",
-            OrderStatus.SHIPPING => "Đang được giao",
-            OrderStatus.PARTIAL_DELIVERY => "Đang được giao",
-            OrderStatus.DELIVERY_FAILED => "Đang được giao",
+            OrderStatus.PAYMENT_CONFIRMING      => "Đang xác nhận thanh toán",
+            OrderStatus.PREPARING               => "Đang chuẩn bị",
+            OrderStatus.SHIPPING                => "Đang được giao",
+            OrderStatus.PARTIAL_DELIVERY        => "Đang được giao",
+            OrderStatus.DELIVERY_FAILED         => "Đang được giao",
             OrderStatus.PAYMENT_EXPIRED_INTERNAL => "Đang xác nhận thanh toán",
-            OrderStatus.COMPLETED => "Hoàn thành",
-            OrderStatus.CANCELLED => "Đã hủy",
+            OrderStatus.COMPLETED               => "Hoàn thành",
+            OrderStatus.CANCELLED               => "Đã hủy",
             _ => status.ToString()
         };
 
@@ -251,31 +249,22 @@ namespace ShopHangTet.Services
             var order = await _context.Orders.FirstOrDefaultAsync(o => o.Id == orderObjectId)
                 ?? throw new InvalidOperationException("Order not found");
 
-            // Kiểm tra transition hợp lệ (chỉ dùng AllowedStaffTransitions — không dùng IsValidStatusTransition cũ)
             if (!AllowedStaffTransitions.IsAllowed(order.Status, status))
-            {
                 throw new InvalidOperationException(
                     $"Không thể chuyển đơn từ {order.Status} sang {status}");
-            }
 
-            // Deduct kho khi PREPARING — có guard chống double-deduct
+            // Deduct kho khi PREPARING — guard chống double-deduct bằng IsInventoryDeducted
             if (status == OrderStatus.PREPARING && !order.IsInventoryDeducted)
-            {
                 await DeductReservedInventoryAsync(order, updatedBy);
-            }
 
             // Xử lý hủy đơn
             if (status == OrderStatus.CANCELLED)
             {
                 if (order.Status == OrderStatus.PAYMENT_CONFIRMING
                     || order.Status == OrderStatus.PAYMENT_EXPIRED_INTERNAL)
-                {
                     await ReleaseInventoryReservationAsync(order, updatedBy);
-                }
                 else if (order.IsInventoryDeducted)
-                {
                     await RestockOrderInventoryAsync(order, updatedBy);
-                }
             }
 
             order.Status = status;
@@ -287,7 +276,6 @@ namespace ShopHangTet.Services
                 Notes = notes ?? string.Empty
             });
             order.UpdatedAt = DateTime.UtcNow;
-
             await _context.SaveChangesAsync();
             return order;
         }
@@ -312,7 +300,7 @@ namespace ShopHangTet.Services
 
             if (order.Status != OrderStatus.PAYMENT_CONFIRMING)
             {
-                // Idempotent: nếu đã qua PREPARING/SHIPPING/COMPLETED do webhook trước → bỏ qua
+                // Idempotent: webhook trùng lặp sau khi đã confirm thành công → bỏ qua
                 if (order.Status is OrderStatus.PREPARING or OrderStatus.SHIPPING or OrderStatus.COMPLETED)
                 {
                     _logger.LogInformation("ConfirmPayment: Duplicate webhook ignored for {Code}", orderCode);
@@ -354,13 +342,12 @@ namespace ShopHangTet.Services
                 return false;
             }
 
-            // Guard chống double-deduct: chỉ deduct nếu chưa được deduct
-            if (!order.IsInventoryDeducted)
-            {
-                await DeductReservedInventoryAsync(order, "SePay-Webhook");
-            }
+            // Guard chống double-deduct — IsInventoryDeducted được check bên trong
+            await DeductReservedInventoryAsync(order, "SePay-Webhook");
 
             order.Status = OrderStatus.PREPARING;
+            order.PaymentMethod = "BANK_TRANSFER";
+            order.PaymentDate = DateTime.UtcNow;
             order.StatusHistory.Add(new OrderStatusHistory
             {
                 Status = OrderStatus.PREPARING,
@@ -388,13 +375,11 @@ namespace ShopHangTet.Services
                 throw new InvalidOperationException(
                     $"Chỉ có thể xác nhận thanh toán khi đơn đang ở trạng thái 'Đang xác nhận thanh toán'. Trạng thái hiện tại: {order.Status}");
 
-            // Guard chống double-deduct
-            if (!order.IsInventoryDeducted)
-            {
-                await DeductReservedInventoryAsync(order, staffName);
-            }
+            await DeductReservedInventoryAsync(order, staffName);
 
             order.Status = OrderStatus.PREPARING;
+            order.PaymentMethod = "MANUAL_STAFF";
+            order.PaymentDate = DateTime.UtcNow;
             order.StatusHistory.Add(new OrderStatusHistory
             {
                 Status = OrderStatus.PREPARING,
@@ -480,22 +465,21 @@ namespace ShopHangTet.Services
         public async Task<OrderStatus> AggregateDeliveryStatusAsync(string orderId)
         {
             var deliveries = await _context.OrderDeliveries
-                .Where(d => d.OrderId == orderId)
-                .ToListAsync();
+                .Where(d => d.OrderId == orderId).ToListAsync();
 
             if (!deliveries.Any()) return OrderStatus.SHIPPING;
 
             var allCancelled = deliveries.All(d => d.Status == "CANCELLED");
             var allDelivered = deliveries.All(d => d.Status == "DELIVERED");
-            var anyFailed = deliveries.Any(d => d.Status == "FAILED");
+            var anyFailed   = deliveries.Any(d => d.Status == "FAILED");
             var anyDelivered = deliveries.Any(d => d.Status == "DELIVERED");
             var anyShipping = deliveries.Any(d => d.Status is "SHIPPING" or "PENDING");
 
             if (allCancelled) return OrderStatus.CANCELLED;
             if (allDelivered) return OrderStatus.COMPLETED;
-            if (anyShipping) return OrderStatus.SHIPPING;
+            if (anyShipping)  return OrderStatus.SHIPPING;
             if (anyFailed && anyDelivered) return OrderStatus.PARTIAL_DELIVERY;
-            if (anyFailed) return OrderStatus.DELIVERY_FAILED;
+            if (anyFailed)    return OrderStatus.DELIVERY_FAILED;
             return OrderStatus.SHIPPING;
         }
 
@@ -656,8 +640,6 @@ namespace ShopHangTet.Services
             if (addresses.Count != addressIds.Count)
                 throw new InvalidOperationException("Một hoặc nhiều địa chỉ không hợp lệ");
 
-            // Tạo lookup itemId → orderItem để map allocation
-            // Dùng (itemId, itemType) làm key vì cùng GiftBox có thể có nhiều dòng khác nhau
             var orderItemLookup = orderItems.ToDictionary(
                 i => (i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty, i.Type),
                 i => i);
@@ -701,7 +683,6 @@ namespace ShopHangTet.Services
             await ReserveInventoryAsync(order, "System-PlaceOrder");
             await _context.SaveChangesAsync();
 
-            // Tạo OrderDelivery per địa chỉ — mỗi địa chỉ có DeliveryDate riêng
             foreach (var allocation in dto.DeliveryAllocations)
             {
                 var effectiveDeliveryDate = (allocation.DeliveryDate ?? dto.DeliveryDate).Date;
@@ -714,17 +695,14 @@ namespace ShopHangTet.Services
                     CreatedAt = DateTime.UtcNow
                 };
                 _context.OrderDeliveries.Add(orderDelivery);
-                await _context.SaveChangesAsync(); // cần Id trước khi tạo items
+                await _context.SaveChangesAsync();
 
                 foreach (var itemAlloc in allocation.ItemAllocations)
                 {
-                    // Map bằng ItemId + ItemType — an toàn hơn dùng index
                     var key = (itemAlloc.ItemId, itemAlloc.ItemType);
                     if (!orderItemLookup.TryGetValue(key, out var orderItem))
-                    {
                         throw new InvalidOperationException(
                             $"ItemId '{itemAlloc.ItemId}' (type={itemAlloc.ItemType}) không tồn tại trong đơn hàng");
-                    }
 
                     _context.OrderDeliveryItems.Add(new OrderDeliveryItem
                     {
@@ -757,7 +735,6 @@ namespace ShopHangTet.Services
             if (dto.Items == null || !dto.Items.Any())
                 result.Errors.Add("Phải có ít nhất 1 sản phẩm");
 
-            // So sánh ngày theo Asia/Ho_Chi_Minh tránh lỗi timezone
             var vnNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
                 TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
             if (dto.DeliveryDate.Date < vnNow.Date)
@@ -802,7 +779,6 @@ namespace ShopHangTet.Services
             if (!dto.DeliveryAllocations.Any())
                 result.Errors.Add("B2B phải có ít nhất 1 địa chỉ giao hàng");
 
-            // Kiểm tra từng địa chỉ có deliveryDate hợp lệ
             var vnNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
                 TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
 
@@ -866,7 +842,6 @@ namespace ShopHangTet.Services
             var items = await _context.Items.Where(x => itemIds.Contains(x.Id)).ToListAsync();
             var itemMap = items.ToDictionary(x => x.Id, x => x);
 
-            // Đếm theo tổng QUANTITY (không phải số dòng)
             result.TotalItemCount = customBox.Items
                 .Where(cbi => itemMap.ContainsKey(cbi.ItemId))
                 .Sum(cbi => cbi.Quantity);
@@ -889,12 +864,10 @@ namespace ShopHangTet.Services
 
             result.SnackCount = result.NutCount + result.FoodCount;
 
-            // SAVORY dùng category thay vì hardcode tên
             result.SavoryCount = customBox.Items
                 .Where(cbi => itemMap.TryGetValue(cbi.ItemId, out var it) && it.Category == ItemCategory.SAVORY)
                 .Sum(cbi => cbi.Quantity);
 
-            // ── Kiểm tra rules ──────────────────────────────────────────────
             if (result.TotalItemCount < 4 || result.TotalItemCount > 6)
             {
                 result.Errors.Add("Mix & Match phải có tổng từ 4 đến 6 món");
@@ -918,8 +891,6 @@ namespace ShopHangTet.Services
                 result.Errors.Add("Nhóm đặc sản mặn được chọn tối đa 2 sản phẩm");
                 result.IsValid = false;
             }
-
-            // NOTE: Rule Chivas (max item khi có Chivas 12/21) đã được bỏ theo nghiệp vụ mới
 
             return result;
         }
@@ -977,7 +948,6 @@ namespace ShopHangTet.Services
 
             if (order.OrderType != OrderType.B2B) return result;
 
-            // B2B: load deliveries kèm DeliveryDate riêng từng shipment
             var deliveries = await _context.OrderDeliveries
                 .Where(d => d.OrderId == order.Id.ToString())
                 .OrderBy(d => d.CreatedAt)
@@ -990,14 +960,12 @@ namespace ShopHangTet.Services
                 .Where(x => deliveryIds.Contains(x.OrderDeliveryId))
                 .ToListAsync();
 
-            var addressIds = deliveries
-                .Select(d => d.AddressId)
+            var addressIds = deliveries.Select(d => d.AddressId)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct().ToList();
 
             var addresses = await _context.Addresses
-                .Where(a => addressIds.Contains(a.Id))
-                .ToListAsync();
+                .Where(a => addressIds.Contains(a.Id)).ToListAsync();
             var addressMap = addresses.ToDictionary(a => a.Id, a => a);
 
             var orderItemMap = order.Items.ToDictionary(i => i.Id.ToString(), i => i);
@@ -1076,10 +1044,16 @@ namespace ShopHangTet.Services
                 await ProcessInventoryForOrderItemAsync(orderItem, ReserveItemStockAsync, updatedBy, order.Id.ToString());
         }
 
+        /// DeductReservedInventoryAsync — tích hợp guard chống double-deduct.
+        /// Đặt IsInventoryDeducted = true ngay trong method này để đảm bảo
+        /// cả webhook lẫn StaffConfirm đều không deduct lần 2.
         private async Task DeductReservedInventoryAsync(OrderModel order, string updatedBy)
         {
             if (order.IsInventoryDeducted)
+            {
+                _logger.LogWarning("DeductReservedInventory skipped: already deducted for order {Code}", order.OrderCode);
                 return;
+            }
 
             foreach (var orderItem in order.Items)
                 await ProcessInventoryForOrderItemAsync(orderItem, DeductItemStockAsync, updatedBy, order.Id.ToString());

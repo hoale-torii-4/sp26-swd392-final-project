@@ -5,12 +5,8 @@ using ShopHangTet.Services;
 
 namespace ShopHangTet.Controllers
 {
-    // ════════════════════════════════════════════════════════════════════
-    // ADMIN Inventory Management
-    // Route: /api/admin/inventory/...
     // Xem kho: ADMIN + STAFF đều được
     // Điều chỉnh tồn kho: ADMIN only
-    // ════════════════════════════════════════════════════════════════════
     [ApiController]
     [Route("api/admin/inventory")]
     [Authorize(Roles = "ADMIN,STAFF")]
@@ -22,8 +18,6 @@ namespace ShopHangTet.Controllers
         {
             _service = service;
         }
-
-        // ── Xem kho (ADMIN + STAFF) ──────────────────────────────────────
 
         /// GET /api/admin/inventory?search=&category=&stockStatus=LOW_STOCK&page=1&pageSize=20
         [HttpGet]
@@ -48,7 +42,7 @@ namespace ShopHangTet.Controllers
             return Ok(ApiResponse<InventoryItemDetailDTO>.SuccessResult(dto));
         }
 
-        /// GET /api/admin/inventory/summary — tổng quan tồn kho
+        /// GET /api/admin/inventory/summary
         [HttpGet("summary")]
         public async Task<IActionResult> Summary()
         {
@@ -70,9 +64,7 @@ namespace ShopHangTet.Controllers
             return Ok(ApiResponse<PagedResult<InventoryLogDTO>>.SuccessResult(res));
         }
 
-        // ── Điều chỉnh tồn kho (ADMIN only) ─────────────────────────────
-
-        /// POST /api/admin/inventory/adjust
+        /// POST /api/admin/inventory/adjust — ADMIN only
         /// Body: { "itemId": "...", "adjustType": "INCREASE"|"DECREASE", "quantity": 10, "reason": "..." }
         [HttpPost("adjust")]
         [Authorize(Roles = "ADMIN")]

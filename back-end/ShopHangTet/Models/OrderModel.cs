@@ -40,12 +40,11 @@ public class OrderModel
     // Order status
     public OrderStatus Status { get; set; } = OrderStatus.PAYMENT_CONFIRMING;
 
-    // ── Inventory guard ──────────────────────────────────────────────────────
-    /// Flag chống double-deduct: true = kho đã được deduct (không deduct lại).
-    /// Được set = true khi chuyển sang PREPARING lần đầu tiên (dù qua webhook hay Staff).
+    // ── Inventory & Payment Guard ───────────────────────────────────────────
     public bool IsInventoryDeducted { get; set; } = false;
 
-    // ── Payment audit metadata ───────────────────────────────────────────────
+    public string? PaymentMethod { get; set; }
+    public DateTime? PaymentDate { get; set; }
     public string? TransactionReference { get; set; }
     public string? PaymentGateway { get; set; }
     public string? RawWebhookData { get; set; }

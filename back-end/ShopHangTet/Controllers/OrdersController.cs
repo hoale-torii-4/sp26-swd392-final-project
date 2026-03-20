@@ -283,7 +283,6 @@ public class OrdersController : ControllerBase
     // STAFF — DANH SÁCH ĐƠN
     // ════════════════════════════════════════════════════════════════════
 
-    /// Lấy danh sách đơn cho Staff dashboard
     /// GET /api/orders/staff/list?status=PREPARING&type=B2C&search=SHT&page=1&pageSize=20
     [Authorize(Roles = "STAFF")]
     [HttpGet("staff/list")]
@@ -319,8 +318,7 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            // Guard: trạng thái internal chỉ do hệ thống set tự động
-            // chỉ được set bởi hệ thống, Staff không set thủ công
+            // Guard: các trạng thái internal chỉ do hệ thống set tự động, Staff không set thủ công
             if (request.Status is OrderStatus.PARTIAL_DELIVERY
                 or OrderStatus.DELIVERY_FAILED
                 or OrderStatus.PAYMENT_EXPIRED_INTERNAL)
@@ -452,6 +450,7 @@ public class OrdersController : ControllerBase
             || string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
     }
 
+    /// Lấy userId từ nhiều claim khác nhau để tương thích với các cách issue token
     private string? GetUserIdFromClaims()
     {
         return User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -462,14 +461,14 @@ public class OrdersController : ControllerBase
 
     private static string GetStatusLabel(OrderStatus status) => status switch
     {
-        OrderStatus.PAYMENT_CONFIRMING => "Đang xác nhận thanh toán",
-        OrderStatus.PREPARING => "Đang chuẩn bị",
-        OrderStatus.SHIPPING => "Đang được giao",
-        OrderStatus.PARTIAL_DELIVERY => "Đang được giao",
-        OrderStatus.DELIVERY_FAILED => "Đang được giao",
+        OrderStatus.PAYMENT_CONFIRMING       => "Đang xác nhận thanh toán",
+        OrderStatus.PREPARING                => "Đang chuẩn bị",
+        OrderStatus.SHIPPING                 => "Đang được giao",
+        OrderStatus.PARTIAL_DELIVERY         => "Đang được giao",
+        OrderStatus.DELIVERY_FAILED          => "Đang được giao",
         OrderStatus.PAYMENT_EXPIRED_INTERNAL => "Đang xác nhận thanh toán",
-        OrderStatus.COMPLETED => "Hoàn thành",
-        OrderStatus.CANCELLED => "Đã hủy",
+        OrderStatus.COMPLETED                => "Hoàn thành",
+        OrderStatus.CANCELLED                => "Đã hủy",
         _ => status.ToString()
     };
 

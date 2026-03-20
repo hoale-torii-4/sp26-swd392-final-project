@@ -17,18 +17,19 @@ public class MixMatchCustomerService : IMixMatchCustomerService
         _context = context;
     }
 
-    // ════════════════════════════════════════════════════════════════════
     // TẠO CUSTOM BOX
-    // ════════════════════════════════════════════════════════════════════
-
     /// userId có thể là ObjectId của Member hoặc session string của Guest.
     /// Validation rule Mix & Match chỉ thực thi khi checkout (ValidateMixMatchRulesAsync).
     public async Task<string> CreateCustomBoxAsync(string userId, CreateCustomBoxDTO dto)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("UserId là bắt buộc");
-        if (dto?.Items == null || !dto.Items.Any())
-            throw new ArgumentException("Custom box phải có ít nhất 1 item");
+        if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentException("UserId is required");
+        if (dto?.Items == null || !dto.Items.Any()) throw new ArgumentException("Items are required");
+
+        var totalItems = dto.Items.Sum(x => x.Quantity);
+        if (totalItems < 4 || totalItems > 6)
+            throw new InvalidOperationException("Mix & Match phải có tổng từ 4 đến 6 món");
+
+        await ValidateMixMatchItemsAsync(dto.Items);
 
         var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
         var itemsDict = await _context.Items
@@ -57,10 +58,7 @@ public class MixMatchCustomerService : IMixMatchCustomerService
         return customBox.Id;
     }
 
-    // ════════════════════════════════════════════════════════════════════
     // ĐỌC
-    // ════════════════════════════════════════════════════════════════════
-
     public async Task<CustomBoxResponseDTO?> GetCustomBoxAsync(string id)
     {
         var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == id);
@@ -165,7 +163,8 @@ public class MixMatchCustomerService : IMixMatchCustomerService
                 Name = item?.Name ?? string.Empty,
                 Price = price,
                 Quantity = i.Quantity,
-                Subtotal = price * i.Quantity
+                Subtotal = price * i.Quantity,
+                ImageUrl = item?.Images?.FirstOrDefault()
             };
         }).ToList();
 
@@ -177,5 +176,19 @@ public class MixMatchCustomerService : IMixMatchCustomerService
             TotalPrice = box.TotalPrice,
             CreatedAt = box.CreatedAt
         };
+    }
+
+    private static Task ValidateMixMatchItemsAsync(List<CreateCustomBoxItemDTO> items)
+    {
+        if (items.Count == 0)
+            throw new InvalidOperationException("Phải có ít nhất 1 item");
+
+        if (items.Any(i => string.IsNullOrWhiteSpace(i.ItemId)))
+            throw new InvalidOperationException("ItemId là bắt buộc");
+
+        if (items.Any(i => i.Quantity <= 0))
+            throw new InvalidOperationException("Số lượng item phải lớn hơn 0");
+
+        return Task.CompletedTask;
     }
 }
