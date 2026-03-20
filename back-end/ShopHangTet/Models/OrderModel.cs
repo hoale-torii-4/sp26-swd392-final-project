@@ -45,6 +45,11 @@ public class OrderModel
     /// Được set = true khi chuyển sang PREPARING lần đầu tiên (dù qua webhook hay Staff).
     public bool IsInventoryDeducted { get; set; } = false;
 
+    // ── Payment audit metadata ───────────────────────────────────────────────
+    public string? TransactionReference { get; set; }
+    public string? PaymentGateway { get; set; }
+    public string? RawWebhookData { get; set; }
+
     // Tracking
     public List<OrderStatusHistory> StatusHistory { get; set; } = new();
 

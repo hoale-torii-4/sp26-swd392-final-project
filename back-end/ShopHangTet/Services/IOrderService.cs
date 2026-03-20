@@ -38,7 +38,12 @@ namespace ShopHangTet.Services
 
         // ── Thanh toán ───────────────────────────────────────────────────────
         /// Xác nhận thanh toán từ SePay webhook (tự động)
-        Task<bool> ConfirmPaymentAsync(string orderCode, decimal amountPaid);
+        Task<bool> ConfirmPaymentAsync(
+            string orderCode,
+            decimal amountPaid,
+            string? transactionReference = null,
+            string? paymentGateway = null,
+            string? rawWebhookData = null);
 
         /// Xác nhận thanh toán thủ công bởi Staff
         Task<bool> StaffConfirmPaymentAsync(string orderId, string staffName);
@@ -66,6 +71,7 @@ namespace ShopHangTet.Services
     {
         public string OrderCode { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
+        public string StatusLabel { get; set; } = string.Empty;
         public DateTime CreatedAt { get; set; }
         public DateTime? DeliveryDate { get; set; }
         public decimal TotalAmount { get; set; }
