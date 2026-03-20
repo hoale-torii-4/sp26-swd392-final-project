@@ -8,6 +8,7 @@ using ShopHangTet.Repositories;
 using ShopHangTet.Services;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,7 @@ var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"] ?? "ShopHang
 builder.Services.AddControllers()
     .AddJsonOptions(options => {
         options.JsonSerializerOptions.PropertyNamingPolicy = null; // Giữ nguyên tên thuộc tính như trong C#
+        // Cho phép FE gửi enum dạng string
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 

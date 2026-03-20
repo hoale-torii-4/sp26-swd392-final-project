@@ -9,6 +9,7 @@ public class MyOrderItemDto
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public OrderItemType Type { get; set; }
+    public List<OrderItemSnapshotResponseDto> SnapshotItems { get; set; } = new();
 }
 
 public class MyOrderResponseDto

@@ -5,6 +5,8 @@ using ShopHangTet.Models;
 using Microsoft.AspNetCore.Authorization;
 using MongoDB.Bson;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using ShopHangTet.Data;
 
 namespace ShopHangTet.Controllers;
 
@@ -15,15 +17,18 @@ public class OrdersController : ControllerBase
     private readonly IOrderService _orderService;
     private readonly IEmailService _emailService;
     private readonly ILogger<OrdersController> _logger;
+    private readonly ShopHangTetDbContext _context;
 
     public OrdersController(
         IOrderService orderService,
         IEmailService emailService,
-        ILogger<OrdersController> logger)
+        ILogger<OrdersController> logger,
+        ShopHangTetDbContext context)
     {
         _orderService = orderService;
         _emailService = emailService;
         _logger = logger;
+        _context = context;
     }
 
     // ════════════════════════════════════════════════════════════════════
@@ -129,7 +134,7 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = GetUserIdFromClaims();
             var isStaffOrAdmin = IsStaffOrAdmin();
 
             if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(email))
@@ -157,7 +162,7 @@ public class OrdersController : ControllerBase
     {
         try
         {
-            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = GetUserIdFromClaims();
             if (string.IsNullOrWhiteSpace(userId))
                 return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
 
@@ -210,14 +215,25 @@ public class OrdersController : ControllerBase
 
     [HttpPost("{orderCode}/confirm-received")]
     public async Task<IActionResult> ConfirmReceived(
-        string orderCode, [FromQuery] string email)
+        string orderCode, [FromQuery] string? email = null)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(email))
-                return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
+            var targetEmail = email;
+            if (string.IsNullOrWhiteSpace(targetEmail))
+            {
+                var userId = GetUserIdFromClaims();
+                if (string.IsNullOrWhiteSpace(userId))
+                    return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
 
-            var ok = await _orderService.ConfirmReceivedByCustomerAsync(orderCode, email);
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null)
+                    return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+
+                targetEmail = user.Email;
+            }
+
+            var ok = await _orderService.ConfirmReceivedByCustomerAsync(orderCode, targetEmail);
             if (!ok)
                 return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
 
@@ -232,14 +248,25 @@ public class OrdersController : ControllerBase
 
     [HttpPost("deliveries/{deliveryId}/confirm-received")]
     public async Task<IActionResult> ConfirmDeliveryReceived(
-        string deliveryId, [FromQuery] string email)
+        string deliveryId, [FromQuery] string? email = null)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(email))
-                return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
+            var targetEmail = email;
+            if (string.IsNullOrWhiteSpace(targetEmail))
+            {
+                var userId = GetUserIdFromClaims();
+                if (string.IsNullOrWhiteSpace(userId))
+                    return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
 
-            var ok = await _orderService.ConfirmDeliveryReceivedByCustomerAsync(deliveryId, email);
+                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
+                if (user == null)
+                    return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+
+                targetEmail = user.Email;
+            }
+
+            var ok = await _orderService.ConfirmDeliveryReceivedByCustomerAsync(deliveryId, targetEmail);
             if (!ok)
                 return NotFound(ApiResponse<object>.ErrorResult("Delivery not found"));
 
@@ -452,6 +479,7 @@ public class OrdersController : ControllerBase
         OrderCode = order.OrderCode,
         OrderType = order.OrderType,
         Status = order.Status,
+        StatusLabel = GetStatusLabel(order.Status),
         SubTotal = order.SubTotal,
         ShippingFee = order.ShippingFee,
         TotalAmount = order.TotalAmount,
@@ -463,7 +491,14 @@ public class OrdersController : ControllerBase
             Name = i.ProductName,
             Quantity = i.Quantity,
             UnitPrice = i.UnitPrice,
-            TotalPrice = i.TotalPrice
+            TotalPrice = i.TotalPrice,
+            SnapshotItems = i.SnapshotItems.Select(s => new OrderItemSnapshotResponseDto
+            {
+                ItemId = s.ItemId,
+                ItemName = s.ItemName,
+                Quantity = s.Quantity,
+                UnitPrice = s.UnitPrice
+            }).ToList()
         }).ToList()
     };
 }
