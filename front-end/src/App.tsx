@@ -39,6 +39,7 @@ import AdminInventoryPage from './pages/admin/AdminInventoryPage'
 import AdminMixMatchPage from './pages/admin/AdminMixMatchPage'
 import AdminReviewsPage from './pages/admin/AdminReviewsPage'
 import AdminReportsPage from './pages/admin/AdminReportsPage'
+import AdminTaskSummaryPage from './pages/admin/AdminTaskSummaryPage'
 import AddressesPage from './pages/AddressesPage'
 import CustomBoxPage from './pages/CustomBoxPage'
 
@@ -85,6 +86,7 @@ function App() {
                 <Route path="mix-match" element={<AdminMixMatchPage />} />
                 <Route path="reviews" element={<AdminReviewsPage />} />
                 <Route path="reports" element={<AdminReportsPage />} />
+                <Route path="tasks" element={<AdminTaskSummaryPage />} />
               </Route>
 
               {/* Staff + Admin roles */}
