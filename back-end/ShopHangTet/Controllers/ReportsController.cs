@@ -8,52 +8,102 @@ namespace ShopHangTet.Controllers;
 public class ReportsController : ControllerBase
 {
     private readonly IReportService _service;
+    private readonly ILogger<ReportsController> _logger;
 
-    public ReportsController(IReportService service)
+    public ReportsController(IReportService service, ILogger<ReportsController> logger)
     {
         _service = service;
+        _logger = logger;
     }
 
     [HttpGet("dashboard")]
     public async Task<IActionResult> Dashboard()
     {
-        var res = await _service.GetDashboardAsync();
-        return Ok(res);
+        try
+        {
+            var res = await _service.GetDashboardAsync();
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reports/Dashboard failed");
+            return StatusCode(500, new { error = "Failed to load dashboard report" });
+        }
     }
 
     [HttpGet("revenue")]
     public async Task<IActionResult> Revenue([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] string view = "day", [FromQuery] string? orderType = null)
     {
-        var res = await _service.GetRevenueAsync(fromDate, toDate, view, orderType);
-        return Ok(res);
+        try
+        {
+            var res = await _service.GetRevenueAsync(fromDate, toDate, view, orderType);
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reports/Revenue failed");
+            return StatusCode(500, new { error = "Failed to load revenue report" });
+        }
     }
 
     [HttpGet("collections-performance")]
     public async Task<IActionResult> CollectionsPerformance()
     {
-        var res = await _service.GetCollectionsPerformanceAsync();
-        return Ok(res);
+        try
+        {
+            var res = await _service.GetCollectionsPerformanceAsync();
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reports/CollectionsPerformance failed");
+            return StatusCode(500, new { error = "Failed to load collection report" });
+        }
     }
 
     [HttpGet("giftbox-performance")]
     public async Task<IActionResult> GiftBoxPerformance()
     {
-        var res = await _service.GetGiftBoxPerformanceAsync();
-        return Ok(res);
+        try
+        {
+            var res = await _service.GetGiftBoxPerformanceAsync();
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reports/GiftBoxPerformance failed");
+            return StatusCode(500, new { error = "Failed to load giftbox report" });
+        }
     }
 
     [HttpGet("b2c-b2b-comparison")]
     public async Task<IActionResult> B2cB2bComparison()
     {
-        var res = await _service.GetB2cB2bComparisonAsync();
-        return Ok(res);
+        try
+        {
+            var res = await _service.GetB2cB2bComparisonAsync();
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reports/B2cB2bComparison failed");
+            return StatusCode(500, new { error = "Failed to load B2C/B2B comparison" });
+        }
     }
 
     [HttpGet("inventory-alert")]
     public async Task<IActionResult> InventoryAlert([FromQuery] int threshold = 10)
     {
-        var res = await _service.GetInventoryAlertAsync(threshold);
-        return Ok(res);
+        try
+        {
+            var res = await _service.GetInventoryAlertAsync(threshold);
+            return Ok(res);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Reports/InventoryAlert failed");
+            return StatusCode(500, new { error = "Failed to load inventory alerts" });
+        }
     }
 
     // ===== Excel export endpoints =====
