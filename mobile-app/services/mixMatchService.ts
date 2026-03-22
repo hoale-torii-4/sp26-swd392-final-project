@@ -8,6 +8,8 @@ export interface MixMatchItem {
     CategoryLabel?: string;
     Price?: number;
     IsAlcohol?: boolean;
+    StockQuantity?: number;
+    AvailableQuantity?: number;
 }
 
 export interface CustomBoxItemPayload {

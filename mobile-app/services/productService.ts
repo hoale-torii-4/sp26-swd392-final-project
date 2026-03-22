@@ -8,6 +8,8 @@ export interface GiftBoxDetailItemDto {
     Price: number;
     Image: string | null;
     Quantity: number;
+    StockQuantity?: number;
+    AvailableQuantity?: number;
 }
 
 export interface GiftBoxDetailDto {
@@ -34,6 +36,7 @@ export interface GiftBoxListDto {
     CollectionName: string;
     IsActive: boolean;
     CreatedAt: string;
+    TotalStock?: number;
 }
 
 const PRODUCTS_ENDPOINT = '/Products';

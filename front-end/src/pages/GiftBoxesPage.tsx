@@ -457,8 +457,15 @@ function ProductCard({ box }: { box: GiftBoxListDto }) {
                     </span>
                 )}
                 {box.Price < 1_000_000 && (
-                    <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#8B1A1A] text-white text-[10px] font-bold tracking-wider uppercase rounded">
+                    <span className="absolute top-3 flex left-3 px-2.5 py-1 bg-[#8B1A1A] text-white text-[10px] font-bold tracking-wider uppercase rounded">
                         Best Seller
+                    </span>
+                )}
+                
+                {/* Stock Badge */}
+                {box.TotalStock !== undefined && (
+                    <span className={`absolute top-3 right-3 px-2.5 py-1 text-white text-[10px] font-bold tracking-wider uppercase rounded ${box.TotalStock > 0 ? 'bg-green-600' : 'bg-gray-500'}`}>
+                        {box.TotalStock > 0 ? `Còn ${box.TotalStock}` : 'Hết hàng'}
                     </span>
                 )}
             </div>
@@ -473,7 +480,8 @@ function ProductCard({ box }: { box: GiftBoxListDto }) {
                 </p>
                 <Link
                     to={`/gift-boxes/${box.Id}`}
-                    className="inline-flex items-center justify-center w-full py-2.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-xs font-bold tracking-[0.15em] uppercase rounded-lg hover:bg-[#8B1A1A] hover:text-white transition-colors"
+                    className={`inline-flex items-center justify-center w-full py-2.5 border-2 text-xs font-bold tracking-[0.15em] uppercase rounded-lg transition-colors ${box.TotalStock === 0 ? 'border-gray-300 text-gray-400 bg-gray-50 pointer-events-none' : 'border-[#8B1A1A] text-[#8B1A1A] hover:bg-[#8B1A1A] hover:text-white'}`}
+                    aria-disabled={box.TotalStock === 0}
                 >
                     Chi tiết
                 </Link>
