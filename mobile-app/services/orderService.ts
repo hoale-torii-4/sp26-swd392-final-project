@@ -95,12 +95,14 @@ type OrderCreatedApiResponse = {
 
 export interface OrderItemResponseDto {
   Id: string;
-  Type: OrderItemType;
-  GiftBoxId: string | null;
-  CustomBoxId: string | null;
+  Type: OrderItemType | string;
+  GiftBoxId?: string | null;
+  CustomBoxId?: string | null;
   Quantity: number;
-  Price: number;
-  Name: string | null;
+  Price?: number;
+  UnitPrice?: number;
+  TotalPrice?: number;
+  Name?: string | null;
 }
 
 export interface DeliveryAddressResponseDto {
@@ -113,13 +115,34 @@ export interface DeliveryAddressResponseDto {
   HideInvoice: boolean;
 }
 
+export interface DeliveryShipmentItemResponseDto {
+  OrderItemId: string;
+  Name: string;
+  Type: OrderItemType | string;
+  Quantity: number;
+  UnitPrice: number;
+  TotalPrice: number;
+}
+
+export interface DeliveryShipmentResponseDto {
+  DeliveryId: string;
+  AddressId: string;
+  Status: string;
+  RetryCount: number;
+  MaxRetries: number;
+  LastAttemptAt: string | null;
+  FailureReason: string | null;
+  CreatedAt: string;
+  Items: DeliveryShipmentItemResponseDto[];
+}
+
 export interface OrderDto {
   Id: string;
   OrderCode: string;
   UserId: string | null;
   Email: string;
-  OrderType: OrderType;
-  Status: OrderStatus;
+  OrderType: OrderType | string;
+  Status: OrderStatus | string;
   TotalAmount: number;
   DeliveryDate: string;
   GreetingMessage: string | null;
@@ -127,6 +150,7 @@ export interface OrderDto {
   CreatedAt: string;
   Items: OrderItemResponseDto[];
   DeliveryAddresses: DeliveryAddressResponseDto[];
+  DeliveryShipments?: DeliveryShipmentResponseDto[];
 }
 
 export interface MyOrderItemDto {
@@ -157,6 +181,49 @@ interface ApiResponse<T> {
 }
 
 const ORDERS = '/Orders';
+
+const normalizeOrderDetail = (raw: any): OrderDto => {
+  const src = raw?.Data ?? raw?.data ?? raw ?? {};
+
+  const itemsFromRoot = src?.Items ?? src?.items ?? src?.OrderItems ?? src?.orderItems ?? [];
+  const shipments = src?.DeliveryShipments ?? src?.deliveryShipments ?? [];
+
+  const fallbackItemsFromShipments = Array.isArray(shipments)
+    ? shipments.flatMap((s: any) => s?.Items ?? s?.items ?? [])
+    : [];
+
+  const normalizedItems = (Array.isArray(itemsFromRoot) && itemsFromRoot.length > 0
+    ? itemsFromRoot
+    : fallbackItemsFromShipments
+  ).map((i: any, idx: number) => ({
+    Id: i?.Id ?? i?.id ?? i?.OrderItemId ?? i?.orderItemId ?? String(idx),
+    Type: i?.Type ?? i?.type ?? i?.OrderItemType ?? i?.orderItemType ?? 'READY_MADE',
+    GiftBoxId: i?.GiftBoxId ?? i?.giftBoxId ?? null,
+    CustomBoxId: i?.CustomBoxId ?? i?.customBoxId ?? null,
+    Quantity: Number(i?.Quantity ?? i?.quantity ?? 0),
+    Price: i?.Price ?? i?.price,
+    UnitPrice: i?.UnitPrice ?? i?.unitPrice,
+    TotalPrice: i?.TotalPrice ?? i?.totalPrice,
+    Name: i?.Name ?? i?.name ?? i?.ProductName ?? i?.productName,
+  }));
+
+  return {
+    Id: src?.Id ?? src?.id ?? '',
+    OrderCode: src?.OrderCode ?? src?.orderCode ?? '',
+    UserId: src?.UserId ?? src?.userId ?? null,
+    Email: src?.Email ?? src?.email ?? '',
+    OrderType: src?.OrderType ?? src?.orderType ?? '',
+    Status: src?.Status ?? src?.status ?? '',
+    TotalAmount: Number(src?.TotalAmount ?? src?.totalAmount ?? 0),
+    DeliveryDate: src?.DeliveryDate ?? src?.deliveryDate ?? '',
+    GreetingMessage: src?.GreetingMessage ?? src?.greetingMessage ?? null,
+    GreetingCardUrl: src?.GreetingCardUrl ?? src?.greetingCardUrl ?? null,
+    CreatedAt: src?.CreatedAt ?? src?.createdAt ?? '',
+    Items: normalizedItems,
+    DeliveryAddresses: src?.DeliveryAddresses ?? src?.deliveryAddresses ?? [],
+    DeliveryShipments: shipments,
+  } as OrderDto;
+};
 
 export const orderService = {
   createB2COrder: async (data: CreateOrderB2CDto): Promise<OrderCreatedResponse> => {
@@ -198,6 +265,18 @@ export const orderService = {
       params: { orderCode, email },
     });
     return res.data;
+  },
+
+  getOrderDetailByCode: async (orderCode: string, email?: string): Promise<OrderDto> => {
+    const res = await apiClient.get(`${ORDERS}/detail/${orderCode}`, {
+      params: email ? { email } : undefined,
+    });
+    return normalizeOrderDetail(res.data);
+  },
+
+  getOrderDetailById: async (orderId: string): Promise<OrderDto> => {
+    const res = await apiClient.get(`${ORDERS}/${orderId}`);
+    return normalizeOrderDetail(res.data);
   },
 
   getMyOrders: async (skip = 0, take = 20) => {

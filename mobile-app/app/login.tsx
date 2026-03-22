@@ -8,19 +8,22 @@ import {
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
+    Modal,
+    Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
-import type { ApiError } from '../types/auth';
+import type { ApiError, User } from '../types/auth';
+import { isInternalRole } from '../types/auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
     const router = useRouter();
-    const { login, loginWithGoogle } = useAuth();
+    const { login, loginWithGoogle, setSiteMode } = useAuth();
 
     const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
     const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
@@ -42,6 +45,8 @@ export default function LoginScreen() {
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
 
+    const [sitePickerVisible, setSitePickerVisible] = useState(false);
+
     const validate = () => {
         let valid = true;
         setEmailError('');
@@ -61,6 +66,26 @@ export default function LoginScreen() {
         return valid;
     };
 
+    const goToSite = async (mode: 'customer' | 'admin') => {
+        await setSiteMode(mode);
+        setSitePickerVisible(false);
+        if (mode === 'admin') {
+            router.replace('/(admin-tabs)/dashboard' as any);
+        } else {
+            router.replace('/(tabs)' as any);
+        }
+    };
+
+    const postLoginRouting = async (loggedInUser: User) => {
+        if (isInternalRole(loggedInUser.Role)) {
+            setSitePickerVisible(true);
+            return;
+        }
+
+        await setSiteMode('customer');
+        router.replace('/(tabs)' as any);
+    };
+
     const handleLogin = async () => {
         if (!validate()) return;
 
@@ -68,8 +93,8 @@ export default function LoginScreen() {
         setIsLoading(true);
         try {
             const response = await login({ email: email.trim(), password });
-            if (response.Success) {
-                router.replace('/(tabs)' as any);
+            if (response.Success && response.Data?.User) {
+                await postLoginRouting(response.Data.User);
             } else {
                 setServerError(response.Message || 'Đăng nhập thất bại.');
             }
@@ -111,8 +136,8 @@ export default function LoginScreen() {
 
                 try {
                     const loginResponse = await loginWithGoogle({ idToken });
-                    if (loginResponse.Success) {
-                        router.replace('/(tabs)' as any);
+                    if (loginResponse.Success && loginResponse.Data?.User) {
+                        await postLoginRouting(loginResponse.Data.User);
                     } else {
                         setServerError(loginResponse.Message || 'Đăng nhập Google thất bại.');
                     }
@@ -131,7 +156,7 @@ export default function LoginScreen() {
         };
 
         consumeGoogleToken();
-    }, [response, loginWithGoogle, router]);
+    }, [response, loginWithGoogle]);
 
     return (
         <KeyboardAvoidingView
@@ -143,7 +168,6 @@ export default function LoginScreen() {
                 contentContainerStyle={styles.container}
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Brand Header */}
                 <View style={styles.brandHeader}>
                     <View style={styles.logoCircle}>
                         <Text style={styles.logoText}>✦</Text>
@@ -152,20 +176,17 @@ export default function LoginScreen() {
                     <Text style={styles.brandSub}>Premium Tết Gifts</Text>
                 </View>
 
-                {/* Title */}
                 <Text style={styles.title}>Chào mừng bạn trở lại</Text>
                 <Text style={styles.subtitle}>
                     Đăng nhập để tiếp tục trải nghiệm dịch vụ quà tặng cao cấp.
                 </Text>
 
-                {/* Server Error */}
                 {serverError && (
                     <View style={styles.errorBanner}>
                         <Text style={styles.errorBannerText}>{serverError}</Text>
                     </View>
                 )}
 
-                {/* Email */}
                 <View style={styles.fieldGroup}>
                     <Text style={styles.label}>Email hoặc Số điện thoại</Text>
                     <TextInput
@@ -181,7 +202,6 @@ export default function LoginScreen() {
                     {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
                 </View>
 
-                {/* Password */}
                 <View style={styles.fieldGroup}>
                     <Text style={styles.label}>Mật khẩu</Text>
                     <View style={styles.passwordWrap}>
@@ -204,7 +224,6 @@ export default function LoginScreen() {
                     {passwordError ? <Text style={styles.fieldError}>{passwordError}</Text> : null}
                 </View>
 
-                {/* Forgot Password */}
                 <TouchableOpacity
                     style={styles.forgotRow}
                     onPress={() => router.push('/forgot-password' as any)}
@@ -212,7 +231,6 @@ export default function LoginScreen() {
                     <Text style={styles.forgotText}>Quên mật khẩu?</Text>
                 </TouchableOpacity>
 
-                {/* Submit */}
                 <TouchableOpacity
                     style={[styles.submitButton, isLoading && styles.buttonDisabled]}
                     onPress={handleLogin}
@@ -224,7 +242,6 @@ export default function LoginScreen() {
                     </Text>
                 </TouchableOpacity>
 
-                {/* Google Login */}
                 <TouchableOpacity
                     style={[styles.googleButton, (isGoogleLoading || !request) && styles.buttonDisabled]}
                     onPress={handleGoogleLogin}
@@ -236,7 +253,6 @@ export default function LoginScreen() {
                     </Text>
                 </TouchableOpacity>
 
-                {/* Register link */}
                 <View style={styles.registerRow}>
                     <Text style={styles.registerLabel}>Chưa có tài khoản? </Text>
                     <TouchableOpacity onPress={() => router.push('/register' as any)}>
@@ -244,11 +260,29 @@ export default function LoginScreen() {
                     </TouchableOpacity>
                 </View>
 
-                {/* Security badge */}
                 <View style={styles.securityRow}>
                     <Text style={styles.securityText}>🔒 Hệ thống bảo mật tiêu chuẩn quốc tế</Text>
                 </View>
             </ScrollView>
+
+            <Modal visible={sitePickerVisible} transparent animationType="fade">
+                <View style={styles.modalBackdrop}>
+                    <View style={styles.modalCard}>
+                        <Text style={styles.modalTitle}>Chọn khu vực làm việc</Text>
+                        <Text style={styles.modalDesc}>
+                            Tài khoản của bạn có quyền nội bộ. Bạn muốn vào trang quản trị hay trang khách hàng?
+                        </Text>
+
+                        <Pressable style={styles.modalPrimaryBtn} onPress={() => goToSite('admin')}>
+                            <Text style={styles.modalPrimaryText}>Vào Admin site</Text>
+                        </Pressable>
+
+                        <Pressable style={styles.modalSecondaryBtn} onPress={() => goToSite('customer')}>
+                            <Text style={styles.modalSecondaryText}>Vào Customer site</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Modal>
         </KeyboardAvoidingView>
     );
 }
@@ -417,5 +451,54 @@ const styles = StyleSheet.create({
     securityText: {
         fontSize: 11,
         color: AppColors.textMuted,
+    },
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    modalCard: {
+        width: '100%',
+        backgroundColor: '#FFF',
+        borderRadius: BorderRadius.lg,
+        padding: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: AppColors.text,
+        marginBottom: 8,
+    },
+    modalDesc: {
+        fontSize: 14,
+        color: AppColors.textSecondary,
+        marginBottom: 16,
+        lineHeight: 20,
+    },
+    modalPrimaryBtn: {
+        backgroundColor: AppColors.primary,
+        borderRadius: BorderRadius.sm,
+        paddingVertical: 12,
+        alignItems: 'center',
+        marginBottom: 10,
+    },
+    modalPrimaryText: {
+        color: '#FFF',
+        fontWeight: '700',
+        fontSize: 14,
+    },
+    modalSecondaryBtn: {
+        borderWidth: 1,
+        borderColor: AppColors.primary,
+        borderRadius: BorderRadius.sm,
+        paddingVertical: 12,
+        alignItems: 'center',
+    },
+    modalSecondaryText: {
+        color: AppColors.primary,
+        fontWeight: '700',
+        fontSize: 14,
     },
 });

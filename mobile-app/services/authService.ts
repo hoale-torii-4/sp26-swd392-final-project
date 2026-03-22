@@ -14,15 +14,30 @@ const AUTH_ENDPOINT = '/Auth';
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 
-const normalizeUser = (input: any): User => ({
-    Id: input?.Id ?? input?.id ?? '',
-    Email: input?.Email ?? input?.email ?? '',
-    FullName: input?.FullName ?? input?.fullName ?? '',
-    Phone: input?.Phone ?? input?.phone ?? '',
-    Role: Number(input?.Role ?? input?.role ?? 0),
-    Status: Number(input?.Status ?? input?.status ?? 0),
-    CreatedAt: input?.CreatedAt ?? input?.createdAt ?? new Date().toISOString(),
-});
+const normalizeUser = (input: any): User => {
+    const rawRole = input?.Role ?? input?.role ?? 0;
+    const rawStatus = input?.Status ?? input?.status ?? 0;
+
+    const normalizedRole =
+        typeof rawRole === 'string' && Number.isNaN(Number(rawRole))
+            ? rawRole.toUpperCase()
+            : Number(rawRole);
+
+    const normalizedStatus =
+        typeof rawStatus === 'string' && Number.isNaN(Number(rawStatus))
+            ? rawStatus.toUpperCase()
+            : Number(rawStatus);
+
+    return {
+        Id: input?.Id ?? input?.id ?? '',
+        Email: input?.Email ?? input?.email ?? '',
+        FullName: input?.FullName ?? input?.fullName ?? '',
+        Phone: input?.Phone ?? input?.phone ?? '',
+        Role: normalizedRole,
+        Status: normalizedStatus,
+        CreatedAt: input?.CreatedAt ?? input?.createdAt ?? new Date().toISOString(),
+    };
+};
 
 export const authService = {
     register: async (data: RegisterRequest): Promise<RegisterResponse> => {
@@ -41,8 +56,10 @@ export const authService = {
         const result = response.data;
 
         if (result.Success && result.Data) {
+            const normalizedUser = normalizeUser(result.Data.User);
+            result.Data.User = normalizedUser;
             await AsyncStorage.setItem(TOKEN_KEY, result.Data.Token);
-            await AsyncStorage.setItem(USER_KEY, JSON.stringify(result.Data.User));
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
         }
 
         return result;
@@ -56,8 +73,10 @@ export const authService = {
         const result = response.data;
 
         if (result.Success && result.Data) {
+            const normalizedUser = normalizeUser(result.Data.User);
+            result.Data.User = normalizedUser;
             await AsyncStorage.setItem(TOKEN_KEY, result.Data.Token);
-            await AsyncStorage.setItem(USER_KEY, JSON.stringify(result.Data.User));
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
         }
 
         return result;

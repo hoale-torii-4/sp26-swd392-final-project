@@ -11,6 +11,7 @@ import AboutPage from './pages/AboutPage'
 import AccountPage from './pages/AccountPage'
 import GiftBoxesPage from './pages/GiftBoxesPage'
 import ProductDetailPage from './pages/ProductDetailPage'
+import OrderDetailPage from './pages/OrderDetailPage'
 import CartPage from './pages/CartPage'
 import CheckoutPage from './pages/CheckoutPage'
 import B2BCheckoutPage from './pages/B2BCheckoutPage'
@@ -71,6 +72,7 @@ function App() {
           <Route path="/order-success" element={<OrderSuccessPage />} />
           <Route path="/order-tracking" element={<OrderTrackingPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/:id" element={<OrderDetailPage />} />
           <Route path="/mix-match" element={<MixMatchPage />} />
 
           {/* Admin panel routes */}

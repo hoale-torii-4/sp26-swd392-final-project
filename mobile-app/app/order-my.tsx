@@ -126,7 +126,7 @@ export default function MyOrdersScreen() {
             <TouchableOpacity
               key={order.Id}
               style={styles.orderCard}
-              onPress={() => router.push({ pathname: '/order-detail', params: { code: order.OrderCode } } as any)}
+              onPress={() => router.push({ pathname: '/order-detail', params: { id: order.Id, code: order.OrderCode } } as any)}
             >
               <View style={styles.cardHeader}>
                 <View>

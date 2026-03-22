@@ -2,8 +2,6 @@
 
 import apiClient from "./apiClient";
 
-// ─── Enums as const objects (erasableSyntaxOnly compatible) ───
-
 export const OrderStatus = {
     PAYMENT_CONFIRMING: "PAYMENT_CONFIRMING",
     PAYMENT_EXPIRED_INTERNAL: "PAYMENT_EXPIRED_INTERNAL",
@@ -28,8 +26,6 @@ export const OrderItemType = {
 } as const;
 export type OrderItemType = (typeof OrderItemType)[keyof typeof OrderItemType];
 
-// ─── Request DTOs ───
-
 export interface OrderItemDto {
     Type: OrderItemType;
     GiftBoxId?: string;
@@ -39,7 +35,6 @@ export interface OrderItemDto {
     Name?: string;
 }
 
-/** B2C order — single delivery address (guest or member) */
 export interface CreateOrderB2CDto {
     UserId?: string;
     CustomerEmail: string;
@@ -51,10 +46,9 @@ export interface CreateOrderB2CDto {
     DeliveryAddress: string;
     GreetingMessage?: string;
     GreetingCardUrl?: string;
-    DeliveryDate: string; // ISO date
+    DeliveryDate: string;
 }
 
-/** B2B order — multiple delivery addresses (member only) */
 export interface CreateOrderB2BDto {
     UserId: string;
     CustomerEmail: string;
@@ -64,7 +58,7 @@ export interface CreateOrderB2BDto {
     DeliveryAllocations: B2BDeliveryAllocationDto[];
     GreetingMessage?: string;
     GreetingCardUrl?: string;
-    DeliveryDate: string; // ISO date
+    DeliveryDate: string;
 }
 
 export interface B2BDeliveryAllocationDto {
@@ -79,8 +73,6 @@ export interface OrderItemAllocationDto {
     Quantity: number;
 }
 
-// ─── Response DTOs ───
-
 export interface OrderCreatedResponse {
     orderId: string;
     orderCode: string;
@@ -88,7 +80,7 @@ export interface OrderCreatedResponse {
     status: string | number;
     totalAmount: number;
     createdAt: string;
-    deliveryAddressCount?: number; // B2B only
+    deliveryAddressCount?: number;
 }
 
 type OrderCreatedApiResponse = {
@@ -103,12 +95,14 @@ type OrderCreatedApiResponse = {
 
 export interface OrderItemResponseDto {
     Id: string;
-    Type: OrderItemType;
-    GiftBoxId: string | null;
-    CustomBoxId: string | null;
+    Type: OrderItemType | string;
+    GiftBoxId?: string | null;
+    CustomBoxId?: string | null;
     Quantity: number;
-    Price: number;
-    Name: string | null;
+    Price?: number;
+    UnitPrice?: number;
+    TotalPrice?: number;
+    Name?: string | null;
 }
 
 export interface DeliveryAddressResponseDto {
@@ -121,13 +115,34 @@ export interface DeliveryAddressResponseDto {
     HideInvoice: boolean;
 }
 
+export interface DeliveryShipmentItemResponseDto {
+    OrderItemId: string;
+    Name: string;
+    Type: OrderItemType | string;
+    Quantity: number;
+    UnitPrice: number;
+    TotalPrice: number;
+}
+
+export interface DeliveryShipmentResponseDto {
+    DeliveryId: string;
+    AddressId: string;
+    Status: string;
+    RetryCount: number;
+    MaxRetries: number;
+    LastAttemptAt: string | null;
+    FailureReason: string | null;
+    CreatedAt: string;
+    Items: DeliveryShipmentItemResponseDto[];
+}
+
 export interface OrderDto {
     Id: string;
     OrderCode: string;
     UserId: string | null;
     Email: string;
-    OrderType: OrderType;
-    Status: OrderStatus;
+    OrderType: OrderType | string;
+    Status: OrderStatus | string;
     TotalAmount: number;
     DeliveryDate: string;
     GreetingMessage: string | null;
@@ -135,6 +150,7 @@ export interface OrderDto {
     CreatedAt: string;
     Items: OrderItemResponseDto[];
     DeliveryAddresses: DeliveryAddressResponseDto[];
+    DeliveryShipments?: DeliveryShipmentResponseDto[];
 }
 
 export interface MixMatchValidationResult {
@@ -152,8 +168,6 @@ export interface MixMatchValidationResult {
     MeetsRules: boolean;
 }
 
-// ─── API wrapper type ───
-
 interface ApiResponse<T> {
     Success: boolean;
     Message: string;
@@ -161,15 +175,51 @@ interface ApiResponse<T> {
     Errors: string[];
 }
 
-// ─── Order API Service ───
-
 const ORDERS = "/Orders";
 
+const normalizeOrderDetail = (raw: any): OrderDto => {
+    const src = raw?.Data ?? raw?.data ?? raw ?? {};
+
+    const itemsFromRoot = src?.Items ?? src?.items ?? src?.OrderItems ?? src?.orderItems ?? [];
+    const shipments = src?.DeliveryShipments ?? src?.deliveryShipments ?? [];
+    const fallbackItemsFromShipments = Array.isArray(shipments)
+        ? shipments.flatMap((s: any) => s?.Items ?? s?.items ?? [])
+        : [];
+
+    const normalizedItems = (Array.isArray(itemsFromRoot) && itemsFromRoot.length > 0
+        ? itemsFromRoot
+        : fallbackItemsFromShipments
+    ).map((i: any, idx: number) => ({
+        Id: i?.Id ?? i?.id ?? i?.OrderItemId ?? i?.orderItemId ?? String(idx),
+        Type: i?.Type ?? i?.type ?? i?.OrderItemType ?? i?.orderItemType ?? "READY_MADE",
+        GiftBoxId: i?.GiftBoxId ?? i?.giftBoxId ?? null,
+        CustomBoxId: i?.CustomBoxId ?? i?.customBoxId ?? null,
+        Quantity: Number(i?.Quantity ?? i?.quantity ?? 0),
+        Price: i?.Price ?? i?.price,
+        UnitPrice: i?.UnitPrice ?? i?.unitPrice,
+        TotalPrice: i?.TotalPrice ?? i?.totalPrice,
+        Name: i?.Name ?? i?.name ?? i?.ProductName ?? i?.productName,
+    }));
+
+    return {
+        Id: src?.Id ?? src?.id ?? "",
+        OrderCode: src?.OrderCode ?? src?.orderCode ?? "",
+        UserId: src?.UserId ?? src?.userId ?? null,
+        Email: src?.Email ?? src?.email ?? "",
+        OrderType: src?.OrderType ?? src?.orderType ?? "",
+        Status: src?.Status ?? src?.status ?? "",
+        TotalAmount: Number(src?.TotalAmount ?? src?.totalAmount ?? 0),
+        DeliveryDate: src?.DeliveryDate ?? src?.deliveryDate ?? "",
+        GreetingMessage: src?.GreetingMessage ?? src?.greetingMessage ?? null,
+        GreetingCardUrl: src?.GreetingCardUrl ?? src?.greetingCardUrl ?? null,
+        CreatedAt: src?.CreatedAt ?? src?.createdAt ?? "",
+        Items: normalizedItems,
+        DeliveryAddresses: src?.DeliveryAddresses ?? src?.deliveryAddresses ?? [],
+        DeliveryShipments: shipments,
+    } as OrderDto;
+};
+
 export const orderService = {
-    /**
-     * POST /api/Orders/b2c
-     * Create a B2C order (single address). Works for guests and members.
-     */
     createB2COrder: async (data: CreateOrderB2CDto): Promise<OrderCreatedResponse> => {
         const res = await apiClient.post<ApiResponse<OrderCreatedApiResponse>>(
             `${ORDERS}/b2c`,
@@ -187,10 +237,6 @@ export const orderService = {
         };
     },
 
-    /**
-     * POST /api/Orders/b2b
-     * Create a B2B order (multi-address). Requires authentication.
-     */
     createB2BOrder: async (data: CreateOrderB2BDto): Promise<OrderCreatedResponse> => {
         const res = await apiClient.post<ApiResponse<OrderCreatedApiResponse>>(
             `${ORDERS}/b2b`,
@@ -208,10 +254,6 @@ export const orderService = {
         };
     },
 
-    /**
-     * GET /api/Orders/track?orderCode=...&email=...
-     * Track an order by code + email (public, no auth required).
-     */
     trackOrder: async (orderCode: string, email: string): Promise<OrderDto> => {
         const res = await apiClient.get<OrderDto>(`${ORDERS}/track`, {
             params: { orderCode, email },
@@ -219,10 +261,18 @@ export const orderService = {
         return res.data;
     },
 
-    /**
-     * GET /api/Orders/my-orders
-     * Get orders for the authenticated user.
-     */
+    getOrderDetailByCode: async (orderCode: string, email?: string): Promise<OrderDto> => {
+        const res = await apiClient.get(`${ORDERS}/detail/${orderCode}`, {
+            params: email ? { email } : undefined,
+        });
+        return normalizeOrderDetail(res.data);
+    },
+
+    getOrderDetailById: async (orderId: string): Promise<OrderDto> => {
+        const res = await apiClient.get(`${ORDERS}/${orderId}`);
+        return normalizeOrderDetail(res.data);
+    },
+
     getMyOrders: async (skip = 0, take = 20) => {
         const res = await apiClient.get(`${ORDERS}/my-orders`, {
             params: { skip, take },
@@ -230,10 +280,6 @@ export const orderService = {
         return res.data;
     },
 
-    /**
-     * POST /api/Orders/validate-mixmatch/{customBoxId}
-     * Validate mix & match rules for a custom box.
-     */
     validateMixMatch: async (customBoxId: string): Promise<MixMatchValidationResult> => {
         const res = await apiClient.post<ApiResponse<MixMatchValidationResult>>(
             `${ORDERS}/validate-mixmatch/${customBoxId}`,

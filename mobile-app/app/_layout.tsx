@@ -73,6 +73,7 @@ export default function RootLayout() {
             }}
           >
             <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="(admin-tabs)" />
             <Stack.Screen name="login" options={{ animation: 'slide_from_bottom' }} />
             <Stack.Screen name="register" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="verify-email" options={{ animation: 'slide_from_right' }} />

@@ -10,12 +10,14 @@ import { useAuth } from '../../contexts/AuthContext';
 import { authService } from '../../services/authService';
 import { AppColors, Spacing, BorderRadius } from '../../constants/theme';
 import ConfirmModal from '../../components/ConfirmModal';
+import { isInternalRole } from '../../types/auth';
 
 export default function AccountScreen() {
     const router = useRouter();
-    const { user, isAuthenticated, logout } = useAuth();
+    const { user, isAuthenticated, logout, siteMode, setSiteMode } = useAuth();
 
     const initials = user?.FullName?.charAt(0).toUpperCase() || 'U';
+    const canSwitchSite = isInternalRole(user?.Role);
 
     // Profile state
     const [fullName, setFullName] = useState(user?.FullName || '');
@@ -31,6 +33,29 @@ export default function AccountScreen() {
     const [pwIsSuccess, setPwIsSuccess] = useState(false);
 
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+    const handleSwitchSite = async () => {
+        if (!canSwitchSite) return;
+
+        if (siteMode === 'admin') {
+            await setSiteMode('customer');
+            Toast.show({
+                type: 'success',
+                text1: 'Đã chuyển chế độ',
+                text2: 'Bạn đang ở Customer site.',
+            });
+            router.replace('/(tabs)' as any);
+            return;
+        }
+
+        await setSiteMode('admin');
+        Toast.show({
+            type: 'success',
+            text1: 'Đã chuyển chế độ',
+            text2: 'Bạn đang ở Admin site.',
+        });
+        router.replace('/(admin-tabs)/dashboard' as any);
+    };
 
     // If not authenticated, show login prompt
     if (!isAuthenticated || !user) {
@@ -115,6 +140,19 @@ export default function AccountScreen() {
                 </View>
                 <Text style={styles.userName}>{user.FullName}</Text>
                 <Text style={styles.userEmail}>{user.Email}</Text>
+
+                {canSwitchSite && (
+                    <TouchableOpacity style={styles.switchSiteBtn} onPress={handleSwitchSite}>
+                        <Ionicons
+                            name={siteMode === 'admin' ? 'shield-checkmark-outline' : 'storefront-outline'}
+                            size={16}
+                            color={AppColors.primary}
+                        />
+                        <Text style={styles.switchSiteText}>
+                            {siteMode === 'admin' ? 'Đang ở Admin site • Chạm để về Customer site' : 'Đang ở Customer site • Chạm để vào Admin site'}
+                        </Text>
+                    </TouchableOpacity>
+                )}
             </View>
 
             {/* Menu Items */}
@@ -242,7 +280,7 @@ export default function AccountScreen() {
             </TouchableOpacity>
 
             <View style={{ height: 40 }} />
-            
+
             <ConfirmModal
                 visible={showLogoutConfirm}
                 title="Đăng xuất"
@@ -298,6 +336,24 @@ const styles = StyleSheet.create({
         fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
     },
     userEmail: { fontSize: 13, color: AppColors.textSecondary, marginTop: 2 },
+    switchSiteBtn: {
+        marginTop: Spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        borderWidth: 1,
+        borderColor: AppColors.primary,
+        borderRadius: BorderRadius.md,
+        backgroundColor: 'rgba(139, 26, 26, 0.06)',
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 8,
+        marginHorizontal: Spacing.lg,
+    },
+    switchSiteText: {
+        color: AppColors.primary,
+        fontSize: 12,
+        fontWeight: '600',
+    },
 
     menuCard: {
         backgroundColor: AppColors.surface, marginHorizontal: Spacing.lg,

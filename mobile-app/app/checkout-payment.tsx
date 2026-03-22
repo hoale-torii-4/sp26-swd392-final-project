@@ -342,10 +342,18 @@ export default function CheckoutPaymentScreen() {
       setQrExpired(false);
       setQrRemainingSeconds(null);
 
-      // Only clear cart if this is a standard cart checkout, 
-      // not a "buy now" or partial selected items checkout
-      if (!buyNow && !selectedItems && !itemsParam) {
-        await cartService.clearCart();
+      // Clear purchased items from the cart
+      if (buyNow !== '1') {
+        if (selectedItems) {
+          // Remove each selected item from the cart individually
+          const parsedSelected: CartItemDto[] = JSON.parse(selectedItems);
+          await Promise.all(
+            parsedSelected.map((si) => cartService.removeItem(si.Id).catch(() => {}))
+          );
+        } else if (!itemsParam) {
+          // Full cart checkout — clear everything
+          await cartService.clearCart();
+        }
       }
 
       if (paymentMethod === 'BANK') {
