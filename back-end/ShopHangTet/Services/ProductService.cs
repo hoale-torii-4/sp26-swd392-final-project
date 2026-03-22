@@ -74,9 +74,19 @@ namespace ShopHangTet.Services
                 .ToDictionaryAsync(x => x.Id, x => x.Name);
 
             return giftBoxes
-                .Select(x =>
+                .Select(x => new GiftBoxListDto
                 {
-                    var giftBoxItems = x.Items.Select(gi =>
+                    Id = x.Id,
+                    Name = x.Name,
+                    Description = x.Description,
+                    Price = x.Price,
+                    Image = x.Images.FirstOrDefault(),
+                    Collection = collections.TryGetValue(x.CollectionId, out var collectionName) ? collectionName : string.Empty,
+                    Tags = x.Tags
+                        .Select(tagId => tags.TryGetValue(tagId, out var tagName) ? tagName : string.Empty)
+                        .Where(tagName => !string.IsNullOrWhiteSpace(tagName))
+                        .ToList(),
+                    Items = x.Items.Select(gi =>
                     {
                         items.TryGetValue(gi.ItemId, out var item);
                         return new GiftBoxItemFlatDto
@@ -85,34 +95,11 @@ namespace ShopHangTet.Services
                             Name = item?.Name ?? string.Empty,
                             Price = gi.ItemPriceSnapshot > 0 ? gi.ItemPriceSnapshot : item?.Price ?? 0,
                             Image = item?.Images.FirstOrDefault(),
-                            Quantity = gi.Quantity,
-                            StockQuantity = item?.StockQuantity ?? 0,
-                            AvailableQuantity = item?.AvailableQuantity ?? 0
+                            Quantity = gi.Quantity
                         };
-                    }).ToList();
-
-                    // TotalStock = min(available / required) across all items
-                    var totalStock = giftBoxItems.Count > 0
-                        ? giftBoxItems.Min(i => i.Quantity > 0 ? i.AvailableQuantity / i.Quantity : 0)
-                        : 0;
-
-                    return new GiftBoxListDto
-                    {
-                        Id = x.Id,
-                        Name = x.Name,
-                        Description = x.Description,
-                        Price = x.Price,
-                        Image = x.Images.FirstOrDefault(),
-                        Collection = collections.TryGetValue(x.CollectionId, out var collectionName) ? collectionName : string.Empty,
-                        Tags = x.Tags
-                            .Select(tagId => tags.TryGetValue(tagId, out var tagName) ? tagName : string.Empty)
-                            .Where(tagName => !string.IsNullOrWhiteSpace(tagName))
-                            .ToList(),
-                        Items = giftBoxItems,
-                        IsActive = x.IsActive,
-                        CreatedAt = x.CreatedAt,
-                        TotalStock = totalStock
-                    };
+                    }).ToList(),
+                    IsActive = x.IsActive,
+                    CreatedAt = x.CreatedAt
                 })
                 .ToList();
         }
@@ -140,25 +127,6 @@ namespace ShopHangTet.Services
                 .Where(t => tagIds.Contains(t.Id) && t.IsActive)
                 .ToDictionaryAsync(t => t.Id, t => t.Name);
 
-            var giftBoxItems = giftBox.Items.Select(gi =>
-            {
-                items.TryGetValue(gi.ItemId, out var item);
-                return new GiftBoxItemFlatDto
-                {
-                    Id = gi.ItemId,
-                    Name = item?.Name ?? string.Empty,
-                    Price = gi.ItemPriceSnapshot > 0 ? gi.ItemPriceSnapshot : item?.Price ?? 0,
-                    Image = item?.Images.FirstOrDefault(),
-                    Quantity = gi.Quantity,
-                    StockQuantity = item?.StockQuantity ?? 0,
-                    AvailableQuantity = item?.AvailableQuantity ?? 0
-                };
-            }).ToList();
-
-            var totalStock = giftBoxItems.Count > 0
-                ? giftBoxItems.Min(i => i.Quantity > 0 ? i.AvailableQuantity / i.Quantity : 0)
-                : 0;
-
             return new GiftBoxDetailDto
             {
                 Id = giftBox.Id,
@@ -172,10 +140,20 @@ namespace ShopHangTet.Services
                     .Select(tagId => tags.TryGetValue(tagId, out var tagName) ? tagName : string.Empty)
                     .Where(tagName => !string.IsNullOrWhiteSpace(tagName))
                     .ToList(),
-                Items = giftBoxItems,
+                Items = giftBox.Items.Select(gi =>
+                {
+                    items.TryGetValue(gi.ItemId, out var item);
+                    return new GiftBoxItemFlatDto
+                    {
+                        Id = gi.ItemId,
+                        Name = item?.Name ?? string.Empty,
+                        Price = gi.ItemPriceSnapshot > 0 ? gi.ItemPriceSnapshot : item?.Price ?? 0,
+                        Image = item?.Images.FirstOrDefault(),
+                        Quantity = gi.Quantity
+                    };
+                }).ToList(),
                 IsActive = giftBox.IsActive,
-                CreatedAt = giftBox.CreatedAt,
-                TotalStock = totalStock
+                CreatedAt = giftBox.CreatedAt
             };
         }
 
