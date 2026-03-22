@@ -26,8 +26,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Reports/Dashboard failed");
-            return StatusCode(500, new { error = "Failed to load dashboard report" });
+            _logger.LogError(ex, "Error in GET /api/admin/reports/dashboard");
+            return StatusCode(500, new { message = "Lỗi khi tải dữ liệu dashboard.", detail = ex.Message });
         }
     }
 
@@ -41,8 +41,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Reports/Revenue failed");
-            return StatusCode(500, new { error = "Failed to load revenue report" });
+            _logger.LogError(ex, "Error in GET /api/admin/reports/revenue");
+            return StatusCode(500, new { message = "Lỗi khi tải báo cáo doanh thu.", detail = ex.Message });
         }
     }
 
@@ -56,8 +56,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Reports/CollectionsPerformance failed");
-            return StatusCode(500, new { error = "Failed to load collection report" });
+            _logger.LogError(ex, "Error in GET /api/admin/reports/collections-performance");
+            return StatusCode(500, new { message = "Lỗi khi tải hiệu suất bộ sưu tập.", detail = ex.Message });
         }
     }
 
@@ -71,8 +71,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Reports/GiftBoxPerformance failed");
-            return StatusCode(500, new { error = "Failed to load giftbox report" });
+            _logger.LogError(ex, "Error in GET /api/admin/reports/giftbox-performance");
+            return StatusCode(500, new { message = "Lỗi khi tải hiệu suất gift box.", detail = ex.Message });
         }
     }
 
@@ -86,8 +86,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Reports/B2cB2bComparison failed");
-            return StatusCode(500, new { error = "Failed to load B2C/B2B comparison" });
+            _logger.LogError(ex, "Error in GET /api/admin/reports/b2c-b2b-comparison");
+            return StatusCode(500, new { message = "Lỗi khi tải so sánh B2C/B2B.", detail = ex.Message });
         }
     }
 
@@ -101,8 +101,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Reports/InventoryAlert failed");
-            return StatusCode(500, new { error = "Failed to load inventory alerts" });
+            _logger.LogError(ex, "Error in GET /api/admin/reports/inventory-alert");
+            return StatusCode(500, new { message = "Lỗi khi tải cảnh báo tồn kho.", detail = ex.Message });
         }
     }
 
@@ -110,35 +110,75 @@ public class ReportsController : ControllerBase
     [HttpGet("export/revenue")]
     public async Task<IActionResult> ExportRevenue([FromQuery] DateTime? fromDate, [FromQuery] DateTime? toDate, [FromQuery] string view = "day", [FromQuery] string? orderType = null)
     {
-        var data = await _service.ExportRevenueAsync(fromDate, toDate, view, orderType);
-        return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "revenue-report.xlsx");
+        try
+        {
+            var data = await _service.ExportRevenueAsync(fromDate, toDate, view, orderType);
+            return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "revenue-report.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GET /api/admin/reports/export/revenue");
+            return StatusCode(500, new { message = "Lỗi khi xuất báo cáo doanh thu.", detail = ex.Message });
+        }
     }
 
     [HttpGet("export/collections")]
     public async Task<IActionResult> ExportCollections()
     {
-        var data = await _service.ExportCollectionsAsync();
-        return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "collection-report.xlsx");
+        try
+        {
+            var data = await _service.ExportCollectionsAsync();
+            return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "collection-report.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GET /api/admin/reports/export/collections");
+            return StatusCode(500, new { message = "Lỗi khi xuất báo cáo bộ sưu tập.", detail = ex.Message });
+        }
     }
 
     [HttpGet("export/giftboxes")]
     public async Task<IActionResult> ExportGiftBoxes()
     {
-        var data = await _service.ExportGiftBoxesAsync();
-        return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "giftbox-report.xlsx");
+        try
+        {
+            var data = await _service.ExportGiftBoxesAsync();
+            return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "giftbox-report.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GET /api/admin/reports/export/giftboxes");
+            return StatusCode(500, new { message = "Lỗi khi xuất báo cáo gift box.", detail = ex.Message });
+        }
     }
 
     [HttpGet("export/b2c-b2b")]
     public async Task<IActionResult> ExportB2cB2b()
     {
-        var data = await _service.ExportB2cB2bAsync();
-        return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "b2c-b2b-report.xlsx");
+        try
+        {
+            var data = await _service.ExportB2cB2bAsync();
+            return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "b2c-b2b-report.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GET /api/admin/reports/export/b2c-b2b");
+            return StatusCode(500, new { message = "Lỗi khi xuất báo cáo B2C/B2B.", detail = ex.Message });
+        }
     }
 
     [HttpGet("export/inventory-alert")]
     public async Task<IActionResult> ExportInventoryAlert([FromQuery] int threshold = 10)
     {
-        var data = await _service.ExportInventoryAlertAsync(threshold);
-        return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "inventory-alert.xlsx");
+        try
+        {
+            var data = await _service.ExportInventoryAlertAsync(threshold);
+            return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "inventory-alert.xlsx");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GET /api/admin/reports/export/inventory-alert");
+            return StatusCode(500, new { message = "Lỗi khi xuất cảnh báo tồn kho.", detail = ex.Message });
+        }
     }
 }

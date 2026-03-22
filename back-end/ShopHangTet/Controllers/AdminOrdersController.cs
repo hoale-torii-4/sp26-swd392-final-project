@@ -8,10 +8,12 @@ namespace ShopHangTet.Controllers;
 public class AdminOrdersController : ControllerBase
 {
     private readonly IOrderService _orderService;
+    private readonly ILogger<AdminOrdersController> _logger;
 
-    public AdminOrdersController(IOrderService orderService)
+    public AdminOrdersController(IOrderService orderService, ILogger<AdminOrdersController> logger)
     {
         _orderService = orderService;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -22,7 +24,15 @@ public class AdminOrdersController : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await _orderService.GetAllOrdersAsync(status, orderType, keyword, page, pageSize);
-        return Ok(result);
+        try
+        {
+            var result = await _orderService.GetAllOrdersAsync(status, orderType, keyword, page, pageSize);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in GET /api/admin/orders");
+            return StatusCode(500, new { message = "Lỗi khi tải danh sách đơn hàng.", detail = ex.Message });
+        }
     }
 }
