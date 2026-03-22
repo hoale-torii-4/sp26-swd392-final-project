@@ -240,48 +240,50 @@ namespace ShopHangTet.Services
             page = page <= 0 ? 1 : page;
             pageSize = pageSize <= 0 ? 20 : pageSize;
 
-            var query = _context.Orders.AsQueryable();
+            // Mongo EF provider có thể lỗi khi translate ToLower/Contains/enum parse.
+            // Lấy dữ liệu trước rồi filter in-memory để tránh 500 runtime do provider translation.
+            var allOrders = await _context.Orders
+                .OrderByDescending(o => o.CreatedAt)
+                .ToListAsync();
 
-            // Filter by status
+            IEnumerable<OrderModel> filtered = allOrders;
+
             if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<OrderStatus>(status, true, out var statusEnum))
             {
-                query = query.Where(o => o.Status == statusEnum);
+                filtered = filtered.Where(o => o.Status == statusEnum);
             }
 
-            // Filter by order type
             if (!string.IsNullOrWhiteSpace(orderType) && Enum.TryParse<OrderType>(orderType, true, out var typeEnum))
             {
-                query = query.Where(o => o.OrderType == typeEnum);
+                filtered = filtered.Where(o => o.OrderType == typeEnum);
             }
 
-            // Search by keyword (orderCode, customerName, customerEmail)
             if (!string.IsNullOrWhiteSpace(keyword))
             {
-                var kw = keyword.Trim().ToLower();
-                query = query.Where(o =>
-                    (o.OrderCode ?? string.Empty).ToLower().Contains(kw) ||
-                    (o.CustomerName ?? string.Empty).ToLower().Contains(kw) ||
-                    (o.CustomerEmail ?? string.Empty).ToLower().Contains(kw));
+                var kw = keyword.Trim();
+                filtered = filtered.Where(o =>
+                    (o.OrderCode ?? string.Empty).Contains(kw, StringComparison.OrdinalIgnoreCase)
+                    || (o.CustomerName ?? string.Empty).Contains(kw, StringComparison.OrdinalIgnoreCase)
+                    || (o.CustomerEmail ?? string.Empty).Contains(kw, StringComparison.OrdinalIgnoreCase));
             }
 
-            var totalItems = await query.CountAsync();
+            var totalItems = filtered.Count();
             var totalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)pageSize);
 
-            var orders = await query
-                .OrderByDescending(o => o.CreatedAt)
+            var pageItems = filtered
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToListAsync();
+                .ToList();
 
             return new AdminOrderListResult
             {
-                Data = orders.Select(o => new AdminOrderListItem
+                Data = pageItems.Select(o => new AdminOrderListItem
                 {
                     Id = o.Id.ToString(),
-                    OrderCode = o.OrderCode,
-                    CustomerName = o.CustomerName,
-                    CustomerEmail = o.CustomerEmail,
-                    CustomerPhone = o.CustomerPhone,
+                    OrderCode = o.OrderCode ?? string.Empty,
+                    CustomerName = o.CustomerName ?? string.Empty,
+                    CustomerEmail = o.CustomerEmail ?? string.Empty,
+                    CustomerPhone = o.CustomerPhone ?? string.Empty,
                     OrderType = o.OrderType.ToString(),
                     Status = o.Status.ToString(),
                     TotalAmount = o.TotalAmount,
