@@ -365,6 +365,7 @@ namespace ShopHangTet.DTOs
         public bool IsAlcohol { get; set; }
 
         public int StockQuantity { get; set; }
+        public int AvailableQuantity { get; set; }
 
         public string StockStatus { get; set; } = string.Empty;
         public string StockStatusLabel { get; set; } = string.Empty;

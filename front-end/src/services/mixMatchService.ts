@@ -9,6 +9,7 @@ export interface MixMatchItem {
     Price?: number;
     IsAlcohol?: boolean;
     StockQuantity?: number;
+    AvailableQuantity?: number;
     StockStatus?: string;
     StockStatusLabel?: string;
     IsActive?: boolean;
