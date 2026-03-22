@@ -237,32 +237,35 @@ namespace ShopHangTet.Services
         /// Lấy tất cả đơn hàng cho Admin (có phân trang, filter)
         public async Task<AdminOrderListResult> GetAllOrdersAsync(string? status, string? orderType, string? keyword, int page, int pageSize)
         {
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 20 : pageSize;
+
             var query = _context.Orders.AsQueryable();
 
             // Filter by status
-            if (!string.IsNullOrEmpty(status) && Enum.TryParse<OrderStatus>(status, true, out var statusEnum))
+            if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<OrderStatus>(status, true, out var statusEnum))
             {
                 query = query.Where(o => o.Status == statusEnum);
             }
 
             // Filter by order type
-            if (!string.IsNullOrEmpty(orderType) && Enum.TryParse<OrderType>(orderType, true, out var typeEnum))
+            if (!string.IsNullOrWhiteSpace(orderType) && Enum.TryParse<OrderType>(orderType, true, out var typeEnum))
             {
                 query = query.Where(o => o.OrderType == typeEnum);
             }
 
             // Search by keyword (orderCode, customerName, customerEmail)
-            if (!string.IsNullOrEmpty(keyword))
+            if (!string.IsNullOrWhiteSpace(keyword))
             {
                 var kw = keyword.Trim().ToLower();
                 query = query.Where(o =>
-                    o.OrderCode.ToLower().Contains(kw) ||
-                    o.CustomerName.ToLower().Contains(kw) ||
-                    o.CustomerEmail.ToLower().Contains(kw));
+                    (o.OrderCode ?? string.Empty).ToLower().Contains(kw) ||
+                    (o.CustomerName ?? string.Empty).ToLower().Contains(kw) ||
+                    (o.CustomerEmail ?? string.Empty).ToLower().Contains(kw));
             }
 
             var totalItems = await query.CountAsync();
-            var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+            var totalPages = totalItems == 0 ? 0 : (int)Math.Ceiling(totalItems / (double)pageSize);
 
             var orders = await query
                 .OrderByDescending(o => o.CreatedAt)
@@ -282,7 +285,7 @@ namespace ShopHangTet.Services
                     OrderType = o.OrderType.ToString(),
                     Status = o.Status.ToString(),
                     TotalAmount = o.TotalAmount,
-                    TotalItems = o.Items.Sum(i => i.Quantity),
+                    TotalItems = o.Items?.Sum(i => i.Quantity) ?? 0,
                     CreatedAt = o.CreatedAt,
                     DeliveryDate = o.DeliveryDate,
                 }).ToList(),
