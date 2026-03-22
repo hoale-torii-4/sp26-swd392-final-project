@@ -85,7 +85,7 @@ public class DashboardService : IDashboardService
 
     public async Task<OrderStatusSummaryDTO> GetOrderStatusSummaryAsync()
     {
-        var orders = await _context.Orders.ToListAsync();
+        var orders = await SafeListAsync(_context.Orders, nameof(_context.Orders));
 
         return new OrderStatusSummaryDTO
         {
@@ -101,7 +101,7 @@ public class DashboardService : IDashboardService
 
     public async Task<OrderTypeSummaryDTO> GetOrderTypeSummaryAsync()
     {
-        var orders = await _context.Orders.ToListAsync();
+        var orders = await SafeListAsync(_context.Orders, nameof(_context.Orders));
 
         var b2cOrders = orders.Count(o => o.OrderType == OrderType.B2C);
         var b2bOrders = orders.Count(o => o.OrderType == OrderType.B2B);
@@ -131,7 +131,7 @@ public class DashboardService : IDashboardService
             return new List<TopCollectionDTO>();
         }
 
-        var orders = await _context.Orders.ToListAsync();
+        var orders = await SafeListAsync(_context.Orders, nameof(_context.Orders));
         var giftBoxes = await SafeListAsync(_context.GiftBoxes, nameof(_context.GiftBoxes));
         var collections = await SafeListAsync(_context.Collections, nameof(_context.Collections));
 
@@ -187,9 +187,9 @@ public class DashboardService : IDashboardService
             return new List<TopGiftBoxDTO>();
         }
 
-        var orders = await _context.Orders.ToListAsync();
-        var giftBoxes = await _context.GiftBoxes.ToListAsync();
-        var collections = await _context.Collections.ToListAsync();
+        var orders = await SafeListAsync(_context.Orders, nameof(_context.Orders));
+        var giftBoxes = await SafeListAsync(_context.GiftBoxes, nameof(_context.GiftBoxes));
+        var collections = await SafeListAsync(_context.Collections, nameof(_context.Collections));
 
         var map = new Dictionary<string, (int qty, decimal revenue)>();
 
