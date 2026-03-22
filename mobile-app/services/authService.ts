@@ -113,16 +113,27 @@ export const authService = {
                 return true;
             }
 
-            await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
-            return false;
+            return true;
         } catch (error: any) {
             const status = error?.status;
-            if (status === 401 || status === 404 || status === 403) {
+            const message = String(error?.message || '').toLowerCase();
+            const accountRemoved =
+                message.includes('người dùng không tồn tại') ||
+                message.includes('tai khoan khong ton tai') ||
+                (status === 401 && message.includes('không tồn tại'));
+            const definitelyInvalidToken =
+                status === 401 &&
+                (message.includes('jwt') ||
+                    message.includes('token') ||
+                    message.includes('signature') ||
+                    message.includes('expired'));
+
+            if (accountRemoved || definitelyInvalidToken) {
                 await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
                 return false;
             }
 
-            // keep session on transient network/server errors
+            // keep session on transient network/server errors or ambiguous 401
             return true;
         }
     },
