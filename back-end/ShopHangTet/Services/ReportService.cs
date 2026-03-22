@@ -10,10 +10,13 @@ public class ReportService : IReportService
 {
     private readonly ShopHangTetDbContext _context;
     private readonly ILogger<ReportService> _logger;
+    private readonly ILogger<ReportService> _logger;
 
+    public ReportService(ShopHangTetDbContext context, ILogger<ReportService> logger)
     public ReportService(ShopHangTetDbContext context, ILogger<ReportService> logger)
     {
         _context = context;
+        _logger = logger;
         _logger = logger;
     }
 
@@ -22,29 +25,42 @@ public class ReportService : IReportService
 
     public async Task<DashboardReportDTO> GetDashboardAsync()
     {
-        var now = DateTime.UtcNow;
-        var today = now.Date;
-        var recentFrom = now.AddDays(-30);
-        var prevFrom = recentFrom.AddDays(-30);
+        try
+        {
+            var now = DateTime.UtcNow;
+            var today = now.Date;
+            var recentFrom = now.AddDays(-30);
+            var prevFrom = recentFrom.AddDays(-30);
 
-        var allRecentOrders = await _context.Orders.Where(o => o.CreatedAt >= prevFrom).ToListAsync();
-        var recentOrders = allRecentOrders.Where(o => o.CreatedAt >= recentFrom).ToList();
-        var prevOrders = allRecentOrders.Where(o => o.CreatedAt >= prevFrom && o.CreatedAt < recentFrom).ToList();
+            var allRecentOrders = await _context.Orders
+                .AsNoTracking()
+                .Where(o => o.CreatedAt >= prevFrom)
+                .ToListAsync();
 
+            var recentOrders = allRecentOrders.Where(o => o.CreatedAt >= recentFrom).ToList();
+            var prevOrders = allRecentOrders.Where(o => o.CreatedAt >= prevFrom && o.CreatedAt < recentFrom).ToList();
+
+            var recentRevenue = recentOrders.Sum(o => o.TotalAmount);
+            var prevRevenue = prevOrders.Sum(o => o.TotalAmount);
             var recentRevenue = recentOrders.Sum(o => o.TotalAmount);
             var prevRevenue = prevOrders.Sum(o => o.TotalAmount);
 
             double revenueGrowth = prevRevenue <= 0 ? 100.0 : (double)((recentRevenue - prevRevenue) / prevRevenue * 100);
+            double revenueGrowth = prevRevenue <= 0 ? 100.0 : (double)((recentRevenue - prevRevenue) / prevRevenue * 100);
 
-        var recentOrderCount = recentOrders.Count;
-        var prevOrderCount = prevOrders.Count;
-        double orderGrowth = prevOrderCount <= 0 ? 100.0 : (double)((recentOrderCount - prevOrderCount) / (double)prevOrderCount * 100);
+            var recentOrderCount = recentOrders.Count;
+            var prevOrderCount = prevOrders.Count;
+            double orderGrowth = prevOrderCount <= 0 ? 100.0 : (double)((recentOrderCount - prevOrderCount) / (double)prevOrderCount * 100);
 
-        // Today's stats
-        var todayOrders = recentOrders.Where(o => o.CreatedAt.Date == today).ToList();
-        var todayRevenue = todayOrders.Sum(o => o.TotalAmount);
-        var todayOrderCount = todayOrders.Count;
+            // Today's stats
+            var todayOrders = recentOrders.Where(o => o.CreatedAt.Date == today).ToList();
+            var todayRevenue = todayOrders.Sum(o => o.TotalAmount);
+            var todayOrderCount = todayOrders.Count;
 
+            var b2c = recentOrders.Count(o => o.OrderType == OrderType.B2C);
+            var b2b = recentOrders.Count(o => o.OrderType == OrderType.B2B);
+            var b2cPercent = recentOrders.Any() ? (double)b2c / recentOrders.Count * 100 : 0.0;
+            var b2bPercent = recentOrders.Any() ? (double)b2b / recentOrders.Count * 100 : 0.0;
             var b2c = recentOrders.Count(o => o.OrderType == OrderType.B2C);
             var b2b = recentOrders.Count(o => o.OrderType == OrderType.B2B);
             var b2cPercent = recentOrders.Any() ? (double)b2c / recentOrders.Count * 100 : 0.0;
@@ -60,22 +76,43 @@ public class ReportService : IReportService
                 Cancelled = allOrders.Count(o => o.Status == OrderStatus.CANCELLED),
                 DeliveryFailed = allOrders.Count(o => o.Status == OrderStatus.DELIVERY_FAILED)
             };
+            var allOrders = await _context.Orders.AsNoTracking().ToListAsync();
+            var statusSummary = new ReportStatusSummaryDTO
+            {
+                PendingPayment = allOrders.Count(o => o.Status == OrderStatus.PAYMENT_CONFIRMING),
+                Preparing = allOrders.Count(o => o.Status == OrderStatus.PREPARING),
+                Shipping = allOrders.Count(o => o.Status == OrderStatus.SHIPPING),
+                Completed = allOrders.Count(o => o.Status == OrderStatus.COMPLETED),
+                Cancelled = allOrders.Count(o => o.Status == OrderStatus.CANCELLED),
+                DeliveryFailed = allOrders.Count(o => o.Status == OrderStatus.DELIVERY_FAILED)
+            };
 
-        return new DashboardReportDTO
+            return new DashboardReportDTO
+            {
+                TotalRevenue = recentRevenue,
+                RevenueGrowthPercent = Math.Round(revenueGrowth, 2),
+                TotalOrders = recentOrderCount,
+                OrderGrowthPercent = Math.Round(orderGrowth, 2),
+                TodayRevenue = todayRevenue,
+                TodayOrders = todayOrderCount,
+                B2CPercent = Math.Round(b2cPercent, 2),
+                B2BPercent = Math.Round(b2bPercent, 2),
+                StatusSummary = statusSummary
+            };
+        }
+        catch (Exception ex)
         {
-            TotalRevenue = recentRevenue,
-            RevenueGrowthPercent = Math.Round(revenueGrowth, 2),
-            TotalOrders = recentOrderCount,
-            OrderGrowthPercent = Math.Round(orderGrowth, 2),
-            TodayRevenue = todayRevenue,
-            TodayOrders = todayOrderCount,
-            B2CPercent = Math.Round(b2cPercent, 2),
-            B2BPercent = Math.Round(b2bPercent, 2),
-            StatusSummary = statusSummary
-        };
+            _logger.LogError(ex, "ReportService.GetDashboardAsync failed");
+            return new DashboardReportDTO();
+        }
     }
 
     public async Task<RevenueReportDTO> GetRevenueAsync(DateTime? fromDate, DateTime? toDate, string view, string? orderType)
+    {
+        try
+        {
+            var start = fromDate ?? DateTime.UtcNow.AddMonths(-1);
+            var end = (toDate ?? DateTime.UtcNow).Date.AddDays(1).AddTicks(-1);
     {
         try
         {
@@ -85,7 +122,12 @@ public class ReportService : IReportService
             var ordersQuery = _context.Orders.AsNoTracking().AsQueryable();
             if (!string.IsNullOrWhiteSpace(orderType) && Enum.TryParse<OrderType>(orderType, true, out var ot))
                 ordersQuery = ordersQuery.Where(o => o.OrderType == ot);
+            var ordersQuery = _context.Orders.AsNoTracking().AsQueryable();
+            if (!string.IsNullOrWhiteSpace(orderType) && Enum.TryParse<OrderType>(orderType, true, out var ot))
+                ordersQuery = ordersQuery.Where(o => o.OrderType == ot);
 
+            var orders = await ordersQuery.Where(o => o.CreatedAt >= start && o.CreatedAt <= end).ToListAsync();
+            var totalRevenue = orders.Sum(o => o.TotalAmount);
             var orders = await ordersQuery.Where(o => o.CreatedAt >= start && o.CreatedAt <= end).ToListAsync();
             var totalRevenue = orders.Sum(o => o.TotalAmount);
 
@@ -94,7 +136,18 @@ public class ReportService : IReportService
             var prevOrders = await ordersQuery.Where(o => o.CreatedAt >= prevStart && o.CreatedAt <= prevEnd).ToListAsync();
             var prevRevenue = prevOrders.Sum(o => o.TotalAmount);
             double growth = prevRevenue <= 0 ? 100.0 : (double)((totalRevenue - prevRevenue) / prevRevenue * 100);
+            var prevStart = start.AddYears(-1);
+            var prevEnd = end.AddYears(-1);
+            var prevOrders = await ordersQuery.Where(o => o.CreatedAt >= prevStart && o.CreatedAt <= prevEnd).ToListAsync();
+            var prevRevenue = prevOrders.Sum(o => o.TotalAmount);
+            double growth = prevRevenue <= 0 ? 100.0 : (double)((totalRevenue - prevRevenue) / prevRevenue * 100);
 
+            var chart = new List<RevenueReportChartItemDTO>();
+            if (view == "month")
+            {
+                var grouped = orders.GroupBy(o => new { o.CreatedAt.Year, o.CreatedAt.Month })
+                    .Select(g => new { Year = g.Key.Year, Month = g.Key.Month, Revenue = g.Sum(o => o.TotalAmount) })
+                    .OrderBy(x => x.Year).ThenBy(x => x.Month).ToList();
             var chart = new List<RevenueReportChartItemDTO>();
             if (view == "month")
             {
@@ -118,9 +171,30 @@ public class ReportService : IReportService
                     chart.Add(new RevenueReportChartItemDTO { Date = g.Date.ToString("yyyy-MM-dd"), Revenue = g.Revenue, LastYearRevenue = lastYearRev });
                 }
             }
+                foreach (var g in grouped)
+                {
+                    var lastYearRev = prevOrders.Where(o => o.CreatedAt.Year == g.Year - 1 && o.CreatedAt.Month == g.Month).Sum(o => o.TotalAmount);
+                    chart.Add(new RevenueReportChartItemDTO { Date = $"{g.Year}-{g.Month:D2}", Revenue = g.Revenue, LastYearRevenue = lastYearRev });
+                }
+            }
+            else
+            {
+                var grouped = orders.GroupBy(o => o.CreatedAt.Date).Select(g => new { Date = g.Key, Revenue = g.Sum(o => o.TotalAmount) }).OrderBy(x => x.Date).ToList();
+                foreach (var g in grouped)
+                {
+                    var lastYearDate = g.Date.AddYears(-1);
+                    var lastYearRev = prevOrders.Where(o => o.CreatedAt.Date == lastYearDate).Sum(o => o.TotalAmount);
+                    chart.Add(new RevenueReportChartItemDTO { Date = g.Date.ToString("yyyy-MM-dd"), Revenue = g.Revenue, LastYearRevenue = lastYearRev });
+                }
+            }
 
             var best = chart.OrderByDescending(c => c.Revenue).FirstOrDefault();
+            BestDayDTO? bestDay = best != null
+                ? new BestDayDTO { Date = best.Date, Revenue = best.Revenue }
+                : null;
 
+            var b2cPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2C) / orders.Count * 100 : 0.0;
+            var b2bPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2B) / orders.Count * 100 : 0.0;
             var b2cPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2C) / orders.Count * 100 : 0.0;
             var b2bPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2B) / orders.Count * 100 : 0.0;
 
@@ -128,8 +202,7 @@ public class ReportService : IReportService
             {
                 TotalRevenue = totalRevenue,
                 GrowthPercent = Math.Round(growth, 2),
-                BestDayDate = best?.Date ?? string.Empty,
-                BestDayRevenue = best?.Revenue ?? 0m,
+                BestDay = bestDay,
                 B2CPercent = Math.Round(b2cPercent, 2),
                 B2BPercent = Math.Round(b2bPercent, 2),
                 Chart = chart
@@ -151,7 +224,15 @@ public class ReportService : IReportService
             var giftBoxes = giftBoxList.ToDictionary(g => g.Id);
             var collectionList = await _context.Collections.AsNoTracking().ToListAsync();
             var collections = collectionList.ToDictionary(c => c.Id);
+        try
+        {
+            var orders = await _context.Orders.AsNoTracking().ToListAsync();
+            var giftBoxList = await _context.GiftBoxes.AsNoTracking().ToListAsync();
+            var giftBoxes = giftBoxList.ToDictionary(g => g.Id);
+            var collectionList = await _context.Collections.AsNoTracking().ToListAsync();
+            var collections = collectionList.ToDictionary(c => c.Id);
 
+            var colStats = new Dictionary<string, (int orders, decimal revenue)>();
             var colStats = new Dictionary<string, (int orders, decimal revenue)>();
 
             foreach (var order in orders)
@@ -172,9 +253,37 @@ public class ReportService : IReportService
                     }
                 }
             }
+            foreach (var order in orders)
+            {
+                var seenCollections = new HashSet<string>();
+                foreach (var item in order.Items)
+                {
+                    if (item.GiftBoxId == null) continue;
+                    var gid = item.GiftBoxId?.ToString();
+                    if (string.IsNullOrEmpty(gid)) continue;
+                    if (!giftBoxes.TryGetValue(gid, out var gb)) continue;
+                    var cid = gb!.CollectionId;
+                    if (!seenCollections.Contains(cid))
+                    {
+                        seenCollections.Add(cid);
+                        if (!colStats.ContainsKey(cid)) colStats[cid] = (0, 0m);
+                        colStats[cid] = (colStats[cid].orders + 1, colStats[cid].revenue + item.TotalPrice);
+                    }
+                }
+            }
 
             var totalRevenue = colStats.Values.Sum(x => x.revenue);
+            var totalRevenue = colStats.Values.Sum(x => x.revenue);
 
+            var list = colStats.Select(kv => new CollectionPerformanceItemDTO
+            {
+                CollectionId = kv.Key,
+                CollectionName = collections.TryGetValue(kv.Key, out var c) ? c.Name : string.Empty,
+                Orders = kv.Value.orders,
+                Revenue = kv.Value.revenue,
+                Percent = totalRevenue > 0 ? (double)(kv.Value.revenue / totalRevenue * 100) : 0,
+                Thumbnail = collections.TryGetValue(kv.Key, out var c2) ? c2.CoverImage : null
+            }).OrderByDescending(x => x.Revenue).Select((x, idx) => { x.Rank = idx + 1; return x; }).ToList();
             var list = colStats.Select(kv => new CollectionPerformanceItemDTO
             {
                 CollectionId = kv.Key,
@@ -192,6 +301,13 @@ public class ReportService : IReportService
             _logger.LogError(ex, "ReportService.GetCollectionsPerformanceAsync failed");
             return new List<CollectionPerformanceItemDTO>();
         }
+            return list;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ReportService.GetCollectionsPerformanceAsync failed");
+            return new List<CollectionPerformanceItemDTO>();
+        }
     }
 
     public async Task<List<GiftBoxPerformanceItemDTO>> GetGiftBoxPerformanceAsync()
@@ -201,11 +317,30 @@ public class ReportService : IReportService
             var orders = await _context.Orders.AsNoTracking().ToListAsync();
             var giftBoxes = await _context.GiftBoxes.AsNoTracking().ToListAsync();
             var reviews = await _context.Reviews.AsNoTracking().Where(r => r.Status == "APPROVED").ToListAsync();
+        try
+        {
+            var orders = await _context.Orders.AsNoTracking().ToListAsync();
+            var giftBoxes = await _context.GiftBoxes.AsNoTracking().ToListAsync();
+            var reviews = await _context.Reviews.AsNoTracking().Where(r => r.Status == "APPROVED").ToListAsync();
 
+            var dict = new Dictionary<string, (string name, string? image, int sold, decimal revenue, List<int> ratings)>();
+            foreach (var g in giftBoxes) dict[g.Id] = (g.Name, (g.Images != null && g.Images.Any()) ? g.Images.FirstOrDefault() : null, 0, 0m, new List<int>());
             var dict = new Dictionary<string, (string name, string? image, int sold, decimal revenue, List<int> ratings)>();
             foreach (var g in giftBoxes) dict[g.Id] = (g.Name, (g.Images != null && g.Images.Any()) ? g.Images.FirstOrDefault() : null, 0, 0m, new List<int>());
 
             foreach (var o in orders)
+            {
+                foreach (var it in o.Items)
+                {
+                    if (it.GiftBoxId == null) continue;
+                    var gid = it.GiftBoxId?.ToString();
+                    if (string.IsNullOrEmpty(gid) || !dict.ContainsKey(gid)) continue;
+                    var entry = dict[gid];
+                    entry.sold += it.Quantity;
+                    entry.revenue += it.TotalPrice;
+                    dict[gid] = entry;
+                }
+            }
             {
                 foreach (var it in o.Items)
                 {
@@ -223,7 +358,22 @@ public class ReportService : IReportService
             {
                 if (dict.ContainsKey(r.GiftBoxId)) dict[r.GiftBoxId].ratings.Add(r.Rating);
             }
+            foreach (var r in reviews)
+            {
+                if (dict.ContainsKey(r.GiftBoxId)) dict[r.GiftBoxId].ratings.Add(r.Rating);
+            }
 
+            var result = dict.Select(kv => new GiftBoxPerformanceItemDTO
+            {
+                GiftBoxId = kv.Key,
+                GiftBoxName = kv.Value.name,
+                SoldQuantity = kv.Value.sold,
+                Revenue = kv.Value.revenue,
+                AvgRating = kv.Value.ratings.Any() ? Math.Round(kv.Value.ratings.Average(), 2) : 0.0,
+                Image = kv.Value.image,
+                TopProduct = null,
+                MarketingSuggestions = null
+            }).OrderByDescending(x => x.Revenue).ToList();
             var result = dict.Select(kv => new GiftBoxPerformanceItemDTO
             {
                 GiftBoxId = kv.Key,
@@ -243,6 +393,13 @@ public class ReportService : IReportService
             _logger.LogError(ex, "ReportService.GetGiftBoxPerformanceAsync failed");
             return new List<GiftBoxPerformanceItemDTO>();
         }
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ReportService.GetGiftBoxPerformanceAsync failed");
+            return new List<GiftBoxPerformanceItemDTO>();
+        }
     }
 
     public async Task<B2cB2bComparisonDTO> GetB2cB2bComparisonAsync()
@@ -252,15 +409,27 @@ public class ReportService : IReportService
             var now = DateTime.UtcNow;
             var oneYearAgo = now.AddYears(-1);
             var orders = await _context.Orders.AsNoTracking().Where(o => o.CreatedAt >= oneYearAgo).ToListAsync();
+    {
+        try
+        {
+            var now = DateTime.UtcNow;
+            var oneYearAgo = now.AddYears(-1);
+            var orders = await _context.Orders.AsNoTracking().Where(o => o.CreatedAt >= oneYearAgo).ToListAsync();
 
+            var b2cOrders = orders.Where(o => o.OrderType == OrderType.B2C).ToList();
+            var b2bOrders = orders.Where(o => o.OrderType == OrderType.B2B).ToList();
             var b2cOrders = orders.Where(o => o.OrderType == OrderType.B2C).ToList();
             var b2bOrders = orders.Where(o => o.OrderType == OrderType.B2B).ToList();
 
             var b2cRev = b2cOrders.Sum(o => o.TotalAmount);
             var b2bRev = b2bOrders.Sum(o => o.TotalAmount);
+            var b2cRev = b2cOrders.Sum(o => o.TotalAmount);
+            var b2bRev = b2bOrders.Sum(o => o.TotalAmount);
 
             var b2cAvg = b2cOrders.Any() ? b2cRev / b2cOrders.Count : 0m;
+            var b2cAvg = b2cOrders.Any() ? b2cRev / b2cOrders.Count : 0m;
 
+            var totalGiftBoxes = orders.SelectMany(o => o.Items).Where(i => i.GiftBoxId != null).Sum(i => i.Quantity);
             var totalGiftBoxes = orders.SelectMany(o => o.Items).Where(i => i.GiftBoxId != null).Sum(i => i.Quantity);
 
             var chart = new List<B2cB2bMonthlyDTO>();
@@ -272,7 +441,32 @@ public class ReportService : IReportService
                 var mOrders = orders.Where(o => o.CreatedAt >= mStart && o.CreatedAt < mEnd).ToList();
                 chart.Add(new B2cB2bMonthlyDTO { Month = mStart.ToString("yyyy-MM"), B2COrders = mOrders.Count(o => o.OrderType == OrderType.B2C), B2BOrders = mOrders.Count(o => o.OrderType == OrderType.B2B) });
             }
+            var chart = new List<B2cB2bMonthlyDTO>();
+            var start = new DateTime(now.Year, now.Month, 1).AddMonths(-11);
+            for (int i = 0; i < 12; i++)
+            {
+                var mStart = start.AddMonths(i);
+                var mEnd = mStart.AddMonths(1);
+                var mOrders = orders.Where(o => o.CreatedAt >= mStart && o.CreatedAt < mEnd).ToList();
+                chart.Add(new B2cB2bMonthlyDTO { Month = mStart.ToString("yyyy-MM"), B2COrders = mOrders.Count(o => o.OrderType == OrderType.B2C), B2BOrders = mOrders.Count(o => o.OrderType == OrderType.B2B) });
+            }
 
+            return new B2cB2bComparisonDTO
+            {
+                B2CRevenue = b2cRev,
+                B2COrders = b2cOrders.Count,
+                B2CAvgOrderValue = Math.Round(b2cAvg, 2),
+                B2BRevenue = b2bRev,
+                B2BOrders = b2bOrders.Count,
+                TotalGiftBoxes = totalGiftBoxes,
+                MonthlyOrdersChart = chart
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "ReportService.GetB2cB2bComparisonAsync failed");
+            return new B2cB2bComparisonDTO();
+        }
             return new B2cB2bComparisonDTO
             {
                 B2CRevenue = b2cRev,
@@ -304,8 +498,6 @@ public class ReportService : IReportService
             return new List<InventoryAlertItemDTO>();
         }
     }
-
-    // ===== Excel export methods (unchanged logic, use new data sources) =====
 
     public async Task<byte[]> ExportRevenueAsync(DateTime? fromDate, DateTime? toDate, string view, string? orderType)
     {

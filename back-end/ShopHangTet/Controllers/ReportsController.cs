@@ -9,10 +9,13 @@ public class ReportsController : ControllerBase
 {
     private readonly IReportService _service;
     private readonly ILogger<ReportsController> _logger;
+    private readonly ILogger<ReportsController> _logger;
 
+    public ReportsController(IReportService service, ILogger<ReportsController> logger)
     public ReportsController(IReportService service, ILogger<ReportsController> logger)
     {
         _service = service;
+        _logger = logger;
         _logger = logger;
     }
 
@@ -26,8 +29,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GET /api/admin/reports/dashboard");
-            return StatusCode(500, new { message = "Lỗi khi tải dữ liệu dashboard.", detail = ex.Message });
+            _logger.LogError(ex, "Reports/Dashboard failed");
+            return StatusCode(500, new { error = "Failed to load dashboard report" });
         }
     }
 
@@ -41,8 +44,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GET /api/admin/reports/revenue");
-            return StatusCode(500, new { message = "Lỗi khi tải báo cáo doanh thu.", detail = ex.Message });
+            _logger.LogError(ex, "Reports/Revenue failed");
+            return StatusCode(500, new { error = "Failed to load revenue report" });
         }
     }
 
@@ -56,8 +59,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GET /api/admin/reports/collections-performance");
-            return StatusCode(500, new { message = "Lỗi khi tải hiệu suất bộ sưu tập.", detail = ex.Message });
+            _logger.LogError(ex, "Reports/CollectionsPerformance failed");
+            return StatusCode(500, new { error = "Failed to load collection report" });
         }
     }
 
@@ -71,8 +74,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GET /api/admin/reports/giftbox-performance");
-            return StatusCode(500, new { message = "Lỗi khi tải hiệu suất gift box.", detail = ex.Message });
+            _logger.LogError(ex, "Reports/GiftBoxPerformance failed");
+            return StatusCode(500, new { error = "Failed to load giftbox report" });
         }
     }
 
@@ -86,8 +89,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GET /api/admin/reports/b2c-b2b-comparison");
-            return StatusCode(500, new { message = "Lỗi khi tải so sánh B2C/B2B.", detail = ex.Message });
+            _logger.LogError(ex, "Reports/B2cB2bComparison failed");
+            return StatusCode(500, new { error = "Failed to load B2C/B2B comparison" });
         }
     }
 
@@ -101,8 +104,8 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in GET /api/admin/reports/inventory-alert");
-            return StatusCode(500, new { message = "Lỗi khi tải cảnh báo tồn kho.", detail = ex.Message });
+            _logger.LogError(ex, "Reports/InventoryAlert failed");
+            return StatusCode(500, new { error = "Failed to load inventory alerts" });
         }
     }
 

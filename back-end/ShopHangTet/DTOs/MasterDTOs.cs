@@ -1453,11 +1453,16 @@ namespace ShopHangTet.DTOs
     {
         public decimal TotalRevenue { get; set; }
         public double GrowthPercent { get; set; }
-        public string BestDayDate { get; set; } = string.Empty;
-        public decimal BestDayRevenue { get; set; }
+        public BestDayDTO? BestDay { get; set; }
         public double B2CPercent { get; set; }
         public double B2BPercent { get; set; }
         public List<RevenueReportChartItemDTO> Chart { get; set; } = new();
+    }
+
+    public class BestDayDTO
+    {
+        public string Date { get; set; } = string.Empty;
+        public decimal Revenue { get; set; }
     }
 
     public class BestDayDTO
