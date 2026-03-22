@@ -17,7 +17,7 @@ public class DashboardService : IDashboardService
         _logger = logger;
     }
 
-    private async Task<List<T>> SafeListAsync<T>(IQueryable<T> query, string sourceName)
+    private async Task<List<T>> SafeListAsync<T>(IQueryable<T> query, string sourceName) where T : class
     {
         try
         {
