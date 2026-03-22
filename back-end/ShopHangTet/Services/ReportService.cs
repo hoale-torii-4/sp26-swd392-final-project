@@ -1,7 +1,6 @@
 using ClosedXML.Excel;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
+using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 
@@ -18,66 +17,6 @@ public class ReportService : IReportService
         _logger = logger;
     }
 
-    public class ReportReviewDoc
-    {
-        [BsonId]
-        [BsonRepresentation(BsonType.ObjectId)]
-        public string Id { get; set; } = string.Empty;
-
-        [BsonElement("giftBoxId")]
-        public string GiftBoxId { get; set; } = string.Empty;
-
-        [BsonElement("rating")]
-        public int Rating { get; set; }
-
-        [BsonElement("status")]
-        public string Status { get; set; } = string.Empty;
-    }
-
-    // ---- Helper methods ----
-
-    private async Task<List<OrderModel>> GetAllOrdersAsync()
-    {
-        try
-        {
-            return await _ordersCol.Find(Builders<OrderModel>.Filter.Empty).ToListAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load Orders from MongoDB.");
-            return new List<OrderModel>();
-        }
-    }
-
-    private async Task<List<ReportOrderItemDoc>> GetAllOrderItemsAsync()
-    {
-        try
-        {
-            return await _orderItemsCol.Find(Builders<ReportOrderItemDoc>.Filter.Empty).ToListAsync();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to load OrderItems from MongoDB.");
-            return new List<ReportOrderItemDoc>();
-        }
-    }
-
-    /// Build a lookup: orderId -> List<OrderItem>
-    /// OrderItems in MongoDB reference their parent order via an implicit pattern.
-    /// We match based on the ObjectId stored inside each OrderItem's Id range vs the Order's Id.
-    /// Actually, we need to check how the EF provider links OrderItems to Orders.
-    /// Looking at the data: OrderItem IDs are in sequence with Order IDs, but there's no explicit FK.
-    /// The safest approach: load both and match by GiftBoxId/CustomBoxId presence since each order
-    /// has its items created at the same time with sequential ObjectIds.
-    /// 
-    /// SIMPLER APPROACH: Since the OrderModel already declares List<OrderItem> Items,
-    /// and MongoDB stores them in a separate collection, we just load ALL order items
-    /// and group them by their _id proximity to order _ids.
-    /// 
-    /// BUT actually — the EF MongoDB provider uses a convention where child entities
-    /// store a shadow FK. Let's check if there's a hidden FK field.
-    /// For now, let's just use order items globally for aggregations since reports
-    /// only need totals per GiftBox, not per order.
 
     // ---- Report methods ----
 
