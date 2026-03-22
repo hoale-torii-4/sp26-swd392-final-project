@@ -171,8 +171,8 @@ export default function GiftBoxesScreen() {
         return (
             <TouchableOpacity
                 style={styles.productCard}
-                activeOpacity={item.TotalStock === 0 ? 1 : 0.7}
-                onPress={() => item.TotalStock !== 0 && router.push(`/gift-boxes/${item.Id}` as any)}
+                activeOpacity={0.7}
+                onPress={() => router.push(`/product/${item.Id}` as any)}
             >
                 <View style={styles.productImageWrap}>
                     {item.Image ? (
@@ -182,37 +182,18 @@ export default function GiftBoxesScreen() {
                             <Text style={{ fontSize: 36 }}>🎁</Text>
                         </View>
                     )}
-                    {/* Badge - based on price structure for variety */}
-                    {item.Price >= 3000000 && (
-                        <View style={styles.premiumBadge}>
-                            <Text style={styles.badgeText}>Premium</Text>
-                        </View>
-                    )}
-                    {item.Price < 1000000 && (
-                        <View style={styles.bestSellerBadge}>
-                            <Text style={styles.badgeText}>Best Seller</Text>
-                        </View>
-                    )}
-
-                    {/* Stock Badge */}
-                    {item.TotalStock !== undefined && (
-                        <View style={[styles.stockBadge, item.TotalStock > 0 ? styles.inStockBg : styles.outOfStockBg]}>
-                            <Text style={styles.badgeText}>
-                                {item.TotalStock > 0 ? `CÒN ${item.TotalStock}` : 'HẾT HÀNG'}
-                            </Text>
+                    {badge && (
+                        <View style={[styles.badge, { backgroundColor: badge.color }]}>
+                            <Text style={styles.badgeText}>{badge.text}</Text>
                         </View>
                     )}
                 </View>
                 <View style={styles.productInfo}>
                     <Text style={styles.productName} numberOfLines={2}>{item.Name}</Text>
                     <Text style={styles.productPrice}>{formatPrice(item.Price)}</Text>
-                    <TouchableOpacity
-                        style={[styles.detailBtn, item.TotalStock === 0 && styles.detailBtnDisabled]}
-                        onPress={() => item.TotalStock !== 0 && router.push(`/gift-boxes/${item.Id}` as any)}
-                        activeOpacity={item.TotalStock === 0 ? 1 : 0.7}
-                    >
-                        <Text style={[styles.detailBtnText, item.TotalStock === 0 && styles.detailBtnTextDisabled]}>Chi tiết</Text>
-                    </TouchableOpacity>
+                    <View style={styles.detailBtn}>
+                        <Text style={styles.detailBtnText}>Chi tiết</Text>
+                    </View>
                 </View>
             </TouchableOpacity>
         );
@@ -642,52 +623,13 @@ const styles = StyleSheet.create({
         paddingVertical: 14, alignItems: 'center', marginTop: 20,
     },
     modalDoneBtnText: { color: '#FFF', fontSize: 14, fontWeight: '700' },
-    premiumBadge: {
-        position: 'absolute',
-        top: 12,
-        left: 12,
-        backgroundColor: '#D4AF37',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
+
+    sortOption: {
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: AppColors.borderLight,
     },
-    bestSellerBadge: {
-        position: 'absolute',
-        top: 12,
-        left: 12,
-        backgroundColor: '#8B1A1A',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    badgeText: {
-        color: '#FFFFFF',
-        fontSize: 10,
-        fontWeight: 'bold',
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-    },
-    stockBadge: {
-        position: 'absolute',
-        top: 12,
-        right: 12,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    inStockBg: {
-        backgroundColor: '#16a34a',
-    },
-    outOfStockBg: {
-        backgroundColor: '#6b7280',
-    },
-    detailBtnDisabled: {
-        backgroundColor: '#F3F4F6',
-        borderColor: '#D1D5DB',
-    },
-    detailBtnTextDisabled: {
-        color: '#9CA3AF',
-    },
+    sortOptionText: { fontSize: 14, color: AppColors.text },
+    sortOptionActive: { color: AppColors.primary, fontWeight: '700' },
 });
 
 

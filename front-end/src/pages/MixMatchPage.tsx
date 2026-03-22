@@ -338,35 +338,22 @@ export default function MixMatchPage() {
                                 {filteredItems.map((item) => (
                                     <div
                                         key={item.Id}
-                                        draggable={item.AvailableQuantity !== undefined && item.AvailableQuantity > 0}
-                                        onDragStart={(e) => {
-                                            if (item.AvailableQuantity !== undefined && item.AvailableQuantity > 0) {
-                                                setDragSource({ id: item.Id, fromSlot: null });
-                                            } else {
-                                                e.preventDefault();
-                                            }
-                                        }}
-                                        className={`bg-white rounded-2xl p-4 shadow-sm border ${item.AvailableQuantity !== undefined && item.AvailableQuantity > 0 ? 'border-transparent hover:border-[#8B1A1A]/40 cursor-grab' : 'border-gray-200 opacity-60 cursor-not-allowed'} transition-all relative`}
+                                        draggable
+                                        onDragStart={() => setDragSource({ id: item.Id, fromSlot: null })}
+                                        className="bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-[#8B1A1A]/40 transition-all cursor-grab"
                                     >
-                                        <div className="w-full h-40 rounded-xl bg-[#F5F5F0] flex items-center justify-center overflow-hidden mb-4 relative">
+                                        <div className="w-full h-40 rounded-xl bg-[#F5F5F0] flex items-center justify-center overflow-hidden mb-4">
                                             {item.Image ? (
                                                 <img src={item.Image} alt={item.Name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <span className="text-xs text-gray-400">No image</span>
                                             )}
-                                            {item.AvailableQuantity !== undefined && (
-                                                <div className="absolute top-2 right-2 flex flex-col gap-1">
-                                                    <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded text-white ${item.AvailableQuantity > 0 ? 'bg-[#1B3022]' : 'bg-gray-500'}`}>
-                                                        {item.AvailableQuantity > 0 ? `Kho: ${item.AvailableQuantity}` : 'Hết hàng'}
-                                                    </span>
-                                                </div>
-                                            )}
                                         </div>
                                         <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name}</p>
                                         <p className="text-xs text-gray-500 mb-3">{item.CategoryLabel ?? item.Category}</p>
                                         <div className="flex items-center justify-between">
-                                            <span className={`text-sm font-bold ${item.AvailableQuantity !== undefined && item.AvailableQuantity > 0 ? 'text-[#8B1A1A]' : 'text-gray-500'}`}>{item.Price ? formatPrice(item.Price) : "--"}</span>
-                                            {item.AvailableQuantity !== undefined && item.AvailableQuantity > 0 && <span className="text-xs text-gray-400">Kéo để đặt</span>}
+                                            <span className="text-sm font-bold text-[#8B1A1A]">{item.Price ? formatPrice(item.Price) : "--"}</span>
+                                            <span className="text-xs text-gray-400">Kéo để đặt</span>
                                         </div>
                                     </div>
                                 ))}
