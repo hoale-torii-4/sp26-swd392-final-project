@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
     StyleSheet, Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../contexts/AuthContext';
@@ -14,7 +14,27 @@ import { isInternalRole } from '../../types/auth';
 
 export default function AccountScreen() {
     const router = useRouter();
-    const { user, isAuthenticated, logout, siteMode, setSiteMode } = useAuth();
+    const { user, isAuthenticated, logout, validateSession } = useAuth();
+
+    useFocusEffect(
+        useCallback(() => {
+            let isMounted = true;
+
+            const runValidation = async () => {
+                const ok = await validateSession();
+                if (!ok && isMounted) {
+                    Alert.alert('Phiên đăng nhập hết hạn', 'Tài khoản có thể đã bị xóa hoặc không còn hợp lệ. Vui lòng đăng nhập lại.');
+                    router.replace('/login' as any);
+                }
+            };
+
+            runValidation();
+
+            return () => {
+                isMounted = false;
+            };
+        }, [router, validateSession]),
+    );
 
     const initials = user?.FullName?.charAt(0).toUpperCase() || 'U';
     const canSwitchSite = isInternalRole(user?.Role);

@@ -5,6 +5,7 @@ import type {
     RegisterResponse,
     LoginRequest,
     GoogleLoginRequest,
+    GoogleLoginRequest,
     LoginResponse,
     ApiResponse,
     User,
@@ -14,30 +15,15 @@ const AUTH_ENDPOINT = '/Auth';
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 
-const normalizeUser = (input: any): User => {
-    const rawRole = input?.Role ?? input?.role ?? 0;
-    const rawStatus = input?.Status ?? input?.status ?? 0;
-
-    const normalizedRole =
-        typeof rawRole === 'string' && Number.isNaN(Number(rawRole))
-            ? rawRole.toUpperCase()
-            : Number(rawRole);
-
-    const normalizedStatus =
-        typeof rawStatus === 'string' && Number.isNaN(Number(rawStatus))
-            ? rawStatus.toUpperCase()
-            : Number(rawStatus);
-
-    return {
-        Id: input?.Id ?? input?.id ?? '',
-        Email: input?.Email ?? input?.email ?? '',
-        FullName: input?.FullName ?? input?.fullName ?? '',
-        Phone: input?.Phone ?? input?.phone ?? '',
-        Role: normalizedRole,
-        Status: normalizedStatus,
-        CreatedAt: input?.CreatedAt ?? input?.createdAt ?? new Date().toISOString(),
-    };
-};
+const normalizeUser = (input: any): User => ({
+    Id: input?.Id ?? input?.id ?? '',
+    Email: input?.Email ?? input?.email ?? '',
+    FullName: input?.FullName ?? input?.fullName ?? '',
+    Phone: input?.Phone ?? input?.phone ?? '',
+    Role: Number(input?.Role ?? input?.role ?? 0),
+    Status: Number(input?.Status ?? input?.status ?? 0),
+    CreatedAt: input?.CreatedAt ?? input?.createdAt ?? new Date().toISOString(),
+});
 
 export const authService = {
     register: async (data: RegisterRequest): Promise<RegisterResponse> => {
@@ -82,6 +68,36 @@ export const authService = {
         return result;
     },
 
+    loginWithGoogle: async (data: GoogleLoginRequest): Promise<LoginResponse> => {
+        const response = await apiClient.post<LoginResponse>(
+            `${AUTH_ENDPOINT}/google-login`,
+            data,
+        );
+        const result = response.data;
+
+        if (result.Success && result.Data) {
+            await AsyncStorage.setItem(TOKEN_KEY, result.Data.Token);
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(result.Data.User));
+        }
+
+        return result;
+    },
+
+    loginWithGoogle: async (data: GoogleLoginRequest): Promise<LoginResponse> => {
+        const response = await apiClient.post<LoginResponse>(
+            `${AUTH_ENDPOINT}/google-login`,
+            data,
+        );
+        const result = response.data;
+
+        if (result.Success && result.Data) {
+            await AsyncStorage.setItem(TOKEN_KEY, result.Data.Token);
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(result.Data.User));
+        }
+
+        return result;
+    },
+
     logout: async () => {
         await AsyncStorage.removeItem(TOKEN_KEY);
         await AsyncStorage.removeItem(USER_KEY);
@@ -92,6 +108,22 @@ export const authService = {
     },
 
     getUser: async (): Promise<User | null> => {
+        const token = await AsyncStorage.getItem(TOKEN_KEY);
+        if (!token) return null;
+
+        try {
+            const response = await apiClient.get<ApiResponse<User>>(`${AUTH_ENDPOINT}/me`);
+            const result = response.data;
+
+            if (result.Success && result.Data) {
+                const normalized = normalizeUser(result.Data);
+                await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalized));
+                return normalized;
+            }
+        } catch {
+            // fallback to cached user for temporary network failure
+        }
+
         const token = await AsyncStorage.getItem(TOKEN_KEY);
         if (!token) return null;
 
@@ -132,27 +164,16 @@ export const authService = {
                 return true;
             }
 
-            return true;
+            await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
+            return false;
         } catch (error: any) {
             const status = error?.status;
-            const message = String(error?.message || '').toLowerCase();
-            const accountRemoved =
-                message.includes('người dùng không tồn tại') ||
-                message.includes('tai khoan khong ton tai') ||
-                (status === 401 && message.includes('không tồn tại'));
-            const definitelyInvalidToken =
-                status === 401 &&
-                (message.includes('jwt') ||
-                    message.includes('token') ||
-                    message.includes('signature') ||
-                    message.includes('expired'));
-
-            if (accountRemoved || definitelyInvalidToken) {
+            if (status === 401 || status === 404 || status === 403) {
                 await AsyncStorage.multiRemove([TOKEN_KEY, USER_KEY]);
                 return false;
             }
 
-            // keep session on transient network/server errors or ambiguous 401
+            // keep session on transient network/server errors
             return true;
         }
     },

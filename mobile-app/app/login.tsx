@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -8,22 +9,21 @@ import {
     KeyboardAvoidingView,
     Platform,
     StyleSheet,
-    Modal,
-    Pressable,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import * as Google from 'expo-auth-session/providers/google';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
-import type { ApiError, User } from '../types/auth';
-import { isInternalRole } from '../types/auth';
+import type { ApiError } from '../types/auth';
 
 WebBrowser.maybeCompleteAuthSession();
 
 export default function LoginScreen() {
     const router = useRouter();
-    const { login, loginWithGoogle, setSiteMode } = useAuth();
+    const { login, loginWithGoogle } = useAuth();
 
     const googleWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
     const googleAndroidClientId = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
@@ -39,6 +39,7 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
     const [serverError, setServerError] = useState<string | null>(null);
 
@@ -136,8 +137,8 @@ export default function LoginScreen() {
 
                 try {
                     const loginResponse = await loginWithGoogle({ idToken });
-                    if (loginResponse.Success && loginResponse.Data?.User) {
-                        await postLoginRouting(loginResponse.Data.User);
+                    if (loginResponse.Success) {
+                        router.replace('/(tabs)' as any);
                     } else {
                         setServerError(loginResponse.Message || 'Đăng nhập Google thất bại.');
                     }
@@ -156,7 +157,7 @@ export default function LoginScreen() {
         };
 
         consumeGoogleToken();
-    }, [response, loginWithGoogle]);
+    }, [response, loginWithGoogle, router]);
 
     return (
         <KeyboardAvoidingView
@@ -235,6 +236,7 @@ export default function LoginScreen() {
                     style={[styles.submitButton, isLoading && styles.buttonDisabled]}
                     onPress={handleLogin}
                     disabled={isLoading || isGoogleLoading}
+                    disabled={isLoading || isGoogleLoading}
                     activeOpacity={0.85}
                 >
                     <Text style={styles.submitText}>
@@ -242,6 +244,7 @@ export default function LoginScreen() {
                     </Text>
                 </TouchableOpacity>
 
+                {/* Google Login */}
                 <TouchableOpacity
                     style={[styles.googleButton, (isGoogleLoading || !request) && styles.buttonDisabled]}
                     onPress={handleGoogleLogin}
@@ -253,6 +256,7 @@ export default function LoginScreen() {
                     </Text>
                 </TouchableOpacity>
 
+                {/* Register link */}
                 <View style={styles.registerRow}>
                     <Text style={styles.registerLabel}>Chưa có tài khoản? </Text>
                     <TouchableOpacity onPress={() => router.push('/register' as any)}>
@@ -415,7 +419,21 @@ const styles = StyleSheet.create({
         borderRadius: BorderRadius.sm,
         paddingVertical: 14,
         alignItems: 'center',
+        marginBottom: Spacing.md,
+    },
+    googleButton: {
+        borderWidth: 1,
+        borderColor: AppColors.border,
+        borderRadius: BorderRadius.sm,
+        paddingVertical: 14,
+        alignItems: 'center',
         marginBottom: Spacing.xl,
+        backgroundColor: '#FFF',
+    },
+    googleButtonText: {
+        color: AppColors.text,
+        fontSize: 14,
+        fontWeight: '700',
         backgroundColor: '#FFF',
     },
     googleButtonText: {
