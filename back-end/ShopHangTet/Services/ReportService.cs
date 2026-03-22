@@ -132,9 +132,6 @@ public class ReportService : IReportService
             }
 
             var best = chart.OrderByDescending(c => c.Revenue).FirstOrDefault();
-            BestDayDTO? bestDay = best != null
-                ? new BestDayDTO { Date = best.Date, Revenue = best.Revenue }
-                : null;
 
             var b2cPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2C) / orders.Count * 100 : 0.0;
             var b2bPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2B) / orders.Count * 100 : 0.0;
@@ -143,7 +140,8 @@ public class ReportService : IReportService
             {
                 TotalRevenue = totalRevenue,
                 GrowthPercent = Math.Round(growth, 2),
-                BestDay = bestDay,
+                BestDayDate = best?.Date ?? string.Empty,
+                BestDayRevenue = best?.Revenue ?? 0m,
                 B2CPercent = Math.Round(b2cPercent, 2),
                 B2BPercent = Math.Round(b2bPercent, 2),
                 Chart = chart
