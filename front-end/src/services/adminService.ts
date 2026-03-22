@@ -165,20 +165,21 @@ export interface GiftBoxDetail {
 export interface GiftBoxCreateDto {
     Name: string;
     Description: string;
-    PriceOverride?: number;
+    Price: number;
     Images: string[];
     CollectionId: string;
-    Tags: string[];
+    TagIds: string[];
     Items: { ItemId: string; ItemName: string; Quantity: number; ItemPrice: number }[];
+    IsActive?: boolean;
 }
 
 export interface GiftBoxUpdateDto {
     Name?: string;
     Description?: string;
-    PriceOverride?: number;
+    Price?: number;
     Images?: string[];
     CollectionId?: string;
-    Tags?: string[];
+    TagIds?: string[];
     Items?: { ItemId: string; ItemName: string; Quantity: number; ItemPrice: number }[];
     IsActive?: boolean;
 }
@@ -234,12 +235,14 @@ export interface InventoryLog {
     Id: string;
     ItemId: string;
     ItemName: string;
+    Sku: string;
     ChangeType: string;
+    ChangeTypeLabel: string;
     QuantityChange: number;
-    PreviousQuantity: number;
-    NewQuantity: number;
+    PreviousStock: number;
+    NewStock: number;
     Source: string;
-    Note?: string;
+    Reason?: string;
     CreatedAt: string;
 }
 
@@ -252,8 +255,19 @@ export interface InventorySummaryDto {
 
 export interface InventoryAdjustDto {
     ItemId: string;
-    QuantityChange: number;
-    Note?: string;
+    AdjustType: "INCREASE" | "DECREASE";
+    Quantity: number;
+    Reason?: string;
+}
+
+export interface InventoryCreateDto {
+    Name: string;
+    Category: string;
+    Price: number;
+    Image?: string;
+    IsAlcohol: boolean;
+    InitialStock: number;
+    IsActive?: boolean;
 }
 
 // ── MixMatch ──
@@ -384,6 +398,20 @@ export interface OrderAdminResponse {
     updatedAt: string;
 }
 
+export interface AdminOrderListItem {
+    Id: string;
+    OrderCode: string;
+    CustomerName: string;
+    CustomerEmail: string;
+    CustomerPhone: string;
+    OrderType: string;
+    Status: string;
+    TotalAmount: number;
+    TotalItems: number;
+    CreatedAt: string;
+    DeliveryDate?: string;
+}
+
 /* ═══════════════════════════════════════════════════════════
    API FUNCTIONS
    ═══════════════════════════════════════════════════════════ */
@@ -490,6 +518,9 @@ export const adminService = {
     adjustInventory: (data: InventoryAdjustDto) =>
         apiClient.post("/admin/inventory/adjust", data),
 
+    createInventoryItem: (data: InventoryCreateDto) =>
+        apiClient.post<{ Id: string }>("/admin/inventory", data).then(r => r.data),
+
     getInventorySummary: () =>
         apiClient.get<InventorySummaryDto>("/admin/inventory/summary").then(r => r.data),
 
@@ -569,6 +600,9 @@ export const adminService = {
         apiClient.get("/admin/reports/export/inventory-alert", { params: { threshold }, responseType: "blob" }).then(r => r.data),
 
     // ════════ ORDERS (STAFF) ════════
+    getAdminOrders: (params?: { status?: string; orderType?: string; keyword?: string; page?: number; pageSize?: number }) =>
+        apiClient.get<PagedResult<AdminOrderListItem>>("/admin/orders", { params }).then(r => r.data),
+
     updateOrderStatus: (orderId: string, status: string, note?: string) =>
         apiClient.put(`/Orders/${orderId}/status`, { Status: status, Note: note }).then(r => r.data),
 
@@ -577,4 +611,7 @@ export const adminService = {
 
     reshipDelivery: (deliveryId: string) =>
         apiClient.post(`/Orders/deliveries/${deliveryId}/reship`).then(r => r.data),
+
+    trackOrder: (orderCode: string, email: string) =>
+        apiClient.get("/Orders/track", { params: { orderCode, email } }).then(r => r.data),
 };

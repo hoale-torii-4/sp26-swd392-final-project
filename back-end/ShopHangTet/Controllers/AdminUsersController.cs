@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.DTOs;
 using ShopHangTet.Services;
@@ -7,7 +6,6 @@ namespace ShopHangTet.Controllers
 {
     [ApiController]
     [Route("api/admin/users")]
-    [Authorize(Roles = "ADMIN")]
     public class AdminUsersController : ControllerBase
     {
         private readonly InternalUserService _service;

@@ -104,7 +104,7 @@ export default function LoginPage() {
                     </div>
 
                     <p className="text-white/40 text-xs">
-                        © 2024 Lộc Xuân. All rights reserved.
+                        © 2026 Lộc Xuân. All rights reserved.
                     </p>
                 </div>
             </div>

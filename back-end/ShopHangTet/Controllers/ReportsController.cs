@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.Services;
 
@@ -6,7 +5,6 @@ namespace ShopHangTet.Controllers;
 
 [ApiController]
 [Route("api/admin/reports")]
-[Authorize(Roles = "ADMIN")]
 public class ReportsController : ControllerBase
 {
     private readonly IReportService _service;

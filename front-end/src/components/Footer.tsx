@@ -115,7 +115,7 @@ export default function Footer() {
                 {/* Bottom bar */}
                 <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4">
                     <p className="text-xs text-gray-500">
-                        © 2024 LỘC XUÂN — MÓN QUÀ GỬI TRAO TỪ CÔNG THỨC QUÀ.
+                        © 2026 LỘC XUÂN — MÓN QUÀ GỬI TRAO TỪ CÔNG THỨC QUÀ.
                     </p>
                     <div className="flex gap-4 text-xs text-gray-500">
                         <Link to="/privacy" className="hover:text-gray-300 transition-colors">Chính sách bảo mật</Link>

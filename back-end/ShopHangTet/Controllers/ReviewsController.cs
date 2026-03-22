@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ShopHangTet.DTOs;
 using ShopHangTet.Services;
@@ -7,7 +6,6 @@ namespace ShopHangTet.Controllers;
 
 [ApiController]
 [Route("api/admin/reviews")]
-[Authorize(Roles = "ADMIN")]
 public class ReviewsController : ControllerBase
 {
     private readonly IReviewService _service;
@@ -47,7 +45,6 @@ public class ReviewsController : ControllerBase
     }
 
     // ----------------- User-facing review APIs -----------------
-    [Authorize]
     [HttpPost("/api/reviews")]
     public async Task<IActionResult> CreateReview([FromBody] CreateReviewDTO dto)
     {
@@ -69,7 +66,6 @@ public class ReviewsController : ControllerBase
         }
     }
 
-    [AllowAnonymous]
     [HttpGet("/api/reviews/giftbox/{giftBoxId}")]
     public async Task<IActionResult> GetGiftBoxReviews(string giftBoxId)
     {
@@ -77,7 +73,6 @@ public class ReviewsController : ControllerBase
         return Ok(res);
     }
 
-    [Authorize]
     [HttpGet("/api/user/reviews")]
     public async Task<IActionResult> GetUserReviews()
     {
