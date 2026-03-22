@@ -154,7 +154,6 @@ public class ReportService : IReportService
         }
 
         var best = chart.OrderByDescending(c => c.Revenue).FirstOrDefault();
-        var bestDay = best != null ? (best.Date, best.Revenue) : (string.Empty, 0m);
 
         var b2cPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2C) / orders.Count * 100 : 0.0;
         var b2bPercent = orders.Any() ? (double)orders.Count(o => o.OrderType == OrderType.B2B) / orders.Count * 100 : 0.0;
@@ -163,7 +162,8 @@ public class ReportService : IReportService
         {
             TotalRevenue = totalRevenue,
             GrowthPercent = Math.Round(growth, 2),
-            BestDay = bestDay,
+            BestDayDate = best?.Date ?? string.Empty,
+            BestDayRevenue = best?.Revenue ?? 0m,
             B2CPercent = Math.Round(b2cPercent, 2),
             B2BPercent = Math.Round(b2bPercent, 2),
             Chart = chart
@@ -173,8 +173,27 @@ public class ReportService : IReportService
     public async Task<List<CollectionPerformanceItemDTO>> GetCollectionsPerformanceAsync()
     {
         var orders = await GetOrdersWithFallbackAsync();
-        var giftBoxes = await _context.GiftBoxes.ToDictionaryAsync(g => g.Id);
-        var collections = await _context.Collections.ToDictionaryAsync(c => c.Id);
+
+        List<GiftBox> giftBoxList;
+        List<Collection> collectionList;
+        try
+        {
+            giftBoxList = await _context.GiftBoxes.AsNoTracking().ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load GiftBoxes for collections-performance report.");
+            giftBoxList = new List<GiftBox>();
+        }
+        try
+        {
+            collectionList = await _context.Collections.AsNoTracking().ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load Collections for collections-performance report.");
+            collectionList = new List<Collection>();
+        }
 
         var colStats = new Dictionary<string, (int orders, decimal revenue)>();
 
@@ -186,8 +205,9 @@ public class ReportService : IReportService
                 if (item.GiftBoxId == null) continue;
                 var gid = item.GiftBoxId?.ToString();
                 if (string.IsNullOrEmpty(gid)) continue;
-                if (!giftBoxes.TryGetValue(gid, out var gb)) continue;
-                var cid = gb!.CollectionId;
+                var gb = giftBoxList.FirstOrDefault(g => g.Id == gid);
+                if (gb == null) continue;
+                var cid = gb.CollectionId;
                 if (!seenCollections.Contains(cid))
                 {
                     seenCollections.Add(cid);
@@ -199,14 +219,18 @@ public class ReportService : IReportService
 
         var totalRevenue = colStats.Values.Sum(x => x.revenue);
 
-        var list = colStats.Select(kv => new CollectionPerformanceItemDTO
+        var list = colStats.Select(kv =>
         {
-            CollectionId = kv.Key,
-            CollectionName = collections.TryGetValue(kv.Key, out var c) ? c.Name : string.Empty,
-            Orders = kv.Value.orders,
-            Revenue = kv.Value.revenue,
-            Percent = totalRevenue > 0 ? (double)(kv.Value.revenue / totalRevenue * 100) : 0,
-            Thumbnail = collections.TryGetValue(kv.Key, out var c2) ? c2.CoverImage : null
+            var c = collectionList.FirstOrDefault(col => col.Id == kv.Key);
+            return new CollectionPerformanceItemDTO
+            {
+                CollectionId = kv.Key,
+                CollectionName = c?.Name ?? string.Empty,
+                Orders = kv.Value.orders,
+                Revenue = kv.Value.revenue,
+                Percent = totalRevenue > 0 ? (double)(kv.Value.revenue / totalRevenue * 100) : 0,
+                Thumbnail = c?.CoverImage
+            };
         }).OrderByDescending(x => x.Revenue).Select((x, idx) => { x.Rank = idx + 1; return x; }).ToList();
 
         return list;
@@ -215,8 +239,27 @@ public class ReportService : IReportService
     public async Task<List<GiftBoxPerformanceItemDTO>> GetGiftBoxPerformanceAsync()
     {
         var orders = await GetOrdersWithFallbackAsync();
-        var giftBoxes = await _context.GiftBoxes.ToListAsync();
-        var reviews = await _context.Reviews.Where(r => r.Status == "APPROVED").ToListAsync();
+
+        List<GiftBox> giftBoxes;
+        List<Review> reviews;
+        try
+        {
+            giftBoxes = await _context.GiftBoxes.AsNoTracking().ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load GiftBoxes for giftbox-performance report.");
+            giftBoxes = new List<GiftBox>();
+        }
+        try
+        {
+            reviews = await _context.Reviews.AsNoTracking().Where(r => r.Status == "APPROVED").ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to load Reviews for giftbox-performance report.");
+            reviews = new List<Review>();
+        }
 
         var dict = new Dictionary<string, (string name, string? image, int sold, decimal revenue, List<int> ratings)>();
         foreach (var g in giftBoxes) dict[g.Id] = (g.Name, (g.Images != null && g.Images.Any()) ? g.Images.FirstOrDefault() : null, 0, 0m, new List<int>());
