@@ -18,11 +18,13 @@ public class ReportService : IReportService
     public async Task<DashboardReportDTO> GetDashboardAsync()
     {
         var now = DateTime.UtcNow;
+        var today = now.Date;
         var recentFrom = now.AddDays(-30);
         var prevFrom = recentFrom.AddDays(-30);
 
-        var recentOrders = await _context.Orders.Where(o => o.CreatedAt >= recentFrom).ToListAsync();
-        var prevOrders = await _context.Orders.Where(o => o.CreatedAt >= prevFrom && o.CreatedAt < recentFrom).ToListAsync();
+        var allRecentOrders = await _context.Orders.Where(o => o.CreatedAt >= prevFrom).ToListAsync();
+        var recentOrders = allRecentOrders.Where(o => o.CreatedAt >= recentFrom).ToList();
+        var prevOrders = allRecentOrders.Where(o => o.CreatedAt >= prevFrom && o.CreatedAt < recentFrom).ToList();
 
         var recentRevenue = recentOrders.Sum(o => o.TotalAmount);
         var prevRevenue = prevOrders.Sum(o => o.TotalAmount);
@@ -32,6 +34,11 @@ public class ReportService : IReportService
         var recentOrderCount = recentOrders.Count;
         var prevOrderCount = prevOrders.Count;
         double orderGrowth = prevOrderCount <= 0 ? 100.0 : (double)((recentOrderCount - prevOrderCount) / (double)prevOrderCount * 100);
+
+        // Today's stats
+        var todayOrders = recentOrders.Where(o => o.CreatedAt.Date == today).ToList();
+        var todayRevenue = todayOrders.Sum(o => o.TotalAmount);
+        var todayOrderCount = todayOrders.Count;
 
         var b2c = recentOrders.Count(o => o.OrderType == OrderType.B2C);
         var b2b = recentOrders.Count(o => o.OrderType == OrderType.B2B);
@@ -54,6 +61,8 @@ public class ReportService : IReportService
             RevenueGrowthPercent = Math.Round(revenueGrowth, 2),
             TotalOrders = recentOrderCount,
             OrderGrowthPercent = Math.Round(orderGrowth, 2),
+            TodayRevenue = todayRevenue,
+            TodayOrders = todayOrderCount,
             B2CPercent = Math.Round(b2cPercent, 2),
             B2BPercent = Math.Round(b2bPercent, 2),
             StatusSummary = statusSummary

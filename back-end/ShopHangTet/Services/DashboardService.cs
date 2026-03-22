@@ -40,6 +40,30 @@ public class DashboardService : IDashboardService
         var today = DateTime.UtcNow.Date;
         var ordersToday = orders.Count(o => o.CreatedAt.Date == today);
 
+        // Count customers (users with MEMBER role) and active products
+        int totalCustomers = 0;
+        int totalProducts = 0;
+        try
+        {
+            totalCustomers = await _context.Users
+                .AsNoTracking()
+                .CountAsync(u => u.Role == UserRole.MEMBER);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Dashboard: failed to count customers");
+        }
+        try
+        {
+            totalProducts = await _context.GiftBoxes
+                .AsNoTracking()
+                .CountAsync(g => g.IsActive);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Dashboard: failed to count products");
+        }
+
         var b2cCount = orders.Count(o => o.OrderType == OrderType.B2C);
         var b2bCount = orders.Count(o => o.OrderType == OrderType.B2B);
 
@@ -77,6 +101,8 @@ public class DashboardService : IDashboardService
             TotalOrders = totalOrders,
             OrderGrowthPercent = orderGrowth,
             OrdersToday = ordersToday,
+            TotalCustomers = totalCustomers,
+            TotalProducts = totalProducts,
             B2cPercent = b2cPercent,
             B2bPercent = b2bPercent,
             LastUpdated = DateTime.UtcNow
