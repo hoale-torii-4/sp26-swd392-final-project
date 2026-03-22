@@ -13,6 +13,16 @@ export default function AdminDashboardScreen() {
     const [orderStatus, setOrderStatus] = useState<any[]>([]);
     const [reportDashboard, setReportDashboard] = useState<any>({});
 
+    const STATUS_LABELS: Record<string, string> = {
+        PendingPayment: 'Chờ thanh toán',
+        Preparing: 'Đang chuẩn bị',
+        Shipping: 'Đang giao',
+        DeliveryFailed: 'Giao thất bại',
+        PartiallyDelivered: 'Giao một phần',
+        Completed: 'Hoàn thành',
+        Cancelled: 'Đã hủy',
+    };
+
     const loadData = async () => {
         if (!isAdmin) return;
 
@@ -27,10 +37,19 @@ export default function AdminDashboardScreen() {
             setSummary(summaryRes || {});
             setReportDashboard(reportRes || {});
 
-            if (Array.isArray(statusRes)) {
+            // order-status endpoint returns a flat object like {PendingPayment: 3, Preparing: 1, ...}
+            // Convert it to an array of {status, count} for rendering
+            if (statusRes && typeof statusRes === 'object' && !Array.isArray(statusRes)) {
+                const arr = Object.entries(statusRes)
+                    .filter(([key]) => key in STATUS_LABELS)
+                    .map(([key, value]) => ({
+                        status: STATUS_LABELS[key] ?? key,
+                        count: value ?? 0,
+                    }))
+                    .filter((s: any) => s.count > 0);
+                setOrderStatus(arr);
+            } else if (Array.isArray(statusRes)) {
                 setOrderStatus(statusRes);
-            } else if (Array.isArray(statusRes?.items)) {
-                setOrderStatus(statusRes.items);
             } else {
                 setOrderStatus([]);
             }

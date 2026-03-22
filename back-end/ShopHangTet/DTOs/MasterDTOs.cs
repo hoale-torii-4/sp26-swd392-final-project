@@ -856,6 +856,9 @@ namespace ShopHangTet.DTOs
 
         public int OrdersToday { get; set; }
 
+        public int TotalCustomers { get; set; }
+        public int TotalProducts { get; set; }
+
         public double B2cPercent { get; set; }
         public double B2bPercent { get; set; }
 
@@ -1420,6 +1423,9 @@ namespace ShopHangTet.DTOs
         public int TotalOrders { get; set; }
         public double OrderGrowthPercent { get; set; }
 
+        public decimal TodayRevenue { get; set; }
+        public int TodayOrders { get; set; }
+
         public double B2CPercent { get; set; }
         public double B2BPercent { get; set; }
 
@@ -1452,6 +1458,12 @@ namespace ShopHangTet.DTOs
         public double B2CPercent { get; set; }
         public double B2BPercent { get; set; }
         public List<RevenueReportChartItemDTO> Chart { get; set; } = new();
+    }
+
+    public class BestDayDTO
+    {
+        public string Date { get; set; } = string.Empty;
+        public decimal Revenue { get; set; }
     }
 
     public class CollectionPerformanceItemDTO
