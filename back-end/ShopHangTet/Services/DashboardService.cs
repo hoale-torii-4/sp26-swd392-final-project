@@ -9,15 +9,30 @@ namespace ShopHangTet.Services;
 public class DashboardService : IDashboardService
 {
     private readonly ShopHangTetDbContext _context;
+    private readonly ILogger<DashboardService> _logger;
 
-    public DashboardService(ShopHangTetDbContext context)
+    public DashboardService(ShopHangTetDbContext context, ILogger<DashboardService> logger)
     {
         _context = context;
+        _logger = logger;
+    }
+
+    private async Task<List<T>> SafeListAsync<T>(IQueryable<T> query, string sourceName) where T : class
+    {
+        try
+        {
+            return await query.AsNoTracking().ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Dashboard query failed at {SourceName}. Returning empty list to avoid 500.", sourceName);
+            return new List<T>();
+        }
     }
 
     public async Task<DashboardSummaryDTO> GetDashboardSummaryAsync()
     {
-        var orders = await _context.Orders.ToListAsync();
+        var orders = await SafeListAsync(_context.Orders, nameof(_context.Orders));
 
         var totalRevenue = orders.Sum(o => o.TotalAmount);
         var totalOrders = orders.Count;
@@ -111,9 +126,14 @@ public class DashboardService : IDashboardService
 
     public async Task<List<TopCollectionDTO>> GetTopCollectionsAsync(int limit = 5)
     {
+        if (limit <= 0)
+        {
+            return new List<TopCollectionDTO>();
+        }
+
         var orders = await _context.Orders.ToListAsync();
-        var giftBoxes = await _context.GiftBoxes.ToListAsync();
-        var collections = await _context.Collections.ToListAsync();
+        var giftBoxes = await SafeListAsync(_context.GiftBoxes, nameof(_context.GiftBoxes));
+        var collections = await SafeListAsync(_context.Collections, nameof(_context.Collections));
 
         var totalRevenue = orders.Sum(o => o.TotalAmount);
 
@@ -122,14 +142,20 @@ public class DashboardService : IDashboardService
 
         foreach (var order in orders)
         {
+            if (order.Items == null || order.Items.Count == 0) continue;
+
             foreach (var item in order.Items)
             {
                 if (item.GiftBoxId == null) continue;
                 var gbId = item.GiftBoxId?.ToString();
-                if (string.IsNullOrEmpty(gbId)) continue;
+                if (string.IsNullOrWhiteSpace(gbId)) continue;
+
                 var gb = giftBoxes.FirstOrDefault(g => g.Id == gbId);
                 if (gb == null) continue;
-                var cid = gb.CollectionId ?? string.Empty;
+
+                var cid = gb.CollectionId;
+                if (string.IsNullOrWhiteSpace(cid)) continue;
+
                 if (!map.ContainsKey(cid)) map[cid] = (0m, new HashSet<string>());
                 var entry = map[cid];
                 entry.revenue += item.TotalPrice;
@@ -156,6 +182,11 @@ public class DashboardService : IDashboardService
 
     public async Task<List<TopGiftBoxDTO>> GetTopGiftBoxesAsync(int limit = 10)
     {
+        if (limit <= 0)
+        {
+            return new List<TopGiftBoxDTO>();
+        }
+
         var orders = await _context.Orders.ToListAsync();
         var giftBoxes = await _context.GiftBoxes.ToListAsync();
         var collections = await _context.Collections.ToListAsync();
@@ -164,11 +195,14 @@ public class DashboardService : IDashboardService
 
         foreach (var order in orders)
         {
+            if (order.Items == null || order.Items.Count == 0) continue;
+
             foreach (var item in order.Items)
             {
                 if (item.GiftBoxId == null) continue;
                 var gbId = item.GiftBoxId?.ToString();
-                if (string.IsNullOrEmpty(gbId)) continue;
+                if (string.IsNullOrWhiteSpace(gbId)) continue;
+
                 if (!map.ContainsKey(gbId)) map[gbId] = (0, 0m);
                 var entry = map[gbId];
                 entry.qty += item.Quantity;
@@ -200,7 +234,7 @@ public class DashboardService : IDashboardService
 
     public async Task<List<InventoryAlertDTO>> GetInventoryAlertAsync(int threshold = 10)
     {
-        var items = await _context.Items.ToListAsync();
+        var items = await SafeListAsync(_context.Items, nameof(_context.Items));
 
         var alerts = items
             .Where(i => i.StockQuantity < threshold)
