@@ -172,7 +172,36 @@ var app = builder.Build();
 
 
 //Kích hoạt Middleware
+
+// CORS first — ensures ALL responses (including error responses) get CORS headers.
 app.UseCors("AllowVueApp");
+
+// Global exception handler — catches ALL unhandled exceptions and returns a JSON body.
+// Because UseCors is before this, the CORS headers are added to error responses too.
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        
+        var exceptionFeature = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+        var error = exceptionFeature?.Error;
+        
+        var logger = context.RequestServices.GetService<ILoggerFactory>()?.CreateLogger("GlobalExceptionHandler");
+        logger?.LogError(error, "Unhandled exception at {Path}", context.Request.Path);
+        
+        var response = new
+        {
+            message = "Đã xảy ra lỗi máy chủ.",
+            detail = error?.Message ?? "Unknown error",
+            path = context.Request.Path.ToString()
+        };
+        
+        await context.Response.WriteAsJsonAsync(response);
+    });
+});
+
 app.UseHttpsRedirection();
 
 app.UseAuthentication(); // Thêm Authentication middleware
