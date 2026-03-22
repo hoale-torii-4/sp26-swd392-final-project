@@ -95,7 +95,12 @@ builder.Services.AddAuthorization();
 
 //Cấu hình CORS (Cho phép Vue.js truy cập API)
 // Lấy chuỗi CORS
-var origins = builder.Configuration["Cors:Origins"]?.Split(',') ?? new[] { "http://localhost:5173", "http://localhost:3000" };
+var origins = builder.Configuration["Cors:Origins"]?.Split(',') ?? new[]
+{
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://shophangtet-web.onrender.com"
+};
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowVueApp",

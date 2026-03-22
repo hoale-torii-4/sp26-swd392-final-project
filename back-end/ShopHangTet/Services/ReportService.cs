@@ -22,7 +22,17 @@ public class ReportService : IReportService
 
     private async Task<List<OrderModel>> GetOrdersWithFallbackAsync()
     {
-        var efOrders = await _context.Orders.AsNoTracking().ToListAsync();
+        List<OrderModel> efOrders;
+
+        try
+        {
+            efOrders = await _context.Orders.AsNoTracking().ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Report EF query for Orders failed. Will fallback to raw Mongo collection.");
+            efOrders = new List<OrderModel>();
+        }
 
         if (efOrders.Count > 0)
         {
