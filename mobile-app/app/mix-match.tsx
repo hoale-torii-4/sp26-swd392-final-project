@@ -189,54 +189,28 @@ export default function MixMatchScreen() {
         }
     };
 
-    const renderItemCard = ({ item }: { item: MixMatchItem }) => {
-        const isSelected = slots.includes(item.Id);
-        const isOutOfStock = item.AvailableQuantity !== undefined && item.AvailableQuantity <= 0;
-        
-        return (
-            <TouchableOpacity 
-                style={[
-                    styles.itemCard, 
-                    isSelected && styles.itemCardSelected,
-                    isOutOfStock && styles.itemCardDisabled
-                ]}
-                onPress={() => {
-                    if (!isOutOfStock) {
-                        handleAddItem(item.Id);
-                    }
-                }}
-                activeOpacity={isOutOfStock ? 1 : 0.7}
-            >
-                {/* Stock Badge */}
-                {item.AvailableQuantity !== undefined && (
-                    <View style={[styles.stockBadge, item.AvailableQuantity > 0 ? styles.inStockBg : styles.outOfStockBg]}>
-                        <Text style={styles.stockBadgeText}>
-                            {item.AvailableQuantity > 0 ? `KHO: ${item.AvailableQuantity}` : 'HẾT HÀNG'}
-                        </Text>
-                    </View>
-                )}
 
-                <View style={styles.itemImageWrap}>
-                    {item.Image ? (
-                        <Image source={{ uri: item.Image }} style={styles.itemImage} contentFit="cover" />
-                    ) : (
-                        <View style={styles.itemPlaceholder}><Text>🎁</Text></View>
-                    )}
-                </View>
-                <View style={styles.itemInfo}>
-                    <Text style={styles.itemName} numberOfLines={1}>{item.Name}</Text>
-                    <Text style={[styles.itemPrice, isOutOfStock && styles.itemPriceDisabled]}>
-                        {item.Price ? formatPrice(item.Price) : '--'}
-                    </Text>
-                </View>
-                {!isOutOfStock && (
-                    <TouchableOpacity style={styles.addIcon} onPress={() => handleAddItem(item.Id)}>
-                        <Ionicons name="add-circle" size={24} color={AppColors.primary} />
-                    </TouchableOpacity>
+    const renderItemCard = ({ item }: { item: MixMatchItem }) => (
+        <TouchableOpacity 
+            style={styles.itemCard}
+            onPress={() => handleAddItem(item.Id)}
+        >
+            <View style={styles.itemImageWrap}>
+                {item.Image ? (
+                    <Image source={{ uri: item.Image }} style={styles.itemImage} contentFit="cover" />
+                ) : (
+                    <View style={styles.itemPlaceholder}><Text>🎁</Text></View>
                 )}
+            </View>
+            <View style={styles.itemInfo}>
+                <Text style={styles.itemName} numberOfLines={1}>{item.Name}</Text>
+                <Text style={styles.itemPrice}>{item.Price ? formatPrice(item.Price) : '--'}</Text>
+            </View>
+            <TouchableOpacity style={styles.addIcon} onPress={() => handleAddItem(item.Id)}>
+                <Ionicons name="add-circle" size={24} color={AppColors.primary} />
             </TouchableOpacity>
-        );
-    };
+        </TouchableOpacity>
+    );
 
     if (loading) return <LoadingSpinner />;
 
@@ -380,19 +354,6 @@ const styles = StyleSheet.create({
         borderWidth: 1, borderStyle: 'dashed', borderColor: AppColors.border,
         backgroundColor: AppColors.background, justifyContent: 'center', alignItems: 'center',
     },
-    selectedBadge: {
-        position: 'absolute', top: 8, right: 8, backgroundColor: AppColors.primary,
-        width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', zIndex: 10,
-    },
-    stockBadge: {
-        position: 'absolute', top: 8, left: 8, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, zIndex: 10,
-    },
-    inStockBg: { backgroundColor: '#1B3022' },
-    outOfStockBg: { backgroundColor: '#6b7280' },
-    stockBadgeText: { color: '#FFF', fontSize: 8, fontWeight: 'bold' },
-    itemCardDisabled: { opacity: 0.6, borderColor: '#E5E7EB' },
-    itemPriceDisabled: { color: '#9CA3AF' },
-    bottomBar: { borderStyle: 'solid', borderColor: AppColors.primary + '40', backgroundColor: '#FFF' },
     slotFilled: { borderStyle: 'solid', borderColor: AppColors.primary + '40', backgroundColor: '#FFF' },
     slotImage: { width: '100%', height: '100%', borderRadius: BorderRadius.sm },
     removeIcon: { position: 'absolute', top: -5, right: -5, backgroundColor: '#FFF', borderRadius: 9 },
@@ -416,7 +377,6 @@ const styles = StyleSheet.create({
         shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
         shadowOpacity: 0.05, shadowRadius: 3, elevation: 2,
     },
-    itemCardSelected: { borderColor: AppColors.primary, borderWidth: 2 },
     itemImageWrap: { width: '100%', aspectRatio: 1, backgroundColor: '#F3F4F6', borderTopLeftRadius: BorderRadius.md, borderTopRightRadius: BorderRadius.md },
     itemImage: { width: '100%', height: '100%', borderTopLeftRadius: BorderRadius.md, borderTopRightRadius: BorderRadius.md },
     itemPlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },

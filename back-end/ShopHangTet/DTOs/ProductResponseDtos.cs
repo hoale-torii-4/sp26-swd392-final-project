@@ -51,8 +51,6 @@ namespace ShopHangTet.DTOs
         public decimal Price { get; set; }
         public string? Image { get; set; }
         public int Quantity { get; set; }
-        public int StockQuantity { get; set; }
-        public int AvailableQuantity { get; set; }
     }
 
     public class GiftBoxFlatDto
@@ -67,7 +65,6 @@ namespace ShopHangTet.DTOs
         public List<GiftBoxItemFlatDto> Items { get; set; } = new();
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
-        public int TotalStock { get; set; } // Min available qty across items
     }
 
     public class GiftBoxDetailDto : GiftBoxFlatDto
