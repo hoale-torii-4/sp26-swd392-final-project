@@ -11,16 +11,14 @@ public class DashboardService : IDashboardService
 {
     private readonly ShopHangTetDbContext _context;
     private readonly ILogger<DashboardService> _logger;
-    private readonly IMongoCollection<OrderModel> _ordersCollection;
 
-    public DashboardService(ShopHangTetDbContext context, ILogger<DashboardService> logger, IMongoDatabase mongoDatabase)
+    public DashboardService(ShopHangTetDbContext context, ILogger<DashboardService> logger)
     {
         _context = context;
         _logger = logger;
-        _ordersCollection = mongoDatabase.GetCollection<OrderModel>("Orders");
     }
 
-    private async Task<List<T>> SafeListAsync<T>(IQueryable<T> query, string sourceName) where T : class
+    private async Task<List<T>> SafeListAsync<T>(IQueryable<T> query, string sourceName)
     {
         try
         {
@@ -33,40 +31,9 @@ public class DashboardService : IDashboardService
         }
     }
 
-    private async Task<List<OrderModel>> GetOrdersWithFallbackAsync()
-    {
-        var orders = await SafeListAsync(_context.Orders, nameof(_context.Orders));
-
-        if (orders.Count > 0)
-        {
-            return orders;
-        }
-
-        try
-        {
-            var fallbackOrders = await _ordersCollection
-                .Find(Builders<OrderModel>.Filter.Empty)
-                .ToListAsync();
-
-            if (fallbackOrders.Count > 0)
-            {
-                _logger.LogWarning(
-                    "Dashboard fallback activated: EF returned 0 orders, raw Mongo collection returned {Count} orders.",
-                    fallbackOrders.Count);
-            }
-
-            return fallbackOrders;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Dashboard fallback query on Mongo Orders collection failed.");
-            return orders;
-        }
-    }
-
     public async Task<DashboardSummaryDTO> GetDashboardSummaryAsync()
     {
-        var orders = await GetOrdersWithFallbackAsync();
+        var orders = await SafeListAsync(_context.Orders, nameof(_context.Orders));
 
         var totalRevenue = orders.Sum(o => o.TotalAmount);
         var totalOrders = orders.Count;
@@ -191,7 +158,7 @@ public class DashboardService : IDashboardService
             return new List<TopCollectionDTO>();
         }
 
-        var orders = await GetOrdersWithFallbackAsync();
+        var orders = await _context.Orders.ToListAsync();
         var giftBoxes = await SafeListAsync(_context.GiftBoxes, nameof(_context.GiftBoxes));
         var collections = await SafeListAsync(_context.Collections, nameof(_context.Collections));
 
@@ -204,14 +171,22 @@ public class DashboardService : IDashboardService
         {
             if (order.Items == null || order.Items.Count == 0) continue;
 
+            if (order.Items == null || order.Items.Count == 0) continue;
+
             foreach (var item in order.Items)
             {
                 if (item.GiftBoxId == null) continue;
                 var gbId = item.GiftBoxId?.ToString();
                 if (string.IsNullOrWhiteSpace(gbId)) continue;
 
+                if (string.IsNullOrWhiteSpace(gbId)) continue;
+
                 var gb = giftBoxes.FirstOrDefault(g => g.Id == gbId);
                 if (gb == null) continue;
+
+                var cid = gb.CollectionId;
+                if (string.IsNullOrWhiteSpace(cid)) continue;
+
 
                 var cid = gb.CollectionId;
                 if (string.IsNullOrWhiteSpace(cid)) continue;
@@ -247,9 +222,9 @@ public class DashboardService : IDashboardService
             return new List<TopGiftBoxDTO>();
         }
 
-        var orders = await GetOrdersWithFallbackAsync();
-        var giftBoxes = await SafeListAsync(_context.GiftBoxes, nameof(_context.GiftBoxes));
-        var collections = await SafeListAsync(_context.Collections, nameof(_context.Collections));
+        var orders = await _context.Orders.ToListAsync();
+        var giftBoxes = await _context.GiftBoxes.ToListAsync();
+        var collections = await _context.Collections.ToListAsync();
 
         var map = new Dictionary<string, (int qty, decimal revenue)>();
 
@@ -257,10 +232,14 @@ public class DashboardService : IDashboardService
         {
             if (order.Items == null || order.Items.Count == 0) continue;
 
+            if (order.Items == null || order.Items.Count == 0) continue;
+
             foreach (var item in order.Items)
             {
                 if (item.GiftBoxId == null) continue;
                 var gbId = item.GiftBoxId?.ToString();
+                if (string.IsNullOrWhiteSpace(gbId)) continue;
+
                 if (string.IsNullOrWhiteSpace(gbId)) continue;
 
                 if (!map.ContainsKey(gbId)) map[gbId] = (0, 0m);
@@ -294,6 +273,7 @@ public class DashboardService : IDashboardService
 
     public async Task<List<InventoryAlertDTO>> GetInventoryAlertAsync(int threshold = 10)
     {
+        var items = await SafeListAsync(_context.Items, nameof(_context.Items));
         var items = await SafeListAsync(_context.Items, nameof(_context.Items));
 
         var alerts = items
