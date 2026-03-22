@@ -296,36 +296,10 @@ namespace ShopHangTet.Controllers
         // UPDATE PROFILE (Name, Phone only)
         // ===========================
         [Authorize]
-        [HttpGet("me")]
-        public async Task<IActionResult> GetCurrentUser()
-        {
-            var userId = GetCurrentUserId();
-            if (string.IsNullOrWhiteSpace(userId))
-            {
-                return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
-            }
-
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-            {
-                return Unauthorized(ApiResponse<object>.ErrorResult("Người dùng không tồn tại."));
-            }
-
-            return Ok(ApiResponse<object>.SuccessResult(new
-            {
-                id = user.Id,
-                email = user.Email,
-                fullName = user.FullName,
-                role = user.Role.ToString(),
-                avatar = (string?)null
-            }, "Lấy thông tin người dùng thành công"));
-        }
-
-        [Authorize]
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto request)
         {
-            var userId = GetCurrentUserId();
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userId))
             {
                 return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
@@ -355,14 +329,6 @@ namespace ShopHangTet.Controllers
             };
 
             return Ok(ApiResponse<UserResponseDto>.SuccessResult(updatedUserDto, "Cập nhật thông tin thành công!"));
-        }
-
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirstValue(ClaimTypes.NameIdentifier)
-                ?? User.FindFirst("Id")?.Value
-                ?? User.FindFirst("id")?.Value
-                ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         }
 
         // ===========================

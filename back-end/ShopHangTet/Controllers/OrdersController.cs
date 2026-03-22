@@ -3,10 +3,7 @@ using ShopHangTet.Services;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 using Microsoft.AspNetCore.Authorization;
-using MongoDB.Bson;
 using System.Security.Claims;
-using Microsoft.EntityFrameworkCore;
-using ShopHangTet.Data;
 
 namespace ShopHangTet.Controllers;
 
@@ -17,25 +14,15 @@ public class OrdersController : ControllerBase
     private readonly IOrderService _orderService;
     private readonly IEmailService _emailService;
     private readonly ILogger<OrdersController> _logger;
-    private readonly ShopHangTetDbContext _context;
 
-    public OrdersController(
-        IOrderService orderService,
-        IEmailService emailService,
-        ILogger<OrdersController> logger,
-        ShopHangTetDbContext context)
+    public OrdersController(IOrderService orderService, IEmailService emailService, ILogger<OrdersController> logger)
     {
         _orderService = orderService;
         _emailService = emailService;
         _logger = logger;
-        _context = context;
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // ĐẶT HÀNG
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Tạo đơn B2C — Guest hoặc Member
+    /// Tạo đơn hàng B2C (Guest hoặc Member) - Compliant
     [HttpPost("b2c")]
     public async Task<IActionResult> CreateB2COrder([FromBody] CreateOrderB2CDto request)
     {
@@ -45,31 +32,70 @@ public class OrdersController : ControllerBase
 
             var validation = await _orderService.ValidateB2COrderAsync(request);
             if (!validation.IsValid)
-                return BadRequest(ApiResponse<string>.ErrorResult("Validation failed", validation.Errors));
+            {
+                return BadRequest(new ApiResponse<string>
+                {
+                    Success = false,
+                    Message = "Validation failed",
+                    Errors = validation.Errors
+                });
+            }
 
             var order = await _orderService.PlaceB2COrderAsync(request);
 
             try
             {
                 await _emailService.SendOrderConfirmationAsync(
-                    request.CustomerEmail, order.OrderCode, order.TotalAmount);
+                    request.CustomerEmail,
+                    order.OrderCode,
+                    order.TotalAmount
+                );
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Email sending failed for order {Code}", order.OrderCode);
+                _logger.LogWarning(ex, "Email sending failed for order {OrderCode}", order.OrderCode);
             }
 
-            return Ok(ApiResponse<CreateOrderResponseDto>.SuccessResult(
-                BuildCreateOrderResponse(order), "B2C Order created successfully"));
+            var response = new ApiResponse<CreateOrderResponseDto>
+            {
+                Success = true,
+                Message = "B2C Order created successfully",
+                Data = new CreateOrderResponseDto
+                {
+                    OrderId = order.Id.ToString(),
+                    OrderCode = order.OrderCode,
+                    OrderType = order.OrderType,
+                    Status = order.Status,
+                    SubTotal = order.SubTotal,
+                    ShippingFee = order.ShippingFee,
+                    TotalAmount = order.TotalAmount,
+                    CreatedAt = order.CreatedAt,
+                    Items = order.Items.Select(i => new OrderItemResponseDto
+                    {
+                        Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
+                        Type = i.Type,
+                        Name = i.ProductName,
+                        Quantity = i.Quantity,
+                        UnitPrice = i.UnitPrice,
+                        TotalPrice = i.TotalPrice
+                    }).ToList()
+                }
+            };
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating B2C order");
-            return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
         }
     }
 
-    /// Tạo đơn B2B — Member only
+    /// Tạo đơn hàng B2B (Member - nhiều địa chỉ) - Compliant
     [HttpPost("b2b")]
     [Authorize]
     public async Task<IActionResult> CreateB2BOrder([FromBody] CreateOrderB2BDto request)
@@ -80,72 +106,108 @@ public class OrdersController : ControllerBase
 
             var validation = await _orderService.ValidateB2BOrderAsync(request);
             if (!validation.IsValid)
-                return BadRequest(ApiResponse<string>.ErrorResult("B2B Validation failed", validation.Errors));
+            {
+                return BadRequest(new ApiResponse<string>
+                {
+                    Success = false,
+                    Message = "B2B Validation failed",
+                    Errors = validation.Errors
+                });
+            }
 
             var order = await _orderService.PlaceB2BOrderAsync(request);
 
             try
             {
                 await _emailService.SendOrderConfirmationAsync(
-                    request.CustomerEmail, order.OrderCode, order.TotalAmount);
+                    request.CustomerEmail,
+                    order.OrderCode,
+                    order.TotalAmount
+                );
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Email sending failed for order {Code}", order.OrderCode);
+                _logger.LogWarning(ex, "Email sending failed for order {OrderCode}", order.OrderCode);
             }
 
-            return Ok(ApiResponse<CreateOrderResponseDto>.SuccessResult(
-                BuildCreateOrderResponse(order), "B2B Order created successfully"));
+            var response = new ApiResponse<CreateOrderResponseDto>
+            {
+                Success = true,
+                Message = "B2B Order created successfully",
+                Data = new CreateOrderResponseDto
+                {
+                    OrderId = order.Id.ToString(),
+                    OrderCode = order.OrderCode,
+                    OrderType = order.OrderType,
+                    Status = order.Status,
+                    SubTotal = order.SubTotal,
+                    ShippingFee = order.ShippingFee,
+                    TotalAmount = order.TotalAmount,
+                    CreatedAt = order.CreatedAt,
+                    Items = order.Items.Select(i => new OrderItemResponseDto
+                    {
+                        Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
+                        Type = i.Type,
+                        Name = i.ProductName,
+                        Quantity = i.Quantity,
+                        UnitPrice = i.UnitPrice,
+                        TotalPrice = i.TotalPrice
+                    }).ToList()
+                }
+            };
+
+            return Ok(response);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating B2B order");
-            return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // TRA CỨU ĐƠN HÀNG
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Tra cứu đơn không cần login — email + mã đơn
     [HttpGet("track")]
-    public async Task<IActionResult> TrackOrder(
-        [FromQuery] string orderCode, [FromQuery] string email)
+    public async Task<IActionResult> TrackOrder([FromQuery] string orderCode, [FromQuery] string email)
     {
         try
         {
             var tracking = await _orderService.TrackOrderAsync(orderCode, email);
             if (tracking == null)
-                return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
+            {
+                return NotFound(new { message = "Order not found" });
+            }
 
-            return Ok(ApiResponse<OrderTrackingResult>.SuccessResult(tracking));
+            return Ok(tracking);
         }
         catch (Exception ex)
         {
-            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
+            return BadRequest(new { message = ex.Message });
         }
     }
 
-    /// Lấy chi tiết đơn theo mã đơn — Guest cần email, Member dùng token
     [HttpGet("detail/{orderCode}")]
-    public async Task<IActionResult> GetOrderDetailByCode(
-        string orderCode, [FromQuery] string? email)
+    public async Task<IActionResult> GetOrderDetailByCode(string orderCode, [FromQuery] string? email)
     {
         try
         {
-            var userId = GetUserIdFromClaims();
-            var isStaffOrAdmin = IsStaffOrAdmin();
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var role = User.FindFirst("role")?.Value ?? User.FindFirstValue(ClaimTypes.Role);
+            var isStaffOrAdmin = string.Equals(role, "STAFF", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
 
             if (string.IsNullOrWhiteSpace(userId) && string.IsNullOrWhiteSpace(email))
-                return BadRequest(ApiResponse<object>.ErrorResult(
-                    "Guest cần truyền email để xem chi tiết đơn hàng."));
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Guest cần truyền email để xem chi tiết đơn hàng."));
+            }
 
-            var detail = await _orderService.GetOrderDetailByCodeAsync(
-                orderCode, email, userId, isStaffOrAdmin);
-
+            var detail = await _orderService.GetOrderDetailByCodeAsync(orderCode, email, userId, isStaffOrAdmin);
             if (detail == null)
+            {
                 return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
+            }
 
             return Ok(ApiResponse<OrderDto>.SuccessResult(detail, "Lấy chi tiết đơn hàng thành công"));
         }
@@ -155,20 +217,27 @@ public class OrdersController : ControllerBase
         }
     }
 
-    /// Lấy chi tiết đơn theo ID — Member hoặc Staff/Admin
     [Authorize]
     [HttpGet("{id}")]
     public async Task<IActionResult> GetOrderDetailById(string id)
     {
         try
         {
-            var userId = GetUserIdFromClaims();
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrWhiteSpace(userId))
+            {
                 return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+            }
 
-            var detail = await _orderService.GetOrderDetailByIdAsync(id, userId, IsStaffOrAdmin());
+            var role = User.FindFirst("role")?.Value ?? User.FindFirstValue(ClaimTypes.Role);
+            var isStaffOrAdmin = string.Equals(role, "STAFF", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
+
+            var detail = await _orderService.GetOrderDetailByIdAsync(id, userId, isStaffOrAdmin);
             if (detail == null)
+            {
                 return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
+            }
 
             return Ok(ApiResponse<OrderDto>.SuccessResult(detail, "Lấy chi tiết đơn hàng thành công"));
         }
@@ -178,67 +247,23 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // MY ORDERS (Member)
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Đơn hàng của tôi — Member only, có thể lọc theo trạng thái
-    [Authorize]
-    [HttpGet("my-orders")]
-    public async Task<IActionResult> GetMyOrders(
-        [FromQuery] int skip = 0,
-        [FromQuery] int take = 20,
-        [FromQuery] string? status = null)
-    {
-        try
-        {
-            var userId = GetUserIdFromClaims();
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
-
-            if (!ObjectId.TryParse(userId, out _))
-                return Unauthorized(ApiResponse<object>.ErrorResult("Token không chứa user id hợp lệ."));
-
-            var orders = await _orderService.GetMyOrdersAsync(userId, skip, take, status);
-            return Ok(ApiResponse<List<MyOrderResponseDto>>.SuccessResult(
-                orders, "Lấy đơn hàng thành công"));
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // CONFIRM RECEIVED (Customer)
-    // ════════════════════════════════════════════════════════════════════
-
     [HttpPost("{orderCode}/confirm-received")]
-    public async Task<IActionResult> ConfirmReceived(
-        string orderCode, [FromQuery] string? email = null)
+    public async Task<IActionResult> ConfirmReceived(string orderCode, [FromQuery] string email)
     {
         try
         {
-            var targetEmail = email;
-            if (string.IsNullOrWhiteSpace(targetEmail))
+            if (string.IsNullOrWhiteSpace(email))
             {
-                var userId = GetUserIdFromClaims();
-                if (string.IsNullOrWhiteSpace(userId))
-                    return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
-
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-                if (user == null)
-                    return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
-
-                targetEmail = user.Email;
+                return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
             }
 
-            var ok = await _orderService.ConfirmReceivedByCustomerAsync(orderCode, targetEmail);
+            var ok = await _orderService.ConfirmReceivedByCustomerAsync(orderCode, email);
             if (!ok)
+            {
                 return NotFound(ApiResponse<object>.ErrorResult("Order not found"));
+            }
 
-            return Ok(ApiResponse<object>.SuccessResult(
-                new { confirmed = true }, "Xác nhận đã nhận hàng thành công"));
+            return Ok(ApiResponse<object>.SuccessResult(new { confirmed = true }, "Xác nhận đã nhận hàng thành công"));
         }
         catch (Exception ex)
         {
@@ -247,31 +272,22 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost("deliveries/{deliveryId}/confirm-received")]
-    public async Task<IActionResult> ConfirmDeliveryReceived(
-        string deliveryId, [FromQuery] string? email = null)
+    public async Task<IActionResult> ConfirmDeliveryReceived(string deliveryId, [FromQuery] string email)
     {
         try
         {
-            var targetEmail = email;
-            if (string.IsNullOrWhiteSpace(targetEmail))
+            if (string.IsNullOrWhiteSpace(email))
             {
-                var userId = GetUserIdFromClaims();
-                if (string.IsNullOrWhiteSpace(userId))
-                    return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
-
-                var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == userId);
-                if (user == null)
-                    return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
-
-                targetEmail = user.Email;
+                return BadRequest(ApiResponse<object>.ErrorResult("Email là bắt buộc."));
             }
 
-            var ok = await _orderService.ConfirmDeliveryReceivedByCustomerAsync(deliveryId, targetEmail);
+            var ok = await _orderService.ConfirmDeliveryReceivedByCustomerAsync(deliveryId, email);
             if (!ok)
+            {
                 return NotFound(ApiResponse<object>.ErrorResult("Delivery not found"));
+            }
 
-            return Ok(ApiResponse<object>.SuccessResult(
-                new { confirmed = true }, "Xác nhận shipment đã giao thành công"));
+            return Ok(ApiResponse<object>.SuccessResult(new { confirmed = true }, "Xác nhận shipment đã giao thành công"));
         }
         catch (Exception ex)
         {
@@ -279,148 +295,65 @@ public class OrdersController : ControllerBase
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // STAFF — DANH SÁCH ĐƠN
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Lấy danh sách đơn cho Staff dashboard
-    /// GET /api/orders/staff/list?status=PREPARING&type=B2C&search=SHT&page=1&pageSize=20
-    [Authorize(Roles = "STAFF")]
-    [HttpGet("staff/list")]
-    public async Task<IActionResult> GetStaffOrders(
-        [FromQuery] string? status = null,
-        [FromQuery] string? type = null,
-        [FromQuery] string? search = null,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 20)
+    [Authorize]
+    [HttpGet("my-orders")]
+    public async Task<IActionResult> GetMyOrders([FromQuery] int skip = 0, [FromQuery] int take = 20)
     {
         try
         {
-            var result = await _orderService.GetStaffOrdersAsync(page, pageSize, status, type, search);
-            return Ok(ApiResponse<StaffOrderListResponseDto>.SuccessResult(
-                result, "Lấy danh sách đơn hàng thành công"));
+            var userId = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(ApiResponse<object>.ErrorResult("Không thể xác thực người dùng."));
+            }
+
+            var orders = await _orderService.GetMyOrdersAsync(userId, skip, take);
+
+            return Ok(ApiResponse<List<MyOrderResponseDto>>.SuccessResult(orders, "Lấy đơn hàng thành công"));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting staff order list");
             return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // STAFF — CẬP NHẬT TRẠNG THÁI
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Cập nhật trạng thái đơn — chỉ Staff, chỉ các transition hợp lệ
     [Authorize(Roles = "STAFF")]
     [HttpPut("{orderId}/status")]
-    public async Task<IActionResult> UpdateOrderStatus(
-        string orderId, [FromBody] UpdateOrderStatusDto request)
+    public async Task<IActionResult> UpdateOrderStatus(string orderId, [FromBody] UpdateOrderStatusDto request)
     {
         try
         {
-            // Guard: trạng thái internal chỉ do hệ thống set tự động
-            // chỉ được set bởi hệ thống, Staff không set thủ công
-            if (request.Status is OrderStatus.PARTIAL_DELIVERY
-                or OrderStatus.DELIVERY_FAILED
-                or OrderStatus.PAYMENT_EXPIRED_INTERNAL)
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value ?? "MEMBER";
+            if (userRole != "STAFF")
             {
-                return BadRequest(ApiResponse<object>.ErrorResult(
-                    $"Trạng thái '{request.Status}' được quản lý tự động bởi hệ thống, không thể set thủ công."));
+                return Forbid("Only STAFF can update order status. Admin cannot modify orders.");
             }
 
-            var updatedBy = User.FindFirst("name")?.Value
-                ?? User.Identity?.Name
-                ?? "Staff";
+            var updatedBy = User.FindFirst("name")?.Value ?? User.Identity?.Name ?? "Staff";
+            var order = await _orderService.UpdateStatusAsync(orderId, request.Status, updatedBy, request.Note);
 
-            var order = await _orderService.UpdateStatusAsync(
-                orderId, request.Status, updatedBy, request.Note);
-
-            return Ok(ApiResponse<object>.SuccessResult(new
+            return Ok(new ApiResponse<object>
             {
-                id = order.Id.ToString(),
-                orderCode = order.OrderCode,
-                status = order.Status,
-                statusLabel = GetStatusLabel(order.Status),
-                updatedAt = order.UpdatedAt
-            }, $"Cập nhật trạng thái thành {request.Status} thành công"));
+                Success = true,
+                Message = $"Order status updated to {request.Status}",
+                Data = new
+                {
+                    id = order.Id.ToString(),
+                    orderCode = order.OrderCode,
+                    status = order.Status,
+                    updatedAt = order.UpdatedAt
+                }
+            });
         }
         catch (Exception ex)
         {
-            return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
         }
     }
-
-    // ════════════════════════════════════════════════════════════════════
-    // STAFF — XÁC NHẬN THANH TOÁN THỦ CÔNG
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Xác nhận thanh toán thủ công — dùng khi SePay webhook không bắt được
-    /// POST /api/orders/{orderId}/confirm-payment
-    [Authorize(Roles = "STAFF")]
-    [HttpPost("{orderId}/confirm-payment")]
-    public async Task<IActionResult> StaffConfirmPayment(string orderId)
-    {
-        try
-        {
-            var staffName = User.FindFirst("name")?.Value
-                ?? User.Identity?.Name
-                ?? "Staff";
-
-            var result = await _orderService.StaffConfirmPaymentAsync(orderId, staffName);
-
-            return Ok(ApiResponse<object>.SuccessResult(
-                new { confirmed = result },
-                "Xác nhận thanh toán thành công - đơn đã chuyển sang Đang chuẩn bị"));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error confirming payment for order {OrderId}", orderId);
-            return BadRequest(ApiResponse<object>.ErrorResult(ex.Message));
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // DELIVERY MANAGEMENT (B2B)
-    // ════════════════════════════════════════════════════════════════════
-
-    [Authorize(Roles = "STAFF")]
-    [HttpPut("deliveries/{deliveryId}/status")]
-    public async Task<IActionResult> UpdateDeliveryStatus(
-        string deliveryId, [FromBody] UpdateDeliveryStatusDto request)
-    {
-        try
-        {
-            await _orderService.UpdateDeliveryStatusAsync(
-                deliveryId, request.Status, request.FailureReason);
-
-            return Ok(ApiResponse<string>.SuccessResult(
-                string.Empty, $"Delivery status updated to {request.Status}"));
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
-        }
-    }
-
-    [Authorize(Roles = "STAFF")]
-    [HttpPost("deliveries/{deliveryId}/reship")]
-    public async Task<IActionResult> ReshipDelivery(string deliveryId)
-    {
-        try
-        {
-            var result = await _orderService.ReshipDeliveryAsync(deliveryId);
-            return Ok(ApiResponse<bool>.SuccessResult(result, "Delivery reshipped successfully"));
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
-        }
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // MIX & MATCH VALIDATION
-    // ════════════════════════════════════════════════════════════════════
 
     [HttpPost("validate-mixmatch/{customBoxId}")]
     public async Task<IActionResult> ValidateMixMatchRules(string customBoxId)
@@ -437,68 +370,58 @@ public class OrdersController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // HELPERS
-    // ════════════════════════════════════════════════════════════════════
-
-    private bool IsStaffOrAdmin()
+    [Authorize(Roles = "STAFF")]
+    [HttpPut("deliveries/{deliveryId}/status")]
+    public async Task<IActionResult> UpdateDeliveryStatus(string deliveryId, [FromBody] UpdateDeliveryStatusDto request)
     {
-        var role = User.FindFirst("role")?.Value ?? User.FindFirstValue(ClaimTypes.Role) ?? "";
-        return string.Equals(role, "STAFF", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(role, "ADMIN", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private string? GetUserIdFromClaims()
-    {
-        return User.FindFirstValue(ClaimTypes.NameIdentifier)
-            ?? User.FindFirst("Id")?.Value
-            ?? User.FindFirst("id")?.Value
-            ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
-    }
-
-    private static string GetStatusLabel(OrderStatus status) => status switch
-    {
-        OrderStatus.PAYMENT_CONFIRMING => "Đang xác nhận thanh toán",
-        OrderStatus.PREPARING => "Đang chuẩn bị",
-        OrderStatus.SHIPPING => "Đang được giao",
-        OrderStatus.PARTIAL_DELIVERY => "Đang được giao",
-        OrderStatus.DELIVERY_FAILED => "Đang được giao",
-        OrderStatus.PAYMENT_EXPIRED_INTERNAL => "Đang xác nhận thanh toán",
-        OrderStatus.COMPLETED => "Hoàn thành",
-        OrderStatus.CANCELLED => "Đã hủy",
-        _ => status.ToString()
-    };
-
-    private static CreateOrderResponseDto BuildCreateOrderResponse(OrderModel order) => new()
-    {
-        OrderId = order.Id.ToString(),
-        OrderCode = order.OrderCode,
-        OrderType = order.OrderType,
-        Status = order.Status,
-        StatusLabel = GetStatusLabel(order.Status),
-        SubTotal = order.SubTotal,
-        ShippingFee = order.ShippingFee,
-        TotalAmount = order.TotalAmount,
-        CreatedAt = order.CreatedAt,
-        Items = order.Items.Select(i => new OrderItemResponseDto
+        try
         {
-            Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
-            Type = i.Type,
-            Name = i.ProductName,
-            Quantity = i.Quantity,
-            UnitPrice = i.UnitPrice,
-            TotalPrice = i.TotalPrice,
-            SnapshotItems = i.SnapshotItems.Select(s => new OrderItemSnapshotResponseDto
+            await _orderService.UpdateDeliveryStatusAsync(deliveryId, request.Status, request.FailureReason);
+            return Ok(new ApiResponse<string>
             {
-                ItemId = s.ItemId,
-                ItemName = s.ItemName,
-                Quantity = s.Quantity,
-                UnitPrice = s.UnitPrice
-            }).ToList()
-        }).ToList()
-    };
+                Success = true,
+                Message = $"Delivery status updated to {request.Status}"
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+    }
+
+    [Authorize(Roles = "STAFF")]
+    [HttpPost("deliveries/{deliveryId}/reship")]
+    public async Task<IActionResult> ReshipDelivery(string deliveryId)
+    {
+        try
+        {
+            var result = await _orderService.ReshipDeliveryAsync(deliveryId);
+            return Ok(new ApiResponse<bool>
+            {
+                Success = true,
+                Message = "Delivery reshipped successfully",
+                Data = result
+            });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new ApiResponse<string>
+            {
+                Success = false,
+                Message = ex.Message
+            });
+        }
+    }
 }

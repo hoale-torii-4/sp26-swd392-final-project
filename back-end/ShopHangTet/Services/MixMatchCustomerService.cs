@@ -5,9 +5,6 @@ using ShopHangTet.Models;
 
 namespace ShopHangTet.Services;
 
-/// Service xử lý Custom Box (Mix & Match) cho phía khách hàng.
-/// Validation rule (min/max item, SAVORY...) được thực hiện tại OrderService.ValidateMixMatchRulesAsync
-/// khi checkout, không validate lại tại đây để tránh duplicate logic.
 public class MixMatchCustomerService : IMixMatchCustomerService
 {
     private readonly ShopHangTetDbContext _context;
@@ -17,143 +14,87 @@ public class MixMatchCustomerService : IMixMatchCustomerService
         _context = context;
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // TẠO CUSTOM BOX
-    // ════════════════════════════════════════════════════════════════════
-
-    /// userId có thể là ObjectId của Member hoặc session string của Guest.
-    /// Validation rule Mix & Match chỉ thực thi khi checkout (ValidateMixMatchRulesAsync).
     public async Task<string> CreateCustomBoxAsync(string userId, CreateCustomBoxDTO dto)
     {
-        if (string.IsNullOrWhiteSpace(userId))
-            throw new ArgumentException("UserId là bắt buộc");
-        if (dto?.Items == null || !dto.Items.Any())
-            throw new ArgumentException("Custom box phải có ít nhất 1 item");
+        if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentException("UserId is required");
+        if (dto == null || dto.Items == null) throw new ArgumentException("Items are required");
+
+        var totalItems = dto.Items.Sum(x => x.Quantity);
+        if (totalItems < 4 || totalItems > 6)
+            throw new InvalidOperationException("Mix & Match phải có tổng từ 4 đến 6 món");
+
+        await ValidateMixMatchItemsAsync(dto.Items);
 
         var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
-        var itemsDict = await _context.Items
-            .Where(i => itemIds.Contains(i.Id) && i.IsActive)
-            .ToDictionaryAsync(i => i.Id);
-
-        // Kiểm tra tất cả item tồn tại và đang active
-        var notFound = itemIds.Except(itemsDict.Keys).ToList();
-        if (notFound.Any())
-            throw new InvalidOperationException(
-                $"Sản phẩm không tồn tại hoặc đã tắt: {string.Join(", ", notFound)}");
+        var itemsDict = await _context.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
+        if (itemsDict.Count != itemIds.Count)
+            throw new InvalidOperationException("One or more selected items were not found.");
 
         var customBox = new CustomBox
         {
             UserId = userId,
-            Items = dto.Items
-                .Select(i => new CustomBoxItem { ItemId = i.ItemId, Quantity = i.Quantity })
-                .ToList(),
-            TotalPrice = dto.Items.Sum(i => itemsDict[i.ItemId].Price * i.Quantity),
+            Items = dto.Items.Select(i => new CustomBoxItem { ItemId = i.ItemId, Quantity = i.Quantity }).ToList(),
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
+        decimal totalPrice = 0m;
+        foreach (var it in customBox.Items)
+        {
+            var item = itemsDict[it.ItemId];
+            totalPrice += item.Price * it.Quantity;
+        }
+
+        customBox.TotalPrice = totalPrice;
+
         await _context.CustomBoxes.AddAsync(customBox);
         await _context.SaveChangesAsync();
+
         return customBox.Id;
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // ĐỌC
-    // ════════════════════════════════════════════════════════════════════
-
-    public async Task<CustomBoxResponseDTO?> GetCustomBoxAsync(string id)
-    {
-        var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == id);
-        return box == null ? null : await MapAsync(box);
     }
 
     public async Task<CustomBoxResponseDTO?> GetCustomBoxByUserAsync(string userId)
     {
         if (string.IsNullOrWhiteSpace(userId)) return null;
-
         var box = await _context.CustomBoxes
             .Where(cb => cb.UserId == userId)
             .OrderByDescending(cb => cb.CreatedAt)
             .FirstOrDefaultAsync();
-
-        return box == null ? null : await MapAsync(box);
+        if (box == null) return null;
+        return await MapCustomBoxAsync(box);
     }
 
     public async Task<List<CustomBoxResponseDTO>> GetCustomBoxesByUserAsync(string userId)
     {
-        if (string.IsNullOrWhiteSpace(userId)) return new();
+        if (string.IsNullOrWhiteSpace(userId)) return new List<CustomBoxResponseDTO>();
 
         var boxes = await _context.CustomBoxes
             .Where(cb => cb.UserId == userId)
             .OrderByDescending(cb => cb.CreatedAt)
             .ToListAsync();
 
-        var result = new List<CustomBoxResponseDTO>();
+        if (!boxes.Any()) return new List<CustomBoxResponseDTO>();
+
+        var results = new List<CustomBoxResponseDTO>();
         foreach (var box in boxes)
-            result.Add(await MapAsync(box));
+        {
+            results.Add(await MapCustomBoxAsync(box));
+        }
 
-        return result;
+        return results;
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // CẬP NHẬT / XÓA
-    // ════════════════════════════════════════════════════════════════════
-
-    public async Task<bool> UpdateCustomBoxAsync(string userId, string boxId, CreateCustomBoxDTO dto)
+    public async Task<CustomBoxResponseDTO?> GetCustomBoxAsync(string id)
     {
-        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(boxId))
-            return false;
-
-        var box = await _context.CustomBoxes
-            .FirstOrDefaultAsync(cb => cb.Id == boxId && cb.UserId == userId);
-        if (box == null)
-            throw new InvalidOperationException("Custom box not found or access denied");
-
-        var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
-        var itemsDict = await _context.Items
-            .Where(i => itemIds.Contains(i.Id) && i.IsActive)
-            .ToDictionaryAsync(i => i.Id);
-
-        var notFound = itemIds.Except(itemsDict.Keys).ToList();
-        if (notFound.Any())
-            throw new InvalidOperationException(
-                $"Sản phẩm không tồn tại hoặc đã tắt: {string.Join(", ", notFound)}");
-
-        box.Items = dto.Items
-            .Select(i => new CustomBoxItem { ItemId = i.ItemId, Quantity = i.Quantity })
-            .ToList();
-        box.TotalPrice = dto.Items.Sum(i => itemsDict[i.ItemId].Price * i.Quantity);
-        box.UpdatedAt = DateTime.UtcNow;
-
-        _context.CustomBoxes.Update(box);
-        await _context.SaveChangesAsync();
-        return true;
+        var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == id);
+        if (box == null) return null;
+        return await MapCustomBoxAsync(box);
     }
 
-    public async Task<bool> DeleteCustomBoxAsync(string userId, string boxId)
-    {
-        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(boxId))
-            return false;
-
-        var box = await _context.CustomBoxes
-            .FirstOrDefaultAsync(cb => cb.Id == boxId && cb.UserId == userId);
-        if (box == null) return false;
-
-        _context.CustomBoxes.Remove(box);
-        await _context.SaveChangesAsync();
-        return true;
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // MAP DTO
-    // ════════════════════════════════════════════════════════════════════
-
-    private async Task<CustomBoxResponseDTO> MapAsync(CustomBox box)
+    private async Task<CustomBoxResponseDTO> MapCustomBoxAsync(CustomBox box)
     {
         var itemIds = box.Items.Select(i => i.ItemId).Distinct().ToList();
-        var itemsDict = await _context.Items
-            .Where(i => itemIds.Contains(i.Id))
-            .ToDictionaryAsync(i => i.Id);
+        var itemsDict = await _context.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
 
         var items = box.Items.Select(i =>
         {
@@ -178,5 +119,90 @@ public class MixMatchCustomerService : IMixMatchCustomerService
             TotalPrice = box.TotalPrice,
             CreatedAt = box.CreatedAt
         };
+    }
+    public async Task<bool> UpdateCustomBoxAsync(string userId, string boxId, CreateCustomBoxDTO dto)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(boxId)) return false;
+        
+        var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == boxId && cb.UserId == userId);
+        if (box == null) throw new InvalidOperationException("Custom box not found or access denied");
+
+        var totalItems = dto.Items.Sum(x => x.Quantity);
+        if (totalItems < 4 || totalItems > 6)
+            throw new InvalidOperationException("Mix & Match phải có tổng từ 4 đến 6 món");
+
+        await ValidateMixMatchItemsAsync(dto.Items);
+
+        var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
+        var itemsDict = await _context.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id);
+        if (itemsDict.Count != itemIds.Count)
+            throw new InvalidOperationException("One or more selected items were not found.");
+
+        box.Items = dto.Items.Select(i => new CustomBoxItem { ItemId = i.ItemId, Quantity = i.Quantity }).ToList();
+        box.UpdatedAt = DateTime.UtcNow;
+
+        decimal totalPrice = 0m;
+        foreach (var it in box.Items)
+        {
+            var item = itemsDict[it.ItemId];
+            totalPrice += item.Price * it.Quantity;
+        }
+        
+        box.TotalPrice = totalPrice;
+
+        _context.CustomBoxes.Update(box);
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
+
+    public async Task<bool> DeleteCustomBoxAsync(string userId, string boxId)
+    {
+        if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(boxId)) return false;
+
+        var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == boxId && cb.UserId == userId);
+        if (box == null) return false;
+
+        _context.CustomBoxes.Remove(box);
+        await _context.SaveChangesAsync();
+        
+        return true;
+    }
+
+    private async Task ValidateMixMatchItemsAsync(List<CreateCustomBoxItemDTO> items)
+    {
+        var itemIds = items.Select(x => x.ItemId).ToList();
+        var itemEntities = await _context.Items.Where(x => itemIds.Contains(x.Id)).ToListAsync();
+        var itemMap = itemEntities.ToDictionary(x => x.Id, x => x);
+
+        int drinkCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.DRINK).Sum(i => i.Quantity);
+        int alcoholCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.ALCOHOL).Sum(i => i.Quantity);
+        int nutCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.NUT).Sum(i => i.Quantity);
+        int foodCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.FOOD).Sum(i => i.Quantity);
+        int snackCount = nutCount + foodCount;
+
+        var savoryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Khô gà lá chanh", "Khô bò", "Chà bông cá hồi", "Lạp xưởng tươi"
+        };
+
+        int savoryCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && savoryNames.Contains(itemMap[i.ItemId].Name)).Sum(i => i.Quantity);
+
+        bool hasChivas21 = items.Any(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Name.Contains("Chivas 21", StringComparison.OrdinalIgnoreCase));
+
+        if (drinkCount + alcoholCount < 1)
+        {
+            throw new InvalidOperationException("Mix & Match phải có ít nhất 1 sản phẩm nhóm đồ uống (Trà hoặc Rượu)");
+        }
+
+        if (snackCount < 2)
+        {
+            throw new InvalidOperationException("Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo)");
+        }
+
+        if (hasChivas21 && savoryCount > 1)
+        {
+            throw new InvalidOperationException("Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn");
+        }
     }
 }

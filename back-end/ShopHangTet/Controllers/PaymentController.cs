@@ -4,44 +4,39 @@ using ShopHangTet.DTOs;
 using ShopHangTet.Models;
 using System.Text.RegularExpressions;
 using System.Net;
-using System.Text.Json;
+using System.Globalization;
 
 namespace ShopHangTet.Controllers;
 
+/// Controller xử lý thanh toán qua SePay webhook
 [ApiController]
 [Route("api/[controller]")]
 public class PaymentController : ControllerBase
 {
-    private static readonly TimeSpan PaymentWindow = TimeSpan.FromMinutes(10);
-    private static readonly Regex OrderCodeRegex =
-        new(@"\bSHT\d{3,10}\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex OrderCodeRegex = new(@"SHT\d{6,14}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private readonly IOrderService _orderService;
     private readonly ILogger<PaymentController> _logger;
     private readonly IConfiguration _configuration;
 
-    public PaymentController(
-        IOrderService orderService,
-        ILogger<PaymentController> logger,
-        IConfiguration configuration)
+    public PaymentController(IOrderService orderService, ILogger<PaymentController> logger, IConfiguration configuration)
     {
         _orderService = orderService;
         _logger = logger;
         _configuration = configuration;
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // SEPAY WEBHOOK
-    // ════════════════════════════════════════════════════════════════════
-
+    /// URL cấu hình trên SePay Dashboard:
     [HttpPost("webhook")]
     [HttpPost("/hooks/sepay-payment")]
     public async Task<IActionResult> ReceiveWebhook([FromBody] SePayWebhookDto data)
     {
+        // Bảo mật: Kiểm tra SePay Webhook Token
         var configuredToken = GetConfigValue("SePay:WebhookToken", "SEPAY_WEBHOOK_TOKEN");
         if (!string.IsNullOrEmpty(configuredToken))
         {
             var authHeader = Request.Headers["Authorization"].ToString();
+            // Hỗ trợ cả "Apikey TOKEN" lẫn "Bearer TOKEN"
             var receivedToken = authHeader.StartsWith("Apikey ", StringComparison.OrdinalIgnoreCase)
                 ? authHeader[7..]
                 : authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)
@@ -50,24 +45,28 @@ public class PaymentController : ControllerBase
 
             if (!string.Equals(receivedToken.Trim(), configuredToken, StringComparison.Ordinal))
             {
-                _logger.LogWarning("SePay webhook rejected: invalid token from IP {IP}",
-                    HttpContext.Connection.RemoteIpAddress);
+                _logger.LogWarning("SePay webhook rejected: invalid token from IP {IP}", HttpContext.Connection.RemoteIpAddress);
                 return Ok(new { success = true, status = 200 });
             }
         }
 
         try
         {
-            _logger.LogInformation(
-                "SePay webhook received: Type={Type}, Amount={Amount}, Content={Content}",
+            _logger.LogInformation("SePay webhook received: TransferType={Type}, Amount={Amount}, Content={Content}",
                 data.TransferType, data.TransferAmount, data.Content);
 
+            // Additional debug info to help triage missed updates in production logs
+            _logger.LogInformation("SePay webhook raw: Id={Id}, Reference={Reference}, Gateway={Gateway}, Account={Account}",
+                data.Id, data.ReferenceCode, data.Gateway, data.AccountNumber);
+
+            // 1. Chỉ xử lý nếu là tiền vào
             if (!string.Equals(data.TransferType, "in", StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogInformation("Skipping non-incoming transfer: {Type}", data.TransferType);
                 return Ok(new { success = true, status = 200 });
             }
 
+            // 2. Ưu tiên lấy mã đơn từ field code; fallback parse từ content
             var orderCode = ExtractOrderCode(data);
             if (string.IsNullOrWhiteSpace(orderCode))
             {
@@ -75,62 +74,84 @@ public class PaymentController : ControllerBase
                 return Ok(new { success = true, status = 200 });
             }
 
-            _logger.LogInformation("Found order code: {Code}, Amount: {Amount}",
-                orderCode, data.TransferAmount);
+            _logger.LogInformation("Found order code: {OrderCode}, Amount: {Amount}", orderCode, data.TransferAmount);
 
-            var rawWebhookData = JsonSerializer.Serialize(data);
+            // 4. Gọi service xác nhận thanh toán và cập nhật trạng thái + trừ kho
+            DateTime? paymentDate = null;
+            if (!string.IsNullOrWhiteSpace(data.TransactionDate)
+                && DateTime.TryParse(data.TransactionDate, CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeLocal | DateTimeStyles.AdjustToUniversal, out var parsedPaymentDate))
+            {
+                paymentDate = parsedPaymentDate;
+            }
+
             var result = await _orderService.ConfirmPaymentAsync(
                 orderCode,
                 data.TransferAmount,
-                data.ReferenceCode,
-                data.Gateway,
-                rawWebhookData);
+                paymentMethod: "BANK_TRANSFER",
+                transactionReference: data.ReferenceCode,
+                paymentDate: paymentDate,
+                gateway: data.Gateway);
 
             if (result)
-                _logger.LogInformation("Payment confirmed for order: {Code}", orderCode);
+            {
+                _logger.LogInformation("Payment confirmed for order: {OrderCode}", orderCode);
+            }
             else
-                _logger.LogWarning("Payment confirmation failed for order: {Code}", orderCode);
+            {
+                _logger.LogWarning("Payment confirmation failed for order: {OrderCode} (not found, wrong status, or insufficient amount)", orderCode);
 
+                // Fetch current order snapshot to provide more context in logs
+                try
+                {
+                    var orderSnapshot = await _orderService.GetOrderByCodeAsync(orderCode);
+                    if (orderSnapshot == null)
+                    {
+                        _logger.LogWarning("ConfirmPayment: Order {OrderCode} not found in DB. Reference={Reference}, TransId={Id}",
+                            orderCode, data.ReferenceCode, data.Id);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("ConfirmPayment: Order {OrderCode} exists with Status={Status}, CreatedAt={CreatedAt}, TotalAmount={TotalAmount}. Reference={Reference}, TransId={Id}",
+                            orderCode, orderSnapshot.Status, orderSnapshot.CreatedAt, orderSnapshot.TotalAmount, data.ReferenceCode, data.Id);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to read order snapshot for {OrderCode} after ConfirmPayment failure", orderCode);
+                }
+            }
+
+            // Luôn trả về 200 để SePay dừng gửi lại
             return Ok(new { success = true, status = 200 });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing SePay webhook");
+            // Vẫn trả 200 để tránh SePay retry liên tục khi có lỗi nội bộ
             return Ok(new { success = true, status = 200 });
         }
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // TẠO QR
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Tạo QR SePay cho đơn hàng — trả về URL ảnh QR và thông tin bank
+    /// Tạo QR SePay cho đơn hàng với nội dung là mã đơn SHT... và số tiền chính xác.
     [HttpGet("create-qr/{orderCode}")]
     public async Task<IActionResult> CreateQr(string orderCode)
     {
         var order = await _orderService.GetOrderByCodeAsync(orderCode);
         if (order == null)
+        {
             return NotFound(ApiResponse<string>.ErrorResult("Order not found"));
-
-        if (order.Status != OrderStatus.PAYMENT_CONFIRMING)
-            return BadRequest(ApiResponse<string>.ErrorResult(
-                "Đơn hàng không ở trạng thái chờ thanh toán"));
+        }
 
         var bankAccount = GetConfigValue("SePay:BankAccountNumber", "SEPAY_BANK_ACCOUNT_NUMBER");
         var bankName = GetConfigValue("SePay:BankName", "SEPAY_BANK_NAME");
 
         if (string.IsNullOrWhiteSpace(bankAccount) || string.IsNullOrWhiteSpace(bankName))
-            return BadRequest(ApiResponse<string>.ErrorResult(
-                "Thiếu cấu hình SePay: SePay:BankAccountNumber hoặc SePay:BankName"));
+        {
+            return BadRequest(ApiResponse<string>.ErrorResult("Missing SePay bank config: SePay:BankAccountNumber hoặc SePay:BankName"));
+        }
 
-        var qrUrl =
-            $"https://qr.sepay.vn/img?acc={WebUtility.UrlEncode(bankAccount)}" +
-            $"&bank={WebUtility.UrlEncode(bankName)}" +
-            $"&amount={order.TotalAmount:0}" +
-            $"&des={WebUtility.UrlEncode(order.OrderCode)}";
-
-        var elapsed = DateTime.UtcNow - order.CreatedAt;
-        var secondsRemaining = Math.Max(0, (int)(PaymentWindow - elapsed).TotalSeconds);
+        var qrUrl = $"https://qr.sepay.vn/img?acc={WebUtility.UrlEncode(bankAccount)}&bank={WebUtility.UrlEncode(bankName)}&amount={order.TotalAmount:0}&des={WebUtility.UrlEncode(order.OrderCode)}";
 
         return Ok(ApiResponse<object>.SuccessResult(new
         {
@@ -138,17 +159,11 @@ public class PaymentController : ControllerBase
             amount = order.TotalAmount,
             bankAccount,
             bankName,
-            qrUrl,
-            secondsRemaining  // Frontend dùng để hiển thị countdown
+            qrUrl
         }, "Tạo QR thành công"));
     }
 
-    // ════════════════════════════════════════════════════════════════════
-    // POLLING TRẠNG THÁI THANH TOÁN
-    // ════════════════════════════════════════════════════════════════════
-
-    /// Frontend polling mỗi 3-5 giây để kiểm tra SePay đã xác nhận chưa
-    /// GET /api/payment/check-status/{orderCode}
+    /// API để Frontend polling mỗi 3 giây kiểm tra trạng thái thanh toán đơn hàng.
     [HttpGet("check-status/{orderCode}")]
     public async Task<IActionResult> CheckPaymentStatus(string orderCode)
     {
@@ -156,50 +171,47 @@ public class PaymentController : ControllerBase
         {
             var order = await _orderService.GetOrderByCodeAsync(orderCode);
             if (order == null)
+            {
                 return NotFound(ApiResponse<string>.ErrorResult("Order not found"));
-
-            var elapsed = DateTime.UtcNow - order.CreatedAt;
-            var secondsRemaining = order.Status == OrderStatus.PAYMENT_CONFIRMING
-                ? Math.Max(0, (int)(PaymentWindow - elapsed).TotalSeconds)
-                : 0;
+            }
 
             var response = new PaymentStatusResponseDto
             {
                 OrderCode = order.OrderCode,
                 Status = order.Status.ToString(),
-                StatusLabel = GetStatusLabel(order.Status),
                 TotalAmount = order.TotalAmount,
-                IsPaid = order.Status is OrderStatus.PREPARING
-                    or OrderStatus.SHIPPING
-                    or OrderStatus.COMPLETED,
-                SecondsRemaining = secondsRemaining
+                IsPaid = order.Status == OrderStatus.PREPARING
+                    || order.Status == OrderStatus.SHIPPING
+                    || order.Status == OrderStatus.COMPLETED
             };
 
             return Ok(ApiResponse<PaymentStatusResponseDto>.SuccessResult(response));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking payment status for order: {Code}", orderCode);
+            _logger.LogError(ex, "Error checking payment status for order: {OrderCode}", orderCode);
             return BadRequest(ApiResponse<string>.ErrorResult(ex.Message));
         }
     }
-
-    // ════════════════════════════════════════════════════════════════════
-    // HELPERS
-    // ════════════════════════════════════════════════════════════════════
 
     private static string? ExtractOrderCode(SePayWebhookDto data)
     {
         if (!string.IsNullOrWhiteSpace(data.Code))
         {
-            var m = OrderCodeRegex.Match(data.Code);
-            if (m.Success) return m.Value.ToUpper();
+            var matchFromCode = OrderCodeRegex.Match(data.Code);
+            if (matchFromCode.Success)
+            {
+                return matchFromCode.Value.ToUpper();
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(data.Content))
         {
-            var m = OrderCodeRegex.Match(data.Content);
-            if (m.Success) return m.Value.ToUpper();
+            var matchFromContent = OrderCodeRegex.Match(data.Content);
+            if (matchFromContent.Success)
+            {
+                return matchFromContent.Value.ToUpper();
+            }
         }
 
         return null;
@@ -208,20 +220,11 @@ public class PaymentController : ControllerBase
     private string? GetConfigValue(string key, string envKey)
     {
         var envValue = Environment.GetEnvironmentVariable(envKey);
-        if (!string.IsNullOrWhiteSpace(envValue)) return envValue;
+        if (!string.IsNullOrWhiteSpace(envValue))
+        {
+            return envValue;
+        }
+
         return _configuration[key];
     }
-
-    private static string GetStatusLabel(OrderStatus status) => status switch
-    {
-        OrderStatus.PAYMENT_CONFIRMING => "Đang xác nhận thanh toán",
-        OrderStatus.PREPARING => "Đang chuẩn bị",
-        OrderStatus.SHIPPING => "Đang được giao",
-        OrderStatus.PARTIAL_DELIVERY => "Đang được giao",
-        OrderStatus.DELIVERY_FAILED => "Đang được giao",
-        OrderStatus.PAYMENT_EXPIRED_INTERNAL => "Đang xác nhận thanh toán",
-        OrderStatus.COMPLETED => "Hoàn thành",
-        OrderStatus.CANCELLED => "Đã hủy",
-        _ => status.ToString()
-    };
 }

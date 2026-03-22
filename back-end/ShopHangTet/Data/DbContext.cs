@@ -69,9 +69,7 @@ namespace ShopHangTet.Data
         modelBuilder.Entity<Review>();
         modelBuilder.Entity<ChatSession>();
         modelBuilder.Entity<ChatMessage>();
-        modelBuilder.Entity<SystemConfig>()
-            .HasIndex(x => x.ConfigKey)
-            .IsUnique();
+        modelBuilder.Entity<SystemConfig>();
 
         // Owned collections for embedded items
         modelBuilder.Entity<GiftBox>().OwnsMany(x => x.Items);

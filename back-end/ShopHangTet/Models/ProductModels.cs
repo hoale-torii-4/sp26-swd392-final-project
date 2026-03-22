@@ -113,7 +113,7 @@ namespace ShopHangTet.Models
         public string Name { get; set; } = string.Empty;
 
         [BsonElement("category")]
-        public ItemCategory Category { get; set; } // Enum: DRINK, FOOD, NUT, ALCOHOL, SAVORY
+        public ItemCategory Category { get; set; } // Enum: DRINK, FOOD, NUT, ALCOHOL
 
         [BsonElement("price")]
         public decimal Price { get; set; }
