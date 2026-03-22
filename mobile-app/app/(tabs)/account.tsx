@@ -14,7 +14,7 @@ import { isInternalRole } from '../../types/auth';
 
 export default function AccountScreen() {
     const router = useRouter();
-    const { user, isAuthenticated, logout } = useAuth();
+    const { user, isAuthenticated, logout, siteMode, setSiteMode } = useAuth();
 
     const initials = user?.FullName?.charAt(0).toUpperCase() || 'U';
     const canSwitchSite = isInternalRole(user?.Role);
