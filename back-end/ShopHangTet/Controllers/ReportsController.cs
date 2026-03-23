@@ -9,13 +9,10 @@ public class ReportsController : ControllerBase
 {
     private readonly IReportService _service;
     private readonly ILogger<ReportsController> _logger;
-    private readonly ILogger<ReportsController> _logger;
 
-    public ReportsController(IReportService service, ILogger<ReportsController> logger)
     public ReportsController(IReportService service, ILogger<ReportsController> logger)
     {
         _service = service;
-        _logger = logger;
         _logger = logger;
     }
 
