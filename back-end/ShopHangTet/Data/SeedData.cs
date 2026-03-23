@@ -22,8 +22,6 @@ public static class SeedData
 
     private static async Task SeedItemsAsync(ShopHangTetDbContext context)
     {
-        if (await context.Items.AnyAsync()) return;
-
         var itemsWithImages = new (string Name, ItemCategory Category, decimal Price, int Stock, bool IsAlcohol, string Image)[]
         {
             // Nhóm hạt - dinh dưỡng (10 items)
@@ -100,34 +98,57 @@ public static class SeedData
             Images = new List<string> { x.Image }
         }).ToList();
 
-        await context.Items.AddRangeAsync(items);
+        var existingNames = await context.Items
+            .Select(x => x.Name)
+            .ToListAsync();
+
+        var existingNameSet = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+        var missingItems = items
+            .Where(x => !existingNameSet.Contains(x.Name))
+            .ToList();
+
+        if (missingItems.Count > 0)
+        {
+            await context.Items.AddRangeAsync(missingItems);
+        }
     }
 
     private static async Task SeedTagsAsync(ShopHangTetDbContext context)
     {
-        if (await context.Tags.AnyAsync()) return;
-
         var tags = new List<Tag>
         {
             new() { Name = "Gia đình", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Bạn bè", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Đối tác", Type = "RECIPIENT", IsActive = true },
+            new() { Name = "Doanh nghiệp", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Nhân viên", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Người lớn tuổi", Type = "RECIPIENT", IsActive = true },
             new() { Name = "Sum vầy", Type = "MEANING", IsActive = true },
             new() { Name = "Tri ân", Type = "MEANING", IsActive = true },
+            new() { Name = "Lời cảm ơn", Type = "MEANING", IsActive = true },
+            new() { Name = "Mừng năm mới", Type = "MEANING", IsActive = true },
             new() { Name = "Chúc sức khỏe", Type = "MEANING", IsActive = true },
             new() { Name = "Chúc tài lộc", Type = "MEANING", IsActive = true },
             new() { Name = "Chúc thành công", Type = "MEANING", IsActive = true }
         };
 
-        await context.Tags.AddRangeAsync(tags);
+        var existingNames = await context.Tags
+            .Select(x => x.Name)
+            .ToListAsync();
+
+        var existingNameSet = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+        var missingTags = tags
+            .Where(x => !existingNameSet.Contains(x.Name))
+            .ToList();
+
+        if (missingTags.Count > 0)
+        {
+            await context.Tags.AddRangeAsync(missingTags);
+        }
     }
 
     private static async Task SeedCollectionsAsync(ShopHangTetDbContext context)
     {
-        if (await context.Collections.AnyAsync()) return;
-
         var collections = new List<Collection>
         {
             new()
@@ -182,21 +203,33 @@ public static class SeedData
             }
         };
 
-        await context.Collections.AddRangeAsync(collections);
+        var existingNames = await context.Collections
+            .Select(x => x.Name)
+            .ToListAsync();
+
+        var existingNameSet = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+        var missingCollections = collections
+            .Where(x => !existingNameSet.Contains(x.Name))
+            .ToList();
+
+        if (missingCollections.Count > 0)
+        {
+            await context.Collections.AddRangeAsync(missingCollections);
+        }
     }
 
     private static async Task SeedGiftBoxesAsync(ShopHangTetDbContext context)
     {
         if (await context.GiftBoxes.AnyAsync()) return;
 
-        var items = await context.Items.ToDictionaryAsync(x => x.Name, x => x);
-        var tags = await context.Tags.ToDictionaryAsync(x => x.Name, x => x.Id);
-        var collectionDict = await context.Collections.ToDictionaryAsync(x => x.Name, x => x);
+        var items = await context.Items.ToDictionaryAsync(x => x.Name, x => x, StringComparer.OrdinalIgnoreCase);
+        var tags = await context.Tags.ToDictionaryAsync(x => x.Name, x => x.Id, StringComparer.OrdinalIgnoreCase);
+        var collectionDict = await context.Collections.ToDictionaryAsync(x => x.Name, x => x, StringComparer.OrdinalIgnoreCase);
 
         var boxes = new List<GiftBox>();
 
         // Helper to create gift box
-        GiftBox CreateBox(string name, string collectionName, string[] tagNames, (string Name, int Qty)[] boxItems, string imageUrl)
+        GiftBox? CreateBox(string name, string collectionName, string[] tagNames, (string Name, int Qty)[] boxItems, string imageUrl)
         {
             if (!collectionDict.TryGetValue(collectionName, out var collection))
             {
@@ -210,8 +243,18 @@ public static class SeedData
                 ItemPriceSnapshot = item?.Price ?? 0
             }).ToList();
 
+            if (itemEntries.Any(x => string.IsNullOrWhiteSpace(x.ItemId)))
+            {
+                return null;
+            }
+
             var totalItemCost = itemEntries.Sum(x => x.ItemPriceSnapshot * x.Quantity);
             var finalPrice = Math.Round(totalItemCost * collection.PricingMultiplier + collection.PackagingFee, 0);
+
+            var tagIds = tagNames
+                .Where(t => tags.ContainsKey(t))
+                .Select(t => tags[t])
+                .ToList();
 
             return new GiftBox
             {
@@ -226,171 +269,181 @@ public static class SeedData
             };
         }
 
+        void AddBox(string name, string collectionName, string[] tagNames, (string Name, int Qty)[] boxItems, string imageUrl)
+        {
+            var box = CreateBox(name, collectionName, tagNames, boxItems, imageUrl);
+            if (box != null)
+            {
+                boxes.Add(box);
+            }
+        }
+
         // 1️⃣ XUÂN ĐOÀN VIÊN (8 hộp)
-        boxes.Add(CreateBox("Gia Ấm", "Xuân Đoàn Viên", new[] { "Gia đình", "Sum vầy" },
+        AddBox("Gia Ấm", "Xuân Đoàn Viên", new[] { "Gia đình", "Sum vầy" },
             new[] { ("Hạt điều rang muối", 1), ("Mứt dừa", 1), ("Butter cookies", 1), ("Trà lài", 1) },
-            "https://i.ibb.co/cKpC8kTx/1-1.jpg"));
+            "https://i.ibb.co/cKpC8kTx/1-1.jpg");
 
-        boxes.Add(CreateBox("Trường Thọ", "Xuân Đoàn Viên", new[] { "Người lớn tuổi", "Chúc sức khỏe" },
+        AddBox("Trường Thọ", "Xuân Đoàn Viên", new[] { "Người lớn tuổi", "Chúc sức khỏe" },
             new[] { ("Táo đỏ", 1), ("Mứt gừng", 1), ("Trà sen Tây Hồ", 1), ("Bánh pía mini", 1) },
-            "https://i.ibb.co/pv2xVxJz/1-2.jpg"));
+            "https://i.ibb.co/pv2xVxJz/1-2.jpg");
 
-        boxes.Add(CreateBox("Sum Vầy", "Xuân Đoàn Viên", new[] { "Bạn bè", "Mừng năm mới" },
+        AddBox("Sum Vầy", "Xuân Đoàn Viên", new[] { "Bạn bè", "Mừng năm mới" },
             new[] { ("Hạt macca", 1), ("Kẹo tiramisu", 1), ("Nho khô", 1), ("Trà ô long", 1) },
-            "https://i.ibb.co/XZJxysF6/1-3.jpg"));
+            "https://i.ibb.co/XZJxysF6/1-3.jpg");
 
-        boxes.Add(CreateBox("Tri Ân", "Xuân Đoàn Viên", new[] { "Đối tác", "Tri ân" },
+        AddBox("Tri Ân", "Xuân Đoàn Viên", new[] { "Đối tác", "Tri ân" },
             new[] { ("Hạt hạnh nhân", 1), ("Socola Jinkeli", 1), ("Trà ô long", 1), ("Rượu Batise", 1) },
-            "https://i.ibb.co/TM6QwRvR/1-4.jpg"));
+            "https://i.ibb.co/TM6QwRvR/1-4.jpg");
 
-        boxes.Add(CreateBox("Đoàn Tụ", "Xuân Đoàn Viên", new[] { "Gia đình", "Mừng năm mới" },
+        AddBox("Đoàn Tụ", "Xuân Đoàn Viên", new[] { "Gia đình", "Mừng năm mới" },
             new[] { ("Hạt óc chó", 1), ("Mứt xoài", 1), ("Trà sen Tây Hồ", 1), ("Bánh quy bơ Đan Mạch", 1) },
-            "https://i.ibb.co/PsgNBz1z/1-5.jpg"));
+            "https://i.ibb.co/PsgNBz1z/1-5.jpg");
 
-        boxes.Add(CreateBox("Xuân Hòa", "Xuân Đoàn Viên", new[] { "Gia đình", "Sum vầy" },
+        AddBox("Xuân Hòa", "Xuân Đoàn Viên", new[] { "Gia đình", "Sum vầy" },
             new[] { ("Đậu phộng rang", 1), ("Mứt dứa", 1), ("Trà lài", 1), ("Butter cookies", 1) },
-            "https://i.ibb.co/Gf22BGwx/1-6.jpg"));
+            "https://i.ibb.co/Gf22BGwx/1-6.jpg");
 
-        boxes.Add(CreateBox("Ấm Tình", "Xuân Đoàn Viên", new[] { "Bạn bè", "Tri ân" },
+        AddBox("Ấm Tình", "Xuân Đoàn Viên", new[] { "Bạn bè", "Tri ân" },
             new[] { ("Hạt macca", 1), ("Socola Ferrero", 1), ("Trà ô long", 1), ("Nho khô", 1) },
-            "https://i.ibb.co/DHb9XYnN/1-7.jpg"));
+            "https://i.ibb.co/DHb9XYnN/1-7.jpg");
 
-        boxes.Add(CreateBox("Phúc Lộc", "Xuân Đoàn Viên", new[] { "Gia đình", "Chúc tài lộc" },
+        AddBox("Phúc Lộc", "Xuân Đoàn Viên", new[] { "Gia đình", "Chúc tài lộc" },
             new[] { ("Hạt điều rang muối", 1), ("Mứt gừng", 1), ("Trà thảo mộc", 1), ("Rượu vang đỏ", 1) },
-            "https://i.ibb.co/Pvfqm0S6/1-8.jpg"));
+            "https://i.ibb.co/Pvfqm0S6/1-8.jpg");
 
         // 2️⃣ CÁT TƯỜNG PHÚ QUÝ (9 hộp) - Pricing: 1.5x + 300000
-        boxes.Add(CreateBox("Doanh Gia", "Cát Tường Phú Quý", new[] { "Đối tác", "Chúc thành công" },
+        AddBox("Doanh Gia", "Cát Tường Phú Quý", new[] { "Đối tác", "Chúc thành công" },
             new[] { ("Rượu Chivas 12", 1), ("Hạt dẻ cười", 1), ("Socola Ferrero", 1), ("Trà ô long", 1) },
-            "https://i.ibb.co/Y7YfMD9b/2-1.jpg"));
+            "https://i.ibb.co/Y7YfMD9b/2-1.jpg");
 
-        boxes.Add(CreateBox("Thịnh Phát", "Cát Tường Phú Quý", new[] { "Doanh nghiệp", "Chúc tài lộc" },
+        AddBox("Thịnh Phát", "Cát Tường Phú Quý", new[] { "Doanh nghiệp", "Chúc tài lộc" },
             new[] { ("Rượu Chivas 21", 1), ("Hạt macca", 1), ("Hạt óc chó", 1), ("Trà sen Tây Hồ", 1) },
-            "https://i.ibb.co/99YK8kx5/2-2.jpg"));
+            "https://i.ibb.co/99YK8kx5/2-2.jpg");
 
-        boxes.Add(CreateBox("Tri Ân", "Cát Tường Phú Quý", new[] { "Nhân viên", "Tri ân" },
+        AddBox("Tri Ân", "Cát Tường Phú Quý", new[] { "Nhân viên", "Tri ân" },
             new[] { ("Rượu vang đỏ", 1), ("Bánh quy bơ Đan Mạch", 1), ("Mứt xoài", 1), ("Trà lài", 1) },
-            "https://i.ibb.co/BVCPRFdd/2-3.jpg"));
+            "https://i.ibb.co/BVCPRFdd/2-3.jpg");
 
-        boxes.Add(CreateBox("Cao Niên", "Cát Tường Phú Quý", new[] { "Người lớn tuổi", "Chúc sức khỏe" },
+        AddBox("Cao Niên", "Cát Tường Phú Quý", new[] { "Người lớn tuổi", "Chúc sức khỏe" },
             new[] { ("Táo đỏ", 1), ("Hạt óc chó", 1), ("Trà thảo mộc", 1), ("Mứt gừng", 1) },
-            "https://i.ibb.co/QvtdYXhB/2-4.jpg"));
+            "https://i.ibb.co/QvtdYXhB/2-4.jpg");
 
-        boxes.Add(CreateBox("Giao Hảo", "Cát Tường Phú Quý", new[] { "Bạn bè", "Mừng năm mới" },
+        AddBox("Giao Hảo", "Cát Tường Phú Quý", new[] { "Bạn bè", "Mừng năm mới" },
             new[] { ("Rượu vang đỏ", 1), ("Khô bò", 1), ("Hạt điều rang muối", 1), ("Socola Jinkeli", 1) },
-            "https://i.ibb.co/9kNDtD1S/2-5.jpg"));
+            "https://i.ibb.co/9kNDtD1S/2-5.jpg");
 
-        boxes.Add(CreateBox("Vượng Phát", "Cát Tường Phú Quý", new[] { "Đối tác", "Chúc tài lộc" },
+        AddBox("Vượng Phát", "Cát Tường Phú Quý", new[] { "Đối tác", "Chúc tài lộc" },
             new[] { ("Rượu Chivas 12", 1), ("Hạt óc chó", 1), ("Socola Ferrero", 1), ("Trà sen Tây Hồ", 1) },
-            "https://i.ibb.co/F4BdGyN2/2-6.jpg"));
+            "https://i.ibb.co/F4BdGyN2/2-6.jpg");
 
-        boxes.Add(CreateBox("Kim Ngọc", "Cát Tường Phú Quý", new[] { "Người lớn tuổi", "Mừng năm mới" },
+        AddBox("Kim Ngọc", "Cát Tường Phú Quý", new[] { "Người lớn tuổi", "Mừng năm mới" },
             new[] { ("Rượu vang đỏ", 1), ("Táo đỏ", 1), ("Hạt macca", 1), ("Trà thảo mộc", 1) },
-            "https://i.ibb.co/Rp4SGn4x/2-7.jpg"));
+            "https://i.ibb.co/Rp4SGn4x/2-7.jpg");
 
-        boxes.Add(CreateBox("Thành Công", "Cát Tường Phú Quý", new[] { "Doanh nghiệp", "Chúc thành công" },
+        AddBox("Thành Công", "Cát Tường Phú Quý", new[] { "Doanh nghiệp", "Chúc thành công" },
             new[] { ("Rượu Chivas 12", 1), ("Hạt dẻ cười", 1), ("Bánh quy bơ Đan Mạch", 1), ("Trà ô long", 1) },
-            "https://i.ibb.co/N68rdKzV/2-8.jpg"));
+            "https://i.ibb.co/N68rdKzV/2-8.jpg");
 
-        boxes.Add(CreateBox("Phúc Quý", "Cát Tường Phú Quý", new[] { "Nhân viên", "Chúc tài lộc" },
+        AddBox("Phúc Quý", "Cát Tường Phú Quý", new[] { "Nhân viên", "Chúc tài lộc" },
             new[] { ("Rượu vang đỏ", 1), ("Socola Jinkeli", 1), ("Hạt điều rang muối", 1), ("Trà lài", 1) },
-            "https://i.ibb.co/60t12LgR/2-9.jpg"));
+            "https://i.ibb.co/60t12LgR/2-9.jpg");
 
         // 3️⃣ LỘC XUÂN DOANH NGHIỆP (8 hộp)
-        boxes.Add(CreateBox("Tri Ân", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Lời cảm ơn" },
+        AddBox("Tri Ân", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Lời cảm ơn" },
             new[] { ("Butter cookies", 1), ("Hạt điều rang muối", 1), ("Mứt dứa", 1), ("Trà lài", 1) },
-            "https://i.ibb.co/0RznzxJY/3-1.jpg"));
+            "https://i.ibb.co/0RznzxJY/3-1.jpg");
 
-        boxes.Add(CreateBox("Đồng Hành", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc thành công" },
+        AddBox("Đồng Hành", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc thành công" },
             new[] { ("Rượu vang đỏ", 1), ("Hạt macca", 1), ("Trà ô long", 1), ("Socola Jinkeli", 1) },
-            "https://i.ibb.co/7zQ8Q8Q8/3-2.jpg"));
+            "https://i.ibb.co/7zQ8Q8Q8/3-2.jpg");
 
-        boxes.Add(CreateBox("Khởi Lộc", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc tài lộc" },
+        AddBox("Khởi Lộc", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc tài lộc" },
             new[] { ("Rượu Chivas 12", 1), ("Hạt dẻ cười", 1), ("Trà sen Tây Hồ", 1), ("Bánh quy bơ Đan Mạch", 1) },
-            "https://i.ibb.co/chPZw22Q/3-3.jpg"));
+            "https://i.ibb.co/chPZw22Q/3-3.jpg");
 
-        boxes.Add(CreateBox("Gắn Kết", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Lời cảm ơn" },
+        AddBox("Gắn Kết", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Lời cảm ơn" },
             new[] { ("Khô gà lá chanh", 1), ("Hạt điều rang muối", 1), ("Trà ô long", 1), ("Mứt xoài", 1) },
-            "https://i.ibb.co/67Yw0BGb/3-4.jpg"));
+            "https://i.ibb.co/67Yw0BGb/3-4.jpg");
 
-        boxes.Add(CreateBox("Đồng Tâm", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc thành công" },
+        AddBox("Đồng Tâm", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc thành công" },
             new[] { ("Butter cookies", 1), ("Hạt macca", 1), ("Mứt dứa", 1), ("Trà lài", 1) },
-            "https://i.ibb.co/S4QYH8kM/3-5.jpg"));
+            "https://i.ibb.co/S4QYH8kM/3-5.jpg");
 
-        boxes.Add(CreateBox("Hợp Tác", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc tài lộc" },
+        AddBox("Hợp Tác", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc tài lộc" },
             new[] { ("Rượu vang đỏ", 1), ("Hạt hạnh nhân", 1), ("Trà sen Tây Hồ", 1), ("Socola Ferrero", 1) },
-            "https://i.ibb.co/czyjFHb/3-6.jpg"));
+            "https://i.ibb.co/czyjFHb/3-6.jpg");
 
-        boxes.Add(CreateBox("Khai Xuân", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc thành công" },
+        AddBox("Khai Xuân", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Chúc thành công" },
             new[] { ("Rượu Chivas 12", 1), ("Hạt óc chó", 1), ("Trà ô long", 1), ("Bánh pía mini", 1) },
-            "https://i.ibb.co/fVf362bf/3-7.jpg"));
+            "https://i.ibb.co/fVf362bf/3-7.jpg");
 
-        boxes.Add(CreateBox("Bền Vững", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Lời cảm ơn" },
+        AddBox("Bền Vững", "Lộc Xuân Doanh Nghiệp", new[] { "Doanh nghiệp", "Lời cảm ơn" },
             new[] { ("Khô gà lá chanh", 1), ("Hạt điều rang muối", 1), ("Trà hoa quả", 1), ("Mứt xoài", 1) },
-            "https://i.ibb.co/RkH0RVyd/3-8.jpg"));
+            "https://i.ibb.co/RkH0RVyd/3-8.jpg");
 
         // 4️⃣ AN NHIÊN TÂN XUÂN (7 hộp)
-        boxes.Add(CreateBox("Trường Thọ", "An Nhiên Tân Xuân", new[] { "Gia đình", "Chúc sức khỏe" },
+        AddBox("Trường Thọ", "An Nhiên Tân Xuân", new[] { "Gia đình", "Chúc sức khỏe" },
             new[] { ("Táo đỏ", 1), ("Hạt óc chó", 1), ("Trà thảo mộc", 1), ("Chà bông cá hồi", 1) },
-            "https://i.ibb.co/DHHRtb0Q/4-1.jpg"));
+            "https://i.ibb.co/DHHRtb0Q/4-1.jpg");
 
-        boxes.Add(CreateBox("An Khang", "An Nhiên Tân Xuân", new[] { "Gia đình", "Chúc sức khỏe" },
+        AddBox("An Khang", "An Nhiên Tân Xuân", new[] { "Gia đình", "Chúc sức khỏe" },
             new[] { ("Hạt hạnh nhân", 1), ("Mứt dừa", 1), ("Trà sen Tây Hồ", 1), ("Mứt gừng", 1) },
-            "https://i.ibb.co/nq84TgLB/4-2.jpg"));
+            "https://i.ibb.co/nq84TgLB/4-2.jpg");
 
-        boxes.Add(CreateBox("Thanh Nhã", "An Nhiên Tân Xuân", new[] { "Gia đình", "Mừng năm mới" },
+        AddBox("Thanh Nhã", "An Nhiên Tân Xuân", new[] { "Gia đình", "Mừng năm mới" },
             new[] { ("Trà hoa quả", 1), ("Hạt điều rang muối", 1), ("Nho khô", 1), ("Bánh pía mini", 1) },
-            "https://i.ibb.co/N6FYBj2Z/4-3.jpg"));
+            "https://i.ibb.co/N6FYBj2Z/4-3.jpg");
 
-        boxes.Add(CreateBox("Bình An", "An Nhiên Tân Xuân", new[] { "Gia đình", "Chúc sức khỏe" },
+        AddBox("Bình An", "An Nhiên Tân Xuân", new[] { "Gia đình", "Chúc sức khỏe" },
             new[] { ("Táo đỏ", 1), ("Hạt óc chó", 1), ("Trà thảo mộc", 1), ("Mứt gừng", 1) },
-            "https://i.ibb.co/5wmcsry/4-4.jpg"));
+            "https://i.ibb.co/5wmcsry/4-4.jpg");
 
-        boxes.Add(CreateBox("Thiện Tâm", "An Nhiên Tân Xuân", new[] { "Gia đình", "Tri ân" },
+        AddBox("Thiện Tâm", "An Nhiên Tân Xuân", new[] { "Gia đình", "Tri ân" },
             new[] { ("Hạt hạnh nhân", 1), ("Mứt dừa", 1), ("Trà sen Tây Hồ", 1), ("Nho khô", 1) },
-            "https://i.ibb.co/d4X2WGBy/4-5.jpg"));
+            "https://i.ibb.co/d4X2WGBy/4-5.jpg");
 
-        boxes.Add(CreateBox("Tâm Giao", "An Nhiên Tân Xuân", new[] { "Gia đình", "Tri ân" },
+        AddBox("Tâm Giao", "An Nhiên Tân Xuân", new[] { "Gia đình", "Tri ân" },
             new[] { ("Trà hoa quả", 1), ("Hạt macca", 1), ("Bánh pía mini", 1), ("Mứt xoài", 1) },
-            "https://i.ibb.co/V07X9vRY/4-6.jpg"));
+            "https://i.ibb.co/V07X9vRY/4-6.jpg");
 
-        boxes.Add(CreateBox("An Lành", "An Nhiên Tân Xuân", new[] { "Gia đình", "Mừng năm mới" },
+        AddBox("An Lành", "An Nhiên Tân Xuân", new[] { "Gia đình", "Mừng năm mới" },
             new[] { ("Hạt dẻ cười", 1), ("Táo đỏ", 1), ("Trà thảo mộc", 1), ("Chà bông cá hồi", 1) },
-            "https://i.ibb.co/Dgjmfd3f/4-7.jpg"));
+            "https://i.ibb.co/Dgjmfd3f/4-7.jpg");
 
         // 5️⃣ XUÂN GẮN KẾT (8 hộp)
-        boxes.Add(CreateBox("Chia Sẻ", "Xuân Gắn Kết", new[] { "Gia đình", "Tri ân" },
+        AddBox("Chia Sẻ", "Xuân Gắn Kết", new[] { "Gia đình", "Tri ân" },
             new[] { ("Khô gà lá chanh", 1), ("Hạt điều rang muối", 1), ("Trà lài", 1), ("Mứt dứa", 1) },
-            "https://i.ibb.co/wvxj3F9/5-1.jpg"));
+            "https://i.ibb.co/wvxj3F9/5-1.jpg");
 
-        boxes.Add(CreateBox("Sum Họp", "Xuân Gắn Kết", new[] { "Gia đình", "Sum vầy" },
+        AddBox("Sum Họp", "Xuân Gắn Kết", new[] { "Gia đình", "Sum vầy" },
             new[] { ("Bánh quy bơ Đan Mạch", 1), ("Mứt xoài", 1), ("Trà ô long", 1), ("Hạt macca", 1) },
-            "https://i.ibb.co/BVCLgKFm/5-2.jpg"));
+            "https://i.ibb.co/BVCLgKFm/5-2.jpg");
 
-        boxes.Add(CreateBox("Tri Ân", "Xuân Gắn Kết", new[] { "Gia đình", "Tri ân" },
+        AddBox("Tri Ân", "Xuân Gắn Kết", new[] { "Gia đình", "Tri ân" },
             new[] { ("Rượu vang đỏ", 1), ("Socola Jinkeli", 1), ("Trà lài", 1), ("Hạt hạnh nhân", 1) },
-            "https://i.ibb.co/XrmZrQKL/5-3.jpg"));
+            "https://i.ibb.co/XrmZrQKL/5-3.jpg");
 
-        boxes.Add(CreateBox("Thân Giao", "Xuân Gắn Kết", new[] { "Gia đình", "Chúc thành công" },
+        AddBox("Thân Giao", "Xuân Gắn Kết", new[] { "Gia đình", "Chúc thành công" },
             new[] { ("Rượu Batise", 1), ("Hạt dẻ cười", 1), ("Trà ô long", 1), ("Khô bò", 1) },
-            "https://i.ibb.co/5XTvx7wK/5-4.jpg"));
+            "https://i.ibb.co/5XTvx7wK/5-4.jpg");
 
-        boxes.Add(CreateBox("Tâm Ý", "Xuân Gắn Kết", new[] { "Gia đình", "Mừng năm mới" },
+        AddBox("Tâm Ý", "Xuân Gắn Kết", new[] { "Gia đình", "Mừng năm mới" },
             new[] { ("Khô gà lá chanh", 1), ("Hạt điều rang muối", 1), ("Trà lài", 1), ("Mứt dứa", 1) },
-            "https://i.ibb.co/LhnCh193/5-5.jpg"));
+            "https://i.ibb.co/LhnCh193/5-5.jpg");
 
-        boxes.Add(CreateBox("Thân Ái", "Xuân Gắn Kết", new[] { "Gia đình", "Tri ân" },
+        AddBox("Thân Ái", "Xuân Gắn Kết", new[] { "Gia đình", "Tri ân" },
             new[] { ("Bánh quy bơ Đan Mạch", 1), ("Mứt xoài", 1), ("Trà ô long", 1), ("Hạt hạnh nhân", 1) },
-            "https://i.ibb.co/S4BcVGR9/5-6.jpg"));
+            "https://i.ibb.co/S4BcVGR9/5-6.jpg");
 
-        boxes.Add(CreateBox("Hòa Thuận", "Xuân Gắn Kết", new[] { "Gia đình", "Chúc tài lộc" },
+        AddBox("Hòa Thuận", "Xuân Gắn Kết", new[] { "Gia đình", "Chúc tài lộc" },
             new[] { ("Rượu Batise", 1), ("Hạt dẻ cười", 1), ("Socola Ferrero", 1), ("Trà sen Tây Hồ", 1) },
-            "https://i.ibb.co/JRD9pw6S/5-7.jpg"));
+            "https://i.ibb.co/JRD9pw6S/5-7.jpg");
 
-        boxes.Add(CreateBox("Gắn Bó", "Xuân Gắn Kết", new[] { "Gia đình", "Sum vầy" },
+        AddBox("Gắn Bó", "Xuân Gắn Kết", new[] { "Gia đình", "Sum vầy" },
             new[] { ("Khô bò", 1), ("Hạt macca", 1), ("Trà lài", 1), ("Nho khô", 1) },
-            "https://i.ibb.co/Fk0ft0d3/5-8.jpg"));
+            "https://i.ibb.co/Fk0ft0d3/5-8.jpg");
 
         await context.GiftBoxes.AddRangeAsync(boxes);
     }
 }
+

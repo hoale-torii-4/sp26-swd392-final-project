@@ -44,7 +44,7 @@ namespace ShopHangTet.Services
             return new OrderTrackingResult
             {
                 OrderCode = order.OrderCode,
-                Status = order.Status.ToString(),
+                Status = MapClientTrackingStatus(order.Status),
                 CreatedAt = order.CreatedAt,
                 DeliveryDate = order.DeliveryDate,
                 TotalAmount = order.TotalAmount,
@@ -207,13 +207,19 @@ namespace ShopHangTet.Services
         /// Lấy đơn hàng của user (profile)
         public async Task<List<MyOrderResponseDto>> GetMyOrdersAsync(string userId, int skip, int take)
         {
-            var userObjectId = ObjectId.Parse(userId);
+            if (!ObjectId.TryParse(userId, out var userObjectId))
+            {
+                throw new InvalidOperationException("Invalid user id.");
+            }
+
             var orders = await _context.Orders
                 .Where(o => o.UserId == userObjectId)
                 .OrderByDescending(o => o.CreatedAt)
                 .Skip(skip)
                 .Take(take)
                 .ToListAsync();
+
+            await PopulateOrderItemsForHistoryAsync(orders);
 
             return orders.Select(o => new MyOrderResponseDto
             {
@@ -224,8 +230,8 @@ namespace ShopHangTet.Services
                 TotalAmount = o.TotalAmount,
                 CreatedAt = o.CreatedAt,
                 DeliveryDate = o.DeliveryDate,
-                TotalItems = o.Items.Sum(i => i.Quantity),
-                Items = o.Items.Select(i => new MyOrderItemDto
+                TotalItems = (o.Items ?? new List<OrderItem>()).Sum(i => i.Quantity),
+                Items = (o.Items ?? new List<OrderItem>()).Select(i => new MyOrderItemDto
                 {
                     Name = i.ProductName,
                     Quantity = i.Quantity,
@@ -234,6 +240,316 @@ namespace ShopHangTet.Services
                     Type = i.Type
                 }).ToList()
             }).ToList();
+        }
+
+        private async Task PopulateOrderItemsForHistoryAsync(List<OrderModel> orders)
+        {
+            if (!orders.Any())
+            {
+                return;
+            }
+
+            var missingOrders = orders
+                .Where(o => o.Items == null || o.Items.Count == 0)
+                .ToList();
+
+            if (!missingOrders.Any())
+            {
+                return;
+            }
+
+            var orderIdSet = missingOrders
+                .Select(o => o.Id.ToString())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var orderItemsCollection = _ordersCollection.Database.GetCollection<BsonDocument>("OrderItems");
+            var orderIdStrings = orderIdSet.ToList();
+            var orderIdObjects = orderIdStrings
+                .Where(x => ObjectId.TryParse(x, out _))
+                .Select(ObjectId.Parse)
+                .ToList();
+
+            var fieldCandidates = new[]
+            {
+                "orderId",
+                "OrderId",
+                "orderModelId",
+                "OrderModelId",
+                "order_model_id",
+                "OrderModel_Id"
+            };
+
+            var orFilters = new List<FilterDefinition<BsonDocument>>();
+            foreach (var field in fieldCandidates)
+            {
+                orFilters.Add(Builders<BsonDocument>.Filter.In(field, orderIdStrings));
+                if (orderIdObjects.Count > 0)
+                {
+                    orFilters.Add(Builders<BsonDocument>.Filter.In(field, orderIdObjects));
+                }
+            }
+
+            var filter = orFilters.Count > 0
+                ? Builders<BsonDocument>.Filter.Or(orFilters)
+                : Builders<BsonDocument>.Filter.Empty;
+
+            var rawOrderItems = await orderItemsCollection
+                .Find(filter)
+                .ToListAsync();
+
+            if (!rawOrderItems.Any())
+            {
+                return;
+            }
+
+            var itemMapByOrderId = new Dictionary<string, List<OrderItem>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var raw in rawOrderItems)
+            {
+                var linkedOrderId = TryExtractOrderId(raw, orderIdSet);
+                if (linkedOrderId == null)
+                {
+                    continue;
+                }
+
+                var mapped = MapOrderItemFromDocument(raw);
+                if (mapped == null)
+                {
+                    continue;
+                }
+
+                if (!itemMapByOrderId.TryGetValue(linkedOrderId, out var list))
+                {
+                    list = new List<OrderItem>();
+                    itemMapByOrderId[linkedOrderId] = list;
+                }
+
+                list.Add(mapped);
+            }
+
+            foreach (var order in missingOrders)
+            {
+                if (itemMapByOrderId.TryGetValue(order.Id.ToString(), out var items) && items.Count > 0)
+                {
+                    order.Items = items;
+                }
+            }
+        }
+
+        private static string? TryExtractOrderId(BsonDocument raw, HashSet<string> knownOrderIds)
+        {
+            var fieldCandidates = new[]
+            {
+                "orderId",
+                "OrderId",
+                "orderModelId",
+                "OrderModelId",
+                "order_model_id",
+                "OrderModel_Id"
+            };
+
+            foreach (var field in fieldCandidates)
+            {
+                if (!raw.TryGetValue(field, out var value))
+                {
+                    continue;
+                }
+
+                var parsed = ReadObjectIdAsString(value);
+                if (!string.IsNullOrWhiteSpace(parsed) && knownOrderIds.Contains(parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return null;
+        }
+
+        private static OrderItem? MapOrderItemFromDocument(BsonDocument raw)
+        {
+            var mappedId = ReadObjectId(raw, "_id") ?? ObjectId.GenerateNewId();
+            var name = ReadString(raw, "productName", "ProductName", "name", "Name") ?? string.Empty;
+            var quantity = ReadInt(raw, "quantity", "Quantity");
+            var unitPrice = ReadDecimal(raw, "unitPrice", "UnitPrice", "price", "Price");
+            var totalPrice = ReadDecimal(raw, "totalPrice", "TotalPrice");
+
+            if (quantity <= 0)
+            {
+                return null;
+            }
+
+            if (totalPrice <= 0)
+            {
+                totalPrice = unitPrice * quantity;
+            }
+
+            return new OrderItem
+            {
+                Id = mappedId,
+                ProductName = name,
+                Type = ReadOrderItemType(raw, "type", "Type"),
+                Quantity = quantity,
+                UnitPrice = unitPrice,
+                TotalPrice = totalPrice,
+                GiftBoxId = ReadObjectId(raw, "giftBoxId", "GiftBoxId"),
+                CustomBoxId = ReadObjectId(raw, "customBoxId", "CustomBoxId")
+            };
+        }
+
+        private static string? ReadString(BsonDocument raw, params string[] fields)
+        {
+            foreach (var field in fields)
+            {
+                if (!raw.TryGetValue(field, out var value) || value.IsBsonNull)
+                {
+                    continue;
+                }
+
+                if (value.IsString)
+                {
+                    return value.AsString;
+                }
+
+                return value.ToString();
+            }
+
+            return null;
+        }
+
+        private static int ReadInt(BsonDocument raw, params string[] fields)
+        {
+            foreach (var field in fields)
+            {
+                if (!raw.TryGetValue(field, out var value) || value.IsBsonNull)
+                {
+                    continue;
+                }
+
+                if (value.IsInt32)
+                {
+                    return value.AsInt32;
+                }
+
+                if (value.IsInt64)
+                {
+                    return (int)value.AsInt64;
+                }
+
+                if (value.IsDouble)
+                {
+                    return (int)value.AsDouble;
+                }
+
+                if (int.TryParse(value.ToString(), out var parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return 0;
+        }
+
+        private static decimal ReadDecimal(BsonDocument raw, params string[] fields)
+        {
+            foreach (var field in fields)
+            {
+                if (!raw.TryGetValue(field, out var value) || value.IsBsonNull)
+                {
+                    continue;
+                }
+
+                if (value.IsDecimal128)
+                {
+                    return (decimal)value.AsDecimal128;
+                }
+
+                if (value.IsDouble)
+                {
+                    return (decimal)value.AsDouble;
+                }
+
+                if (value.IsInt32)
+                {
+                    return value.AsInt32;
+                }
+
+                if (value.IsInt64)
+                {
+                    return value.AsInt64;
+                }
+
+                if (decimal.TryParse(value.ToString(), out var parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return 0;
+        }
+
+        private static ObjectId? ReadObjectId(BsonDocument raw, params string[] fields)
+        {
+            foreach (var field in fields)
+            {
+                if (!raw.TryGetValue(field, out var value) || value.IsBsonNull)
+                {
+                    continue;
+                }
+
+                if (value.IsObjectId)
+                {
+                    return value.AsObjectId;
+                }
+
+                if (value.IsString && ObjectId.TryParse(value.AsString, out var parsedFromString))
+                {
+                    return parsedFromString;
+                }
+            }
+
+            return null;
+        }
+
+        private static string? ReadObjectIdAsString(BsonValue value)
+        {
+            if (value.IsObjectId)
+            {
+                return value.AsObjectId.ToString();
+            }
+
+            if (value.IsString && ObjectId.TryParse(value.AsString, out var parsedFromString))
+            {
+                return parsedFromString.ToString();
+            }
+
+            return null;
+        }
+
+        private static OrderItemType ReadOrderItemType(BsonDocument raw, params string[] fields)
+        {
+            foreach (var field in fields)
+            {
+                if (!raw.TryGetValue(field, out var value) || value.IsBsonNull)
+                {
+                    continue;
+                }
+
+                if (value.IsInt32)
+                {
+                    var intValue = value.AsInt32;
+                    if (Enum.IsDefined(typeof(OrderItemType), intValue))
+                    {
+                        return (OrderItemType)intValue;
+                    }
+                }
+
+                if (value.IsString && Enum.TryParse<OrderItemType>(value.AsString, true, out var parsed))
+                {
+                    return parsed;
+                }
+            }
+
+            return OrderItemType.READY_MADE;
         }
 
         /// Lấy tất cả đơn hàng cho Admin (có phân trang, filter)
@@ -364,7 +680,6 @@ namespace ShopHangTet.Services
                     await RestockOrderInventoryAsync(order, updatedBy);
                 }
                 }
-                }
             }
 
             order.Status = status;
@@ -376,7 +691,6 @@ namespace ShopHangTet.Services
                 Notes = notes ?? string.Empty
             });
             order.UpdatedAt = DateTime.UtcNow;
-
 
 
             await _context.SaveChangesAsync();
@@ -469,7 +783,6 @@ namespace ShopHangTet.Services
                 Status = OrderStatus.PREPARING,
                 Timestamp = DateTime.UtcNow,
                 UpdatedBy = "SePay-Webhook",
-                Notes = $"Thanh toán xác nhận tự động qua {noteGateway}. Số tiền: {amountPaid:N0} VND. Ref: {noteReference}"
                 Notes = $"Thanh toán xác nhận tự động qua {noteGateway}. Số tiền: {amountPaid:N0} VND. Ref: {noteReference}"
                 Notes = $"Thanh toán xác nhận tự động qua {noteGateway}. Số tiền: {amountPaid:N0} VND. Ref: {noteReference}"
             });
@@ -605,14 +918,11 @@ namespace ShopHangTet.Services
                 .ToListAsync();
                 .Where(d => d.OrderId == orderId)
                 .ToListAsync();
-                .Where(d => d.OrderId == orderId)
-                .ToListAsync();
 
             if (!deliveries.Any()) return OrderStatus.SHIPPING;
 
             var allCancelled = deliveries.All(d => d.Status == "CANCELLED");
             var allDelivered = deliveries.All(d => d.Status == "DELIVERED");
-            var anyFailed = deliveries.Any(d => d.Status == "FAILED");
             var anyFailed = deliveries.Any(d => d.Status == "FAILED");
             var anyFailed = deliveries.Any(d => d.Status == "FAILED");
             var anyDelivered = deliveries.Any(d => d.Status == "DELIVERED");
@@ -622,9 +932,7 @@ namespace ShopHangTet.Services
             if (allDelivered) return OrderStatus.COMPLETED;
             if (anyShipping) return OrderStatus.SHIPPING;
             if (anyShipping) return OrderStatus.SHIPPING;
-            if (anyShipping) return OrderStatus.SHIPPING;
             if (anyFailed && anyDelivered) return OrderStatus.PARTIAL_DELIVERY;
-            if (anyFailed) return OrderStatus.DELIVERY_FAILED;
             if (anyFailed) return OrderStatus.DELIVERY_FAILED;
             if (anyFailed) return OrderStatus.DELIVERY_FAILED;
             return OrderStatus.SHIPPING;
@@ -847,6 +1155,15 @@ namespace ShopHangTet.Services
         {
             var validator = new EmailAddressAttribute();
             return validator.IsValid(email);
+        }
+
+        private static string MapClientTrackingStatus(OrderStatus status)
+        {
+            return status switch
+            {
+                OrderStatus.PAYMENT_CONFIRMING => "PENDING_PAYMENT",
+                _ => status.ToString()
+            };
         }
 
         private bool IsValidStatusTransition(OrderStatus currentStatus, OrderStatus nextStatus)
@@ -1326,14 +1643,10 @@ namespace ShopHangTet.Services
                 result.IsValid = false;
             }
 
-            if (result.HasChivas21 && result.TotalItemCount > 4)
+            // Đồng bộ FE web: nếu có Chivas 21 thì chỉ được tối đa 1 món mặn.
+            if (result.HasChivas21 && result.SavoryCount > 1)
             {
-                result.Errors.Add("Nếu hộp có Chivas 21, tổng số item tối đa là 4");
-                result.IsValid = false;
-            }
-            else if (result.HasChivas12 && result.TotalItemCount > 5)
-            {
-                result.Errors.Add("Nếu hộp có Chivas 12, tổng số item tối đa là 5");
+                result.Errors.Add("Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn");
                 result.IsValid = false;
             }
 

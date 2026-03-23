@@ -689,8 +689,7 @@ namespace ShopHangTet.DTOs
             && (DrinkCount + AlcoholCount) >= 1
             && SnackCount >= 2
             && SavoryCount <= 2
-            && (!HasChivas21 || TotalItemCount <= 4)
-            && (!HasChivas12 || TotalItemCount <= 5);
+            && (!HasChivas21 || SavoryCount <= 1);
     }
 
     // ========== ORDER RESPONSE DTOs ==========
