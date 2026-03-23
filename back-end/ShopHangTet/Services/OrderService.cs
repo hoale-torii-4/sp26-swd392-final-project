@@ -679,7 +679,6 @@ namespace ShopHangTet.Services
                 {
                     await RestockOrderInventoryAsync(order, updatedBy);
                 }
-                }
             }
 
             order.Status = status;
@@ -783,7 +782,6 @@ namespace ShopHangTet.Services
                 Status = OrderStatus.PREPARING,
                 Timestamp = DateTime.UtcNow,
                 UpdatedBy = "SePay-Webhook",
-                Notes = $"Thanh toán xác nhận tự động qua {noteGateway}. Số tiền: {amountPaid:N0} VND. Ref: {noteReference}"
                 Notes = $"Thanh toán xác nhận tự động qua {noteGateway}. Số tiền: {amountPaid:N0} VND. Ref: {noteReference}"
             });
             order.UpdatedAt = DateTime.UtcNow;
@@ -916,14 +914,11 @@ namespace ShopHangTet.Services
             var deliveries = await _context.OrderDeliveries
                 .Where(d => d.OrderId == orderId)
                 .ToListAsync();
-                .Where(d => d.OrderId == orderId)
-                .ToListAsync();
 
             if (!deliveries.Any()) return OrderStatus.SHIPPING;
 
             var allCancelled = deliveries.All(d => d.Status == "CANCELLED");
             var allDelivered = deliveries.All(d => d.Status == "DELIVERED");
-            var anyFailed = deliveries.Any(d => d.Status == "FAILED");
             var anyFailed = deliveries.Any(d => d.Status == "FAILED");
             var anyDelivered = deliveries.Any(d => d.Status == "DELIVERED");
             var anyShipping = deliveries.Any(d => d.Status == "SHIPPING" || d.Status == "PENDING");
@@ -931,9 +926,7 @@ namespace ShopHangTet.Services
             if (allCancelled) return OrderStatus.CANCELLED;
             if (allDelivered) return OrderStatus.COMPLETED;
             if (anyShipping) return OrderStatus.SHIPPING;
-            if (anyShipping) return OrderStatus.SHIPPING;
             if (anyFailed && anyDelivered) return OrderStatus.PARTIAL_DELIVERY;
-            if (anyFailed) return OrderStatus.DELIVERY_FAILED;
             if (anyFailed) return OrderStatus.DELIVERY_FAILED;
             return OrderStatus.SHIPPING;
         }
