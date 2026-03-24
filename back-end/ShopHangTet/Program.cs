@@ -8,7 +8,6 @@ using ShopHangTet.Repositories;
 using ShopHangTet.Services;
 using System.Text;
 using System.Text.Json.Serialization;
-using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 

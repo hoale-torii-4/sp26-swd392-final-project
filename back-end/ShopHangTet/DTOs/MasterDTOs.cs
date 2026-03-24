@@ -682,14 +682,8 @@ namespace ShopHangTet.DTOs
         public int AlcoholCount { get; set; }
         public bool HasChivas12 { get; set; }
         public bool HasChivas21 { get; set; }
-        
-        public bool MeetsRules =>
-            TotalItemCount >= 4
-            && TotalItemCount <= 6
-            && (DrinkCount + AlcoholCount) >= 1
-            && SnackCount >= 2
-            && SavoryCount <= 2
-            && (!HasChivas21 || SavoryCount <= 1);
+
+        public bool MeetsRules => IsValid;
     }
 
     // ========== ORDER RESPONSE DTOs ==========
@@ -715,7 +709,11 @@ namespace ShopHangTet.DTOs
     {
         public string Id { get; set; } = string.Empty;
         public OrderItemType Type { get; set; }
+        public string? GiftBoxId { get; set; }
+        public string? CustomBoxId { get; set; }
         public string Name { get; set; } = string.Empty;
+        public string? Image { get; set; }
+        public int? StockQuantity { get; set; }
         public int Quantity { get; set; }
         public decimal UnitPrice { get; set; }
         public decimal TotalPrice { get; set; }
@@ -740,6 +738,7 @@ namespace ShopHangTet.DTOs
         public string ReceiverName { get; set; } = string.Empty;
         public string ReceiverPhone { get; set; } = string.Empty;
         public string FullAddress { get; set; } = string.Empty;
+        public string? DeliveryStatus { get; set; }
         public int Quantity { get; set; }
         public string? GreetingMessage { get; set; }
         public bool HideInvoice { get; set; }
@@ -1207,6 +1206,7 @@ namespace ShopHangTet.DTOs
         public string Id { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
         public string CollectionId { get; set; } = string.Empty;
         public string CollectionName { get; set; } = string.Empty;
         public string Type { get; set; } = string.Empty;

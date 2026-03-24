@@ -5,6 +5,7 @@ using MongoDB.Bson;
 using MongoDB.Driver;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 
 namespace ShopHangTet.Services
 {
@@ -41,6 +42,10 @@ namespace ShopHangTet.Services
                 return null;
             }
 
+            await PopulateOrderItemsForHistoryAsync(new List<OrderModel> { order });
+
+            var enrichedItems = await BuildOrderItemResponsesAsync(order.Items ?? new List<OrderItem>());
+
             return new OrderTrackingResult
             {
                 OrderCode = order.OrderCode,
@@ -48,15 +53,7 @@ namespace ShopHangTet.Services
                 CreatedAt = order.CreatedAt,
                 DeliveryDate = order.DeliveryDate,
                 TotalAmount = order.TotalAmount,
-                Items = order.Items.Select(i => new OrderItemResponseDto
-                {
-                    Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
-                    Type = i.Type,
-                    Name = i.ProductName,
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice,
-                    TotalPrice = i.TotalPrice
-                }).ToList(),
+                Items = enrichedItems,
                 StatusHistory = order.StatusHistory.Select(x => new OrderStatusHistoryDto
                 {
                     Status = x.Status,
@@ -94,6 +91,8 @@ namespace ShopHangTet.Services
                 }
             }
 
+            await PopulateOrderItemsForHistoryAsync(new List<OrderModel> { order });
+
             return await BuildOrderDetailDtoAsync(order);
         }
 
@@ -114,6 +113,8 @@ namespace ShopHangTet.Services
             {
                 return null;
             }
+
+            await PopulateOrderItemsForHistoryAsync(new List<OrderModel> { order });
 
             return await BuildOrderDetailDtoAsync(order);
         }
@@ -643,7 +644,7 @@ namespace ShopHangTet.Services
             };
         }
 
-        /// Cập nhật trạng thái đơn hàng và trừ kho khi chuyển sang PREPARING
+        /// Cập nhật trạng thái đơn hàng
         public async Task<OrderModel> UpdateStatusAsync(string orderId, Models.OrderStatus status, string updatedBy, string? notes = null)
         {
             var orderObjectId = ObjectId.Parse(orderId);
@@ -659,26 +660,10 @@ namespace ShopHangTet.Services
                 throw new InvalidOperationException("Invalid order status transition");
             }
 
-            // Inventory deduction only when transitioning to PREPARING
-            if (status == Models.OrderStatus.PREPARING && order.Status != Models.OrderStatus.PREPARING)
-            {
-                await DeductReservedInventoryAsync(order, updatedBy);
-            }
-
-            // Cancel flow:
-            // - PAYMENT_CONFIRMING: release reservation
-            // - PREPARING/SHIPPING/PARTIAL/FAILED: restock deducted inventory
+            // Cancel flow: stock đã bị trừ ngay khi tạo đơn, nên hủy là hoàn kho.
             if (status == Models.OrderStatus.CANCELLED)
             {
-                if (order.Status == Models.OrderStatus.PAYMENT_CONFIRMING
-                    || order.Status == Models.OrderStatus.PAYMENT_EXPIRED_INTERNAL)
-                {
-                    await ReleaseInventoryReservationAsync(order, updatedBy);
-                }
-                else
-                {
-                    await RestockOrderInventoryAsync(order, updatedBy);
-                }
+                await RestockOrderInventoryAsync(order, updatedBy);
             }
 
             order.Status = status;
@@ -738,13 +723,15 @@ namespace ShopHangTet.Services
                 _logger.LogWarning("ConfirmPayment: Order {OrderCode} exceeded payment window ({Minutes} minutes). CreatedAt={CreatedAt}",
                     orderCode, PaymentConfirmationWindow.TotalMinutes, order.CreatedAt);
 
-                order.Status = OrderStatus.PAYMENT_EXPIRED_INTERNAL;
+                await ReleaseInventoryReservationAsync(order, "SePay-Webhook");
+
+                order.Status = OrderStatus.CANCELLED;
                 order.StatusHistory.Add(new OrderStatusHistory
                 {
-                    Status = OrderStatus.PAYMENT_EXPIRED_INTERNAL,
+                    Status = OrderStatus.CANCELLED,
                     Timestamp = DateTime.UtcNow,
                     UpdatedBy = "SePay-Webhook",
-                    Notes = $"Hết thời gian xác nhận thanh toán ({PaymentConfirmationWindow.TotalMinutes} phút)"
+                    Notes = $"Hết thời gian xác nhận thanh toán ({PaymentConfirmationWindow.TotalMinutes} phút) - tự động hủy và hoàn kho"
                 });
                 order.UpdatedAt = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
@@ -757,9 +744,6 @@ namespace ShopHangTet.Services
                     orderCode, order.TotalAmount, amountPaid);
                 return false;
             }
-
-            // 1. Chuyển kho từ Reserved sang Deducted (xác nhận trừ)
-            await DeductReservedInventoryAsync(order, "SePay-Webhook");
 
             var normalizedMethod = string.IsNullOrWhiteSpace(paymentMethod) ? "SePay" : paymentMethod.Trim();
             var paidAt = paymentDate ?? DateTime.UtcNow;
@@ -806,42 +790,8 @@ namespace ShopHangTet.Services
             return $"SHT{timestamp}{random}";
         }
 
-        /// Reserve inventory khi tạo đơn hàng — tăng ReservedQuantity, chưa trừ StockQuantity
-        private async Task ReserveInventoryAsync(OrderModel order, string updatedBy)
-        {
-            foreach (var orderItem in order.Items)
-            {
-                if (orderItem.Type == OrderItemType.READY_MADE)
-                {
-                    if (orderItem.GiftBoxId == null) continue;
-                    var giftBoxId = orderItem.GiftBoxId.Value.ToString();
-                    var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == giftBoxId);
-                    if (giftBox == null) continue;
-
-                    foreach (var giftBoxItem in giftBox.Items)
-                    {
-                        var quantity = giftBoxItem.Quantity * orderItem.Quantity;
-                        await ReserveItemStockAsync(giftBoxItem.ItemId, quantity, order.Id.ToString(), updatedBy);
-                    }
-                }
-                else if (orderItem.Type == OrderItemType.MIX_MATCH)
-                {
-                    if (orderItem.CustomBoxId == null) continue;
-                    var customBoxId = orderItem.CustomBoxId.Value.ToString();
-                    var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == customBoxId);
-                    if (customBox == null) continue;
-
-                    foreach (var customItem in customBox.Items)
-                    {
-                        var quantity = customItem.Quantity * orderItem.Quantity;
-                        await ReserveItemStockAsync(customItem.ItemId, quantity, order.Id.ToString(), updatedBy);
-                    }
-                }
-            }
-        }
-
-        /// Chuyển từ Reserved sang Deducted khi thanh toán xác nhận / chuyển sang PREPARING
-        private async Task DeductReservedInventoryAsync(OrderModel order, string updatedBy)
+        /// Trừ kho theo toàn bộ item của order.
+        private async Task DeductOrderInventoryAsync(OrderModel order, string updatedBy)
         {
             foreach (var orderItem in order.Items)
             {
@@ -874,7 +824,7 @@ namespace ShopHangTet.Services
             }
         }
 
-        /// Release inventory khi đơn hàng bị cancel hoặc hết hạn thanh toán
+        /// Hoàn kho khi đơn hàng bị cancel hoặc hết hạn thanh toán
         public async Task ReleaseInventoryReservationAsync(OrderModel order, string updatedBy)
         {
             foreach (var orderItem in order.Items)
@@ -889,7 +839,7 @@ namespace ShopHangTet.Services
                     foreach (var giftBoxItem in giftBox.Items)
                     {
                         var quantity = giftBoxItem.Quantity * orderItem.Quantity;
-                        await ReleaseItemStockAsync(giftBoxItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                        await RestockItemStockAsync(giftBoxItem.ItemId, quantity, order.Id.ToString(), updatedBy);
                     }
                 }
                 else if (orderItem.Type == OrderItemType.MIX_MATCH)
@@ -902,7 +852,7 @@ namespace ShopHangTet.Services
                     foreach (var customItem in customBox.Items)
                     {
                         var quantity = customItem.Quantity * orderItem.Quantity;
-                        await ReleaseItemStockAsync(customItem.ItemId, quantity, order.Id.ToString(), updatedBy);
+                        await RestockItemStockAsync(customItem.ItemId, quantity, order.Id.ToString(), updatedBy);
                     }
                 }
             }
@@ -1002,6 +952,8 @@ namespace ShopHangTet.Services
 
         private async Task<OrderDto> BuildOrderDetailDtoAsync(OrderModel order)
         {
+            var enrichedItems = await BuildOrderItemResponsesAsync(order.Items ?? new List<OrderItem>());
+
             var result = new OrderDto
             {
                 Id = order.Id.ToString(),
@@ -1015,15 +967,7 @@ namespace ShopHangTet.Services
                 GreetingMessage = order.GreetingMessage,
                 GreetingCardUrl = order.GreetingCardUrl,
                 CreatedAt = order.CreatedAt,
-                Items = order.Items.Select(i => new OrderItemResponseDto
-                {
-                    Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
-                    Type = i.Type,
-                    Name = i.ProductName,
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice,
-                    TotalPrice = i.TotalPrice
-                }).ToList()
+                Items = enrichedItems
             };
 
             if (order.OrderType == OrderType.B2C && order.DeliveryAddress != null)
@@ -1034,6 +978,7 @@ namespace ShopHangTet.Services
                     ReceiverName = order.DeliveryAddress.RecipientName,
                     ReceiverPhone = order.DeliveryAddress.RecipientPhone,
                     FullAddress = order.DeliveryAddress.AddressLine,
+                    DeliveryStatus = order.Status.ToString(),
                     Quantity = order.DeliveryAddress.Quantity,
                     GreetingMessage = order.DeliveryAddress.GreetingMessage,
                     HideInvoice = order.DeliveryAddress.HideInvoice
@@ -1072,8 +1017,14 @@ namespace ShopHangTet.Services
                 .Where(a => addressIds.Contains(a.Id))
                 .ToListAsync();
             var addressMap = addresses.ToDictionary(a => a.Id, a => a);
+            var addressStatusMap = deliveries
+                .GroupBy(d => d.AddressId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => AggregateAddressDeliveryStatus(g.Select(x => x.Status)),
+                    StringComparer.OrdinalIgnoreCase);
 
-            var orderItemMap = order.Items.ToDictionary(i => i.Id.ToString(), i => i);
+            var orderItemMap = (order.Items ?? new List<OrderItem>()).ToDictionary(i => i.Id.ToString(), i => i);
             var addressQuantityMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var delivery in deliveries)
@@ -1135,6 +1086,9 @@ namespace ShopHangTet.Services
                     ReceiverName = address.ReceiverName,
                     ReceiverPhone = address.ReceiverPhone,
                     FullAddress = address.FullAddress,
+                    DeliveryStatus = addressStatusMap.TryGetValue(address.Id, out var deliveryStatus)
+                        ? deliveryStatus
+                        : "PENDING",
                     Quantity = addressQuantityMap.TryGetValue(address.Id, out var quantity) ? quantity : 0,
                     GreetingMessage = order.GreetingMessage,
                     HideInvoice = false
@@ -1142,6 +1096,127 @@ namespace ShopHangTet.Services
             }
 
             return result;
+        }
+
+        private async Task<List<OrderItemResponseDto>> BuildOrderItemResponsesAsync(List<OrderItem> orderItems)
+        {
+            if (!orderItems.Any())
+            {
+                return new List<OrderItemResponseDto>();
+            }
+
+            var giftBoxIds = orderItems
+                .Where(i => i.Type == OrderItemType.READY_MADE && i.GiftBoxId != null)
+                .Select(i => i.GiftBoxId!.Value.ToString())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var customBoxIds = orderItems
+                .Where(i => i.Type == OrderItemType.MIX_MATCH && i.CustomBoxId != null)
+                .Select(i => i.CustomBoxId!.Value.ToString())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var giftBoxes = giftBoxIds.Any()
+                ? await _context.GiftBoxes
+                    .Where(g => giftBoxIds.Contains(g.Id))
+                    .ToDictionaryAsync(g => g.Id, g => g)
+                : new Dictionary<string, GiftBox>(StringComparer.OrdinalIgnoreCase);
+
+            var customBoxes = customBoxIds.Any()
+                ? await _context.CustomBoxes
+                    .Where(c => customBoxIds.Contains(c.Id))
+                    .ToDictionaryAsync(c => c.Id, c => c)
+                : new Dictionary<string, CustomBox>(StringComparer.OrdinalIgnoreCase);
+
+            var requiredItemIds = giftBoxes.Values
+                .SelectMany(g => g.Items ?? new List<GiftBoxItem>())
+                .Select(x => x.ItemId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var itemMap = requiredItemIds.Any()
+                ? await _context.Items
+                    .Where(i => requiredItemIds.Contains(i.Id))
+                    .ToDictionaryAsync(i => i.Id, i => i)
+                : new Dictionary<string, Item>(StringComparer.OrdinalIgnoreCase);
+
+            return orderItems.Select(i =>
+            {
+                var giftBoxId = i.GiftBoxId?.ToString();
+                var customBoxId = i.CustomBoxId?.ToString();
+
+                giftBoxes.TryGetValue(giftBoxId ?? string.Empty, out var giftBox);
+                customBoxes.TryGetValue(customBoxId ?? string.Empty, out var customBox);
+
+                var resolvedName = !string.IsNullOrWhiteSpace(i.ProductName)
+                    ? i.ProductName
+                    : giftBox?.Name ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(resolvedName) && customBox != null)
+                {
+                    resolvedName = "Mix & Match Box";
+                }
+
+                return new OrderItemResponseDto
+                {
+                    Id = giftBoxId ?? customBoxId ?? i.Id.ToString(),
+                    Type = i.Type,
+                    GiftBoxId = giftBoxId,
+                    CustomBoxId = customBoxId,
+                    Name = resolvedName,
+                    Image = giftBox?.Images?.FirstOrDefault(),
+                    StockQuantity = giftBox != null ? CalculateGiftBoxStock(giftBox, itemMap) : null,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice,
+                    TotalPrice = i.TotalPrice
+                };
+            }).ToList();
+        }
+
+        private static int CalculateGiftBoxStock(GiftBox giftBox, Dictionary<string, Item> itemMap)
+        {
+            if (giftBox.Items == null || giftBox.Items.Count == 0)
+            {
+                return 0;
+            }
+
+            var minAvailable = int.MaxValue;
+
+            foreach (var giftItem in giftBox.Items)
+            {
+                if (giftItem.Quantity <= 0)
+                {
+                    continue;
+                }
+
+                if (!itemMap.TryGetValue(giftItem.ItemId, out var item))
+                {
+                    return 0;
+                }
+
+                var available = Math.Max(0, item.StockQuantity / giftItem.Quantity);
+                minAvailable = Math.Min(minAvailable, available);
+            }
+
+            return minAvailable == int.MaxValue ? 0 : minAvailable;
+        }
+
+        private static string AggregateAddressDeliveryStatus(IEnumerable<string> statuses)
+        {
+            var normalized = statuses
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim().ToUpperInvariant())
+                .ToList();
+
+            if (!normalized.Any()) return "PENDING";
+            if (normalized.All(x => x == "CANCELLED")) return "CANCELLED";
+            if (normalized.All(x => x == "DELIVERED")) return "DELIVERED";
+            if (normalized.Any(x => x == "SHIPPING" || x == "PENDING")) return "SHIPPING";
+            if (normalized.Any(x => x == "FAILED") && normalized.Any(x => x == "DELIVERED")) return "PARTIAL_DELIVERY";
+            if (normalized.Any(x => x == "FAILED")) return "FAILED";
+            return "PENDING";
         }
 
         private static bool IsValidEmail(string email)
@@ -1218,65 +1293,18 @@ namespace ShopHangTet.Services
             }).ToList();
         }
 
-        /// Reserve: tăng ReservedQuantity (chưa trừ StockQuantity)
-        private async Task ReserveItemStockAsync(string itemId, int quantity, string orderId, string updatedBy)
-        {
-            if (quantity <= 0) return;
-
-            // Atomic reserve: chỉ tăng ReservedQuantity nếu AvailableQuantity đủ
-            if (!ObjectId.TryParse(itemId, out var objectId))
-                throw new InvalidOperationException("Invalid item id format");
-
-            var filter = new BsonDocument
-            {
-                { "_id", objectId },
-                {
-                    "$expr",
-                    new BsonDocument("$gte", new BsonArray
-                    {
-                        new BsonDocument("$subtract", new BsonArray { "$stockQuantity", "$reservedQuantity" }),
-                        quantity
-                    })
-                }
-            };
-
-            var update = Builders<Item>.Update.Inc(x => x.ReservedQuantity, quantity);
-            var result = await _itemsCollection.UpdateOneAsync(filter, update);
-
-            if (result.ModifiedCount == 0)
-            {
-                var item = await _context.Items.FirstOrDefaultAsync(x => x.Id == itemId);
-                if (item == null)
-                    throw new InvalidOperationException("Item not found");
-
-                throw new InvalidOperationException(
-                    $"Không đủ tồn kho cho sản phẩm '{item.Name}'. Cần: {quantity}, Có sẵn: {item.AvailableQuantity}");
-            }
-
-            _context.InventoryLogs.Add(new InventoryLog
-            {
-                OrderId = orderId,
-                ItemId = itemId,
-                Quantity = -quantity,
-                Action = "RESERVE",
-                CreatedAt = DateTime.UtcNow
-            });
-        }
-
-        /// Deduct: trừ StockQuantity và giảm ReservedQuantity (khi confirm payment)
+        /// Deduct: trừ trực tiếp StockQuantity (khi đặt đơn)
         private async Task DeductItemStockAsync(string itemId, int quantity, string orderId, string updatedBy)
         {
             if (quantity <= 0) return;
 
-            // Atomic deduct: chỉ trừ khi đủ reserved và stock
+            // Atomic deduct: chỉ trừ khi đủ stock
             var filter = Builders<Item>.Filter.And(
                 Builders<Item>.Filter.Eq(x => x.Id, itemId),
-                Builders<Item>.Filter.Gte(x => x.ReservedQuantity, quantity),
                 Builders<Item>.Filter.Gte(x => x.StockQuantity, quantity));
 
             var update = Builders<Item>.Update
-                .Inc(x => x.StockQuantity, -quantity)
-                .Inc(x => x.ReservedQuantity, -quantity);
+                .Inc(x => x.StockQuantity, -quantity);
 
             var result = await _itemsCollection.UpdateOneAsync(filter, update);
             if (result.ModifiedCount == 0)
@@ -1290,29 +1318,6 @@ namespace ShopHangTet.Services
                 ItemId = itemId,
                 Quantity = -quantity,
                 Action = "DEDUCT",
-                CreatedAt = DateTime.UtcNow
-            });
-        }
-
-        /// Release: giảm ReservedQuantity (khi cancel/expire)
-        private async Task ReleaseItemStockAsync(string itemId, int quantity, string orderId, string updatedBy)
-        {
-            if (quantity <= 0) return;
-
-            // Atomic release: không cho ReservedQuantity âm
-            var filter = Builders<Item>.Filter.And(
-                Builders<Item>.Filter.Eq(x => x.Id, itemId),
-                Builders<Item>.Filter.Gte(x => x.ReservedQuantity, quantity));
-
-            var update = Builders<Item>.Update.Inc(x => x.ReservedQuantity, -quantity);
-            await _itemsCollection.UpdateOneAsync(filter, update);
-
-            _context.InventoryLogs.Add(new InventoryLog
-            {
-                OrderId = orderId,
-                ItemId = itemId,
-                Quantity = quantity, // Dương cho RELEASE
-                Action = "RELEASE",
                 CreatedAt = DateTime.UtcNow
             });
         }
@@ -1423,13 +1428,13 @@ namespace ShopHangTet.Services
                 Notes = "Đơn hàng được tạo - Đang xác nhận thanh toán"
             });
 
-            // Persist order first to ensure we have a stable order Id before reserving inventory.
+            // Persist order first to ensure we have a stable order Id for inventory logs.
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            // Reserve inventory after the order is saved to avoid ghost reservations if saving fails.
-            await ReserveInventoryAsync(order, "System-PlaceOrder");
-            // Persist inventory log entries added by ReserveInventoryAsync
+            // Deduct inventory immediately when order is placed.
+            await DeductOrderInventoryAsync(order, "System-PlaceOrder");
+            // Persist inventory log entries added by DeductOrderInventoryAsync
             await _context.SaveChangesAsync();
 
             _logger.LogInformation($"B2C Order created: {order.OrderCode}");
@@ -1495,12 +1500,12 @@ namespace ShopHangTet.Services
                 Notes = "Đơn hàng B2B được tạo - Đang xác nhận thanh toán"
             });
 
-            // Persist order first to ensure stable Id for reservations
+            // Persist order first to ensure stable Id for inventory logs
             _context.Orders.Add(order);
             await _context.SaveChangesAsync();
 
-            // Reserve inventory after order persisted to avoid ghost reservations
-            await ReserveInventoryAsync(order, "System-PlaceOrder");
+            // Deduct inventory immediately when order is placed.
+            await DeductOrderInventoryAsync(order, "System-PlaceOrder");
             await _context.SaveChangesAsync();
 
             // B2B: Tạo OrderDelivery và OrderDeliveryItem
@@ -1548,6 +1553,7 @@ namespace ShopHangTet.Services
         public async Task<MixMatchValidationResult> ValidateMixMatchRulesAsync(string customBoxId)
         {
             var result = new MixMatchValidationResult { IsValid = true };
+            var rules = await GetMixMatchRulesAsync();
 
             var customBox = await _context.CustomBoxes.FirstOrDefaultAsync(x => x.Id == customBoxId);
             if (customBox == null)
@@ -1596,42 +1602,27 @@ namespace ShopHangTet.Services
                 .Where(cbi => itemMap.ContainsKey(cbi.ItemId) && IsSavoryMixMatchItem(itemMap[cbi.ItemId]))
                 .Sum(cbi => cbi.Quantity);
 
-            result.HasChivas12 = customBox.Items.Any(cbi =>
-                itemMap.ContainsKey(cbi.ItemId)
-                && itemMap[cbi.ItemId].Name.Contains("Chivas 12", StringComparison.OrdinalIgnoreCase));
-
-            result.HasChivas21 = customBox.Items.Any(cbi =>
-                itemMap.ContainsKey(cbi.ItemId)
-                && itemMap[cbi.ItemId].Name.Contains("Chivas 21", StringComparison.OrdinalIgnoreCase));
-
-            if (result.TotalItemCount < 4 || result.TotalItemCount > 6)
+            if (result.TotalItemCount < rules.MinItems || result.TotalItemCount > rules.MaxItems)
             {
-                result.Errors.Add("Mix & Match phải có tổng từ 4 đến 6 món");
+                result.Errors.Add($"Mix & Match phải có tổng từ {rules.MinItems} đến {rules.MaxItems} món");
                 result.IsValid = false;
             }
 
-            if (result.DrinkCount + result.AlcoholCount < 1)
+            if (result.DrinkCount + result.AlcoholCount < rules.MinDrink)
             {
-                result.Errors.Add("Mix & Match phải có ít nhất 1 sản phẩm nhóm đồ uống (Trà hoặc Rượu)");
+                result.Errors.Add($"Mix & Match phải có ít nhất {rules.MinDrink} sản phẩm nhóm đồ uống (Trà hoặc Rượu)");
                 result.IsValid = false;
             }
 
-            if (result.SnackCount < 2)
+            if (result.SnackCount < rules.MinSnack)
             {
-                result.Errors.Add("Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo)");
+                result.Errors.Add($"Mix & Match phải có ít nhất {rules.MinSnack} sản phẩm nhóm snack (Hạt/Bánh/Kẹo)");
                 result.IsValid = false;
             }
 
-            if (result.SavoryCount > 2)
+            if (result.SavoryCount > rules.MaxSavory)
             {
-                result.Errors.Add("Nhóm đặc sản mặn được chọn tối đa 2 sản phẩm");
-                result.IsValid = false;
-            }
-
-            // Đồng bộ FE web: nếu có Chivas 21 thì chỉ được tối đa 1 món mặn.
-            if (result.HasChivas21 && result.SavoryCount > 1)
-            {
-                result.Errors.Add("Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn");
+                result.Errors.Add($"Nhóm đặc sản mặn được chọn tối đa {rules.MaxSavory} sản phẩm");
                 result.IsValid = false;
             }
 
@@ -1654,6 +1645,25 @@ namespace ShopHangTet.Services
             };
 
             return savoryNames.Contains(item.Name);
+        }
+
+        private async Task<MixMatchRuleDTO> GetMixMatchRulesAsync()
+        {
+            var cfg = await _context.SystemConfigs.FirstOrDefaultAsync();
+            if (cfg == null || string.IsNullOrWhiteSpace(cfg.EmailTemplate))
+            {
+                return new MixMatchRuleDTO();
+            }
+
+            try
+            {
+                var dto = JsonSerializer.Deserialize<MixMatchRuleDTO>(cfg.EmailTemplate);
+                return dto ?? new MixMatchRuleDTO();
+            }
+            catch
+            {
+                return new MixMatchRuleDTO();
+            }
         }
 
         //Validation methods

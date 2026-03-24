@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using ShopHangTet.Data;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
+using System.Text.Json;
 
 namespace ShopHangTet.Services;
 
@@ -18,10 +19,6 @@ public class MixMatchCustomerService : IMixMatchCustomerService
     {
         if (string.IsNullOrWhiteSpace(userId)) throw new ArgumentException("UserId is required");
         if (dto == null || dto.Items == null) throw new ArgumentException("Items are required");
-
-        var totalItems = dto.Items.Sum(x => x.Quantity);
-        if (totalItems < 4 || totalItems > 6)
-            throw new InvalidOperationException("Mix & Match phải có tổng từ 4 đến 6 món");
 
         await ValidateMixMatchItemsAsync(dto.Items);
 
@@ -127,10 +124,6 @@ public class MixMatchCustomerService : IMixMatchCustomerService
         var box = await _context.CustomBoxes.FirstOrDefaultAsync(cb => cb.Id == boxId && cb.UserId == userId);
         if (box == null) throw new InvalidOperationException("Custom box not found or access denied");
 
-        var totalItems = dto.Items.Sum(x => x.Quantity);
-        if (totalItems < 4 || totalItems > 6)
-            throw new InvalidOperationException("Mix & Match phải có tổng từ 4 đến 6 món");
-
         await ValidateMixMatchItemsAsync(dto.Items);
 
         var itemIds = dto.Items.Select(i => i.ItemId).Distinct().ToList();
@@ -171,9 +164,12 @@ public class MixMatchCustomerService : IMixMatchCustomerService
 
     private async Task ValidateMixMatchItemsAsync(List<CreateCustomBoxItemDTO> items)
     {
+        var rules = await GetMixMatchRulesAsync();
         var itemIds = items.Select(x => x.ItemId).ToList();
         var itemEntities = await _context.Items.Where(x => itemIds.Contains(x.Id)).ToListAsync();
         var itemMap = itemEntities.ToDictionary(x => x.Id, x => x);
+
+        int totalItems = items.Sum(i => i.Quantity);
 
         int drinkCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.DRINK).Sum(i => i.Quantity);
         int alcoholCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Category == ItemCategory.ALCOHOL).Sum(i => i.Quantity);
@@ -188,21 +184,43 @@ public class MixMatchCustomerService : IMixMatchCustomerService
 
         int savoryCount = items.Where(i => itemMap.ContainsKey(i.ItemId) && savoryNames.Contains(itemMap[i.ItemId].Name)).Sum(i => i.Quantity);
 
-        bool hasChivas21 = items.Any(i => itemMap.ContainsKey(i.ItemId) && itemMap[i.ItemId].Name.Contains("Chivas 21", StringComparison.OrdinalIgnoreCase));
-
-        if (drinkCount + alcoholCount < 1)
+        if (totalItems < rules.MinItems || totalItems > rules.MaxItems)
         {
-            throw new InvalidOperationException("Mix & Match phải có ít nhất 1 sản phẩm nhóm đồ uống (Trà hoặc Rượu)");
+            throw new InvalidOperationException($"Mix & Match phải có tổng từ {rules.MinItems} đến {rules.MaxItems} món");
         }
 
-        if (snackCount < 2)
+        if (drinkCount + alcoholCount < rules.MinDrink)
         {
-            throw new InvalidOperationException("Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo)");
+            throw new InvalidOperationException($"Mix & Match phải có ít nhất {rules.MinDrink} sản phẩm nhóm đồ uống (Trà hoặc Rượu)");
         }
 
-        if (hasChivas21 && savoryCount > 1)
+        if (snackCount < rules.MinSnack)
         {
-            throw new InvalidOperationException("Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn");
+            throw new InvalidOperationException($"Mix & Match phải có ít nhất {rules.MinSnack} sản phẩm nhóm snack (Hạt/Bánh/Kẹo)");
+        }
+
+        if (savoryCount > rules.MaxSavory)
+        {
+            throw new InvalidOperationException($"Nhóm đặc sản mặn được chọn tối đa {rules.MaxSavory} sản phẩm");
+        }
+    }
+
+    private async Task<MixMatchRuleDTO> GetMixMatchRulesAsync()
+    {
+        var cfg = await _context.SystemConfigs.FirstOrDefaultAsync();
+        if (cfg == null || string.IsNullOrWhiteSpace(cfg.EmailTemplate))
+        {
+            return new MixMatchRuleDTO();
+        }
+
+        try
+        {
+            var dto = JsonSerializer.Deserialize<MixMatchRuleDTO>(cfg.EmailTemplate);
+            return dto ?? new MixMatchRuleDTO();
+        }
+        catch
+        {
+            return new MixMatchRuleDTO();
         }
     }
 }
