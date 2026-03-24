@@ -8,17 +8,13 @@ using ShopHangTet.Repositories;
 using ShopHangTet.Services;
 using System.Text;
 using System.Text.Json.Serialization;
-using System.Text.Json.Serialization;
-
 var builder = WebApplication.CreateBuilder(args);
 
-// Lấy Connection String
+// Read Mongo connection string.
 var mongoConnectionString = builder.Configuration.GetConnectionString("MongoConnection")
     ?? throw new InvalidOperationException("MongoDB connection string is required. Set ConnectionStrings:MongoConnection in appsettings.json.");
 
-// Database name: ưu tiên Mongo:DatabaseName / MONGO_DATABASE_NAME,
-// nếu không có thì lấy từ connection string (mongodb://.../dbName).
-// Tránh fallback cứng vì rất dễ trỏ nhầm DB và API trả rỗng dù dữ liệu có tồn tại.
+// Resolve database name from config or connection string.
 var mongoDatabaseName = builder.Configuration["Mongo:DatabaseName"]
     ?? builder.Configuration["MONGO_DATABASE_NAME"]
     ?? MongoUrl.Create(mongoConnectionString).DatabaseName;
@@ -33,26 +29,26 @@ if (string.IsNullOrWhiteSpace(mongoDatabaseName))
 
 Console.WriteLine($"[Startup] Mongo database in use: {mongoDatabaseName}");
 
-//Thêm Controllers
+// Register controllers.
 builder.Services.AddControllers()
     .AddJsonOptions(options => {
-        options.JsonSerializerOptions.PropertyNamingPolicy = null; // Giữ nguyên tên thuộc tính như trong C#
+        options.JsonSerializerOptions.PropertyNamingPolicy = null; // Keep C# property names.
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-//Cấu hình OpenAPI .NET 9 với JWT Support
+// Register OpenAPI.
 builder.Services.AddOpenApi();
 
-//Memory Cache for OTP
+// Register memory cache for OTP.
 builder.Services.AddMemoryCache();
 
-//Cấu hình MongoDB với Entity Framework Core
+// Configure MongoDB EF provider.
 builder.Services.AddDbContext<ShopHangTetDbContext>(options =>
 {
     options.UseMongoDB(mongoConnectionString, mongoDatabaseName);
 });
 
-//Đăng ký MongoDB Driver (cho Repositories)
+// Register MongoDB driver.
 builder.Services.AddSingleton<IMongoClient>(sp =>
 {
     var settings = MongoClientSettings.FromConnectionString(mongoConnectionString);
@@ -66,7 +62,7 @@ builder.Services.AddScoped<IMongoDatabase>(sp =>
     return client.GetDatabase(mongoDatabaseName);
 });
 
-//Authentication & Authorization với JWT
+// Configure JWT authentication.
 var jwtSecretKey = builder.Configuration["Jwt:SecretKey"] 
     ?? throw new InvalidOperationException("JWT SecretKey is required. Please configure Jwt:SecretKey in appsettings.json or environment variables.");
 var key = Encoding.UTF8.GetBytes(jwtSecretKey);

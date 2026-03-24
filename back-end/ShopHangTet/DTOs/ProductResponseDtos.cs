@@ -59,6 +59,7 @@ namespace ShopHangTet.DTOs
         public string Name { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public decimal Price { get; set; }
+        public int StockQuantity { get; set; }
         public string? Image { get; set; }
         public string Collection { get; set; } = string.Empty;
         public List<string> Tags { get; set; } = new();

@@ -61,9 +61,9 @@ namespace ShopHangTet.Controllers
             return Ok(collection);
         }
 
-        // === ADMIN: GiftBox CRUD với auto pricing ===
+        // Admin GiftBox CRUD with auto pricing.
 
-        /// Tạo GiftBox mới — Price tự tính từ collection pricing rule
+        /// Create GiftBox with calculated price.
         [HttpPost("gift-boxes")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> CreateGiftBox([FromBody] CreateGiftBoxDto dto)
@@ -85,7 +85,7 @@ namespace ShopHangTet.Controllers
             }
         }
 
-        /// Cập nhật GiftBox — Price tự tính lại nếu items thay đổi
+        /// Update GiftBox and recalculate price when needed.
         [HttpPut("gift-boxes/{id}")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> UpdateGiftBox(string id, [FromBody] UpdateGiftBoxDto dto)
@@ -107,7 +107,7 @@ namespace ShopHangTet.Controllers
             }
         }
 
-        /// Tính giá dự kiến cho GiftBox (preview, không lưu)
+        /// Preview GiftBox price without saving.
         [HttpPost("gift-boxes/calculate-price")]
         [Authorize(Roles = "ADMIN")]
         public async Task<IActionResult> CalculateGiftBoxPrice([FromBody] CalculateGiftBoxPriceDto dto)

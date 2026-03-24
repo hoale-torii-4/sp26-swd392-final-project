@@ -41,6 +41,10 @@ namespace ShopHangTet.Services
                 return null;
             }
 
+            await PopulateOrderItemsForHistoryAsync(new List<OrderModel> { order });
+
+            var enrichedItems = await BuildOrderItemResponsesAsync(order.Items ?? new List<OrderItem>());
+
             return new OrderTrackingResult
             {
                 OrderCode = order.OrderCode,
@@ -48,15 +52,7 @@ namespace ShopHangTet.Services
                 CreatedAt = order.CreatedAt,
                 DeliveryDate = order.DeliveryDate,
                 TotalAmount = order.TotalAmount,
-                Items = order.Items.Select(i => new OrderItemResponseDto
-                {
-                    Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
-                    Type = i.Type,
-                    Name = i.ProductName,
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice,
-                    TotalPrice = i.TotalPrice
-                }).ToList(),
+                Items = enrichedItems,
                 StatusHistory = order.StatusHistory.Select(x => new OrderStatusHistoryDto
                 {
                     Status = x.Status,
@@ -94,6 +90,8 @@ namespace ShopHangTet.Services
                 }
             }
 
+            await PopulateOrderItemsForHistoryAsync(new List<OrderModel> { order });
+
             return await BuildOrderDetailDtoAsync(order);
         }
 
@@ -114,6 +112,8 @@ namespace ShopHangTet.Services
             {
                 return null;
             }
+
+            await PopulateOrderItemsForHistoryAsync(new List<OrderModel> { order });
 
             return await BuildOrderDetailDtoAsync(order);
         }
@@ -1002,6 +1002,8 @@ namespace ShopHangTet.Services
 
         private async Task<OrderDto> BuildOrderDetailDtoAsync(OrderModel order)
         {
+            var enrichedItems = await BuildOrderItemResponsesAsync(order.Items ?? new List<OrderItem>());
+
             var result = new OrderDto
             {
                 Id = order.Id.ToString(),
@@ -1015,15 +1017,7 @@ namespace ShopHangTet.Services
                 GreetingMessage = order.GreetingMessage,
                 GreetingCardUrl = order.GreetingCardUrl,
                 CreatedAt = order.CreatedAt,
-                Items = order.Items.Select(i => new OrderItemResponseDto
-                {
-                    Id = i.GiftBoxId?.ToString() ?? i.CustomBoxId?.ToString() ?? string.Empty,
-                    Type = i.Type,
-                    Name = i.ProductName,
-                    Quantity = i.Quantity,
-                    UnitPrice = i.UnitPrice,
-                    TotalPrice = i.TotalPrice
-                }).ToList()
+                Items = enrichedItems
             };
 
             if (order.OrderType == OrderType.B2C && order.DeliveryAddress != null)
@@ -1034,6 +1028,7 @@ namespace ShopHangTet.Services
                     ReceiverName = order.DeliveryAddress.RecipientName,
                     ReceiverPhone = order.DeliveryAddress.RecipientPhone,
                     FullAddress = order.DeliveryAddress.AddressLine,
+                    DeliveryStatus = order.Status.ToString(),
                     Quantity = order.DeliveryAddress.Quantity,
                     GreetingMessage = order.DeliveryAddress.GreetingMessage,
                     HideInvoice = order.DeliveryAddress.HideInvoice
@@ -1072,8 +1067,14 @@ namespace ShopHangTet.Services
                 .Where(a => addressIds.Contains(a.Id))
                 .ToListAsync();
             var addressMap = addresses.ToDictionary(a => a.Id, a => a);
+            var addressStatusMap = deliveries
+                .GroupBy(d => d.AddressId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => AggregateAddressDeliveryStatus(g.Select(x => x.Status)),
+                    StringComparer.OrdinalIgnoreCase);
 
-            var orderItemMap = order.Items.ToDictionary(i => i.Id.ToString(), i => i);
+            var orderItemMap = (order.Items ?? new List<OrderItem>()).ToDictionary(i => i.Id.ToString(), i => i);
             var addressQuantityMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var delivery in deliveries)
@@ -1135,6 +1136,9 @@ namespace ShopHangTet.Services
                     ReceiverName = address.ReceiverName,
                     ReceiverPhone = address.ReceiverPhone,
                     FullAddress = address.FullAddress,
+                    DeliveryStatus = addressStatusMap.TryGetValue(address.Id, out var deliveryStatus)
+                        ? deliveryStatus
+                        : "PENDING",
                     Quantity = addressQuantityMap.TryGetValue(address.Id, out var quantity) ? quantity : 0,
                     GreetingMessage = order.GreetingMessage,
                     HideInvoice = false
@@ -1142,6 +1146,127 @@ namespace ShopHangTet.Services
             }
 
             return result;
+        }
+
+        private async Task<List<OrderItemResponseDto>> BuildOrderItemResponsesAsync(List<OrderItem> orderItems)
+        {
+            if (!orderItems.Any())
+            {
+                return new List<OrderItemResponseDto>();
+            }
+
+            var giftBoxIds = orderItems
+                .Where(i => i.Type == OrderItemType.READY_MADE && i.GiftBoxId != null)
+                .Select(i => i.GiftBoxId!.Value.ToString())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var customBoxIds = orderItems
+                .Where(i => i.Type == OrderItemType.MIX_MATCH && i.CustomBoxId != null)
+                .Select(i => i.CustomBoxId!.Value.ToString())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var giftBoxes = giftBoxIds.Any()
+                ? await _context.GiftBoxes
+                    .Where(g => giftBoxIds.Contains(g.Id))
+                    .ToDictionaryAsync(g => g.Id, g => g)
+                : new Dictionary<string, GiftBox>(StringComparer.OrdinalIgnoreCase);
+
+            var customBoxes = customBoxIds.Any()
+                ? await _context.CustomBoxes
+                    .Where(c => customBoxIds.Contains(c.Id))
+                    .ToDictionaryAsync(c => c.Id, c => c)
+                : new Dictionary<string, CustomBox>(StringComparer.OrdinalIgnoreCase);
+
+            var requiredItemIds = giftBoxes.Values
+                .SelectMany(g => g.Items ?? new List<GiftBoxItem>())
+                .Select(x => x.ItemId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var itemMap = requiredItemIds.Any()
+                ? await _context.Items
+                    .Where(i => requiredItemIds.Contains(i.Id))
+                    .ToDictionaryAsync(i => i.Id, i => i)
+                : new Dictionary<string, Item>(StringComparer.OrdinalIgnoreCase);
+
+            return orderItems.Select(i =>
+            {
+                var giftBoxId = i.GiftBoxId?.ToString();
+                var customBoxId = i.CustomBoxId?.ToString();
+
+                giftBoxes.TryGetValue(giftBoxId ?? string.Empty, out var giftBox);
+                customBoxes.TryGetValue(customBoxId ?? string.Empty, out var customBox);
+
+                var resolvedName = !string.IsNullOrWhiteSpace(i.ProductName)
+                    ? i.ProductName
+                    : giftBox?.Name ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(resolvedName) && customBox != null)
+                {
+                    resolvedName = "Mix & Match Box";
+                }
+
+                return new OrderItemResponseDto
+                {
+                    Id = giftBoxId ?? customBoxId ?? i.Id.ToString(),
+                    Type = i.Type,
+                    GiftBoxId = giftBoxId,
+                    CustomBoxId = customBoxId,
+                    Name = resolvedName,
+                    Image = giftBox?.Images?.FirstOrDefault(),
+                    StockQuantity = giftBox != null ? CalculateGiftBoxStock(giftBox, itemMap) : null,
+                    Quantity = i.Quantity,
+                    UnitPrice = i.UnitPrice,
+                    TotalPrice = i.TotalPrice
+                };
+            }).ToList();
+        }
+
+        private static int CalculateGiftBoxStock(GiftBox giftBox, Dictionary<string, Item> itemMap)
+        {
+            if (giftBox.Items == null || giftBox.Items.Count == 0)
+            {
+                return 0;
+            }
+
+            var minAvailable = int.MaxValue;
+
+            foreach (var giftItem in giftBox.Items)
+            {
+                if (giftItem.Quantity <= 0)
+                {
+                    continue;
+                }
+
+                if (!itemMap.TryGetValue(giftItem.ItemId, out var item))
+                {
+                    return 0;
+                }
+
+                var available = Math.Max(0, item.AvailableQuantity / giftItem.Quantity);
+                minAvailable = Math.Min(minAvailable, available);
+            }
+
+            return minAvailable == int.MaxValue ? 0 : minAvailable;
+        }
+
+        private static string AggregateAddressDeliveryStatus(IEnumerable<string> statuses)
+        {
+            var normalized = statuses
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim().ToUpperInvariant())
+                .ToList();
+
+            if (!normalized.Any()) return "PENDING";
+            if (normalized.All(x => x == "CANCELLED")) return "CANCELLED";
+            if (normalized.All(x => x == "DELIVERED")) return "DELIVERED";
+            if (normalized.Any(x => x == "SHIPPING" || x == "PENDING")) return "SHIPPING";
+            if (normalized.Any(x => x == "FAILED") && normalized.Any(x => x == "DELIVERED")) return "PARTIAL_DELIVERY";
+            if (normalized.Any(x => x == "FAILED")) return "FAILED";
+            return "PENDING";
         }
 
         private static bool IsValidEmail(string email)
