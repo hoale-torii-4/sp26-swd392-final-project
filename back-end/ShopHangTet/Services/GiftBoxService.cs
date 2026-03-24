@@ -33,6 +33,34 @@ namespace ShopHangTet.Services
             return builder.ToString().Normalize(NormalizationForm.FormC).ToLowerInvariant();
         }
 
+        private static int CalculateGiftBoxAvailableStock(GiftBox giftBox, Dictionary<string, Item> itemMap)
+        {
+            if (giftBox.Items == null || giftBox.Items.Count == 0)
+            {
+                return 0;
+            }
+
+            var minAvailable = int.MaxValue;
+
+            foreach (var giftItem in giftBox.Items)
+            {
+                if (giftItem.Quantity <= 0)
+                {
+                    continue;
+                }
+
+                if (!itemMap.TryGetValue(giftItem.ItemId, out var item))
+                {
+                    return 0;
+                }
+
+                var available = Math.Max(0, item.AvailableQuantity / giftItem.Quantity);
+                minAvailable = Math.Min(minAvailable, available);
+            }
+
+            return minAvailable == int.MaxValue ? 0 : minAvailable;
+        }
+
         public async Task<PagedResult<GiftBoxListResponseDTO>> GetGiftBoxesAsync(string? collectionId, string? keyword, bool? status, int page, int pageSize)
         {
             var query = _context.GiftBoxes.AsQueryable();
@@ -68,11 +96,22 @@ namespace ShopHangTet.Services
             var allTagIds = items.SelectMany(i => i.Tags ?? new List<string>()).Distinct().ToList();
             var tags = await _context.Tags.Where(t => allTagIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id, t => t.Name);
 
+            var itemIds = items
+                .SelectMany(g => g.Items ?? new List<GiftBoxItem>())
+                .Select(x => x.ItemId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+            var itemMap = itemIds.Any()
+                ? await _context.Items.Where(i => itemIds.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i)
+                : new Dictionary<string, Item>();
+
             var resultItems = items.Select(g => new GiftBoxListResponseDTO
             {
                 Id = g.Id,
                 Name = g.Name,
                 Price = g.Price,
+                StockQuantity = CalculateGiftBoxAvailableStock(g, itemMap),
                 CollectionId = g.CollectionId,
                 CollectionName = collections.ContainsKey(g.CollectionId) ? collections[g.CollectionId] : string.Empty,
                 Type = "READY_MADE",
@@ -251,7 +290,7 @@ namespace ShopHangTet.Services
         {
             return await _context.Items
                 .OrderBy(i => i.Name)
-                .Select(i => new SimpleItemDTO { Id = i.Id, Name = i.Name, Category = i.Category.ToString(), Price = i.Price, StockQuantity = i.StockQuantity })
+                .Select(i => new SimpleItemDTO { Id = i.Id, Name = i.Name, Category = i.Category.ToString(), Price = i.Price, StockQuantity = i.StockQuantity - i.ReservedQuantity })
                 .ToListAsync();
         }
 

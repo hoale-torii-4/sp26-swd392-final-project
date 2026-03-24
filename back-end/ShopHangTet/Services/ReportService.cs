@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using ShopHangTet.DTOs;
 using ShopHangTet.Models;
@@ -13,6 +14,7 @@ public class ReportService : IReportService
     private readonly IMongoCollection<Collection> _collectionsCol;
     private readonly IMongoCollection<Review> _reviewsCol;
     private readonly IMongoCollection<Item> _itemsCol;
+    private readonly IMongoCollection<BsonDocument> _orderItemsCol;
 
     public ReportService(ILogger<ReportService> logger, IMongoDatabase mongoDatabase)
     {
@@ -22,6 +24,7 @@ public class ReportService : IReportService
         _collectionsCol = mongoDatabase.GetCollection<Collection>("Collections");
         _reviewsCol = mongoDatabase.GetCollection<Review>("Reviews");
         _itemsCol = mongoDatabase.GetCollection<Item>("Items");
+        _orderItemsCol = mongoDatabase.GetCollection<BsonDocument>("OrderItems");
     }
 
     public async Task<DashboardReportDTO> GetDashboardAsync()
@@ -377,13 +380,167 @@ public class ReportService : IReportService
     {
         try
         {
-            return await _ordersCol.Find(Builders<OrderModel>.Filter.Empty).ToListAsync();
+            var orders = await _ordersCol.Find(Builders<OrderModel>.Filter.Empty).ToListAsync();
+            await PopulateOrderItemsAsync(orders);
+            return orders;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "ReportService.GetAllOrdersAsync failed");
             return new List<OrderModel>();
         }
+    }
+
+    private async Task PopulateOrderItemsAsync(List<OrderModel> orders)
+    {
+        if (!orders.Any()) return;
+
+        var missingOrders = orders.Where(o => o.Items == null || o.Items.Count == 0).ToList();
+        if (!missingOrders.Any()) return;
+
+        var orderIdSet = missingOrders.Select(o => o.Id.ToString()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var orderIdStrings = orderIdSet.ToList();
+        var orderIdObjects = orderIdStrings.Where(x => ObjectId.TryParse(x, out _)).Select(ObjectId.Parse).ToList();
+
+        var fieldCandidates = new[] { "orderId", "OrderId", "orderModelId", "OrderModelId", "order_model_id", "OrderModel_Id" };
+        var orFilters = new List<FilterDefinition<BsonDocument>>();
+        foreach (var field in fieldCandidates)
+        {
+            orFilters.Add(Builders<BsonDocument>.Filter.In(field, orderIdStrings));
+            if (orderIdObjects.Count > 0)
+            {
+                orFilters.Add(Builders<BsonDocument>.Filter.In(field, orderIdObjects));
+            }
+        }
+
+        var filter = orFilters.Count > 0 ? Builders<BsonDocument>.Filter.Or(orFilters) : Builders<BsonDocument>.Filter.Empty;
+        var rawOrderItems = await _orderItemsCol.Find(filter).ToListAsync();
+
+        if (!rawOrderItems.Any()) return;
+
+        var itemMapByOrderId = new Dictionary<string, List<OrderItem>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var raw in rawOrderItems)
+        {
+            var linkedOrderId = TryExtractOrderId(raw, orderIdSet);
+            if (linkedOrderId == null) continue;
+
+            var mapped = MapOrderItemFromDocument(raw);
+            if (mapped == null) continue;
+
+            if (!itemMapByOrderId.TryGetValue(linkedOrderId, out var list))
+            {
+                list = new List<OrderItem>();
+                itemMapByOrderId[linkedOrderId] = list;
+            }
+            list.Add(mapped);
+        }
+
+        foreach (var order in missingOrders)
+        {
+            if (itemMapByOrderId.TryGetValue(order.Id.ToString(), out var items) && items.Count > 0)
+            {
+                order.Items = items;
+            }
+        }
+    }
+
+    private static string? TryExtractOrderId(BsonDocument raw, HashSet<string> knownOrderIds)
+    {
+        var fieldCandidates = new[] { "orderId", "OrderId", "orderModelId", "OrderModelId", "order_model_id", "OrderModel_Id" };
+        foreach (var field in fieldCandidates)
+        {
+            if (!raw.TryGetValue(field, out var value)) continue;
+            
+            var parsed = value.IsObjectId ? value.AsObjectId.ToString() : 
+                        (value.IsString && ObjectId.TryParse(value.AsString, out var oId) ? oId.ToString() : null);
+                        
+            if (!string.IsNullOrWhiteSpace(parsed) && knownOrderIds.Contains(parsed))
+                return parsed;
+        }
+        return null;
+    }
+
+    private static OrderItem? MapOrderItemFromDocument(BsonDocument raw)
+    {
+        var mappedId = raw.TryGetValue("_id", out var idVal) && idVal.IsObjectId ? idVal.AsObjectId : ObjectId.GenerateNewId();
+        var name = ReadString(raw, "productName", "ProductName", "name", "Name") ?? string.Empty;
+        var quantity = ReadInt(raw, "quantity", "Quantity");
+        var unitPrice = ReadDecimal(raw, "unitPrice", "UnitPrice", "price", "Price");
+        var totalPrice = ReadDecimal(raw, "totalPrice", "TotalPrice");
+
+        if (quantity <= 0) return null;
+        if (totalPrice <= 0) totalPrice = unitPrice * quantity;
+
+        var typeStr = ReadString(raw, "type", "Type");
+        var type = Enum.TryParse<OrderItemType>(typeStr, true, out var t) ? t : 
+                   (raw.TryGetValue("type", out var tVal) && tVal.IsInt32 && Enum.IsDefined(typeof(OrderItemType), tVal.AsInt32) ? (OrderItemType)tVal.AsInt32 : OrderItemType.READY_MADE);
+
+        return new OrderItem
+        {
+            Id = mappedId,
+            ProductName = name,
+            Type = type,
+            Quantity = quantity,
+            UnitPrice = unitPrice,
+            TotalPrice = totalPrice,
+            GiftBoxId = ReadObjectId(raw, "giftBoxId", "GiftBoxId"),
+            CustomBoxId = ReadObjectId(raw, "customBoxId", "CustomBoxId")
+        };
+    }
+
+    private static string? ReadString(BsonDocument raw, params string[] fields)
+    {
+        foreach (var field in fields)
+        {
+            if (raw.TryGetValue(field, out var value) && !value.IsBsonNull)
+                return value.IsString ? value.AsString : value.ToString();
+        }
+        return null;
+    }
+
+    private static int ReadInt(BsonDocument raw, params string[] fields)
+    {
+        foreach (var field in fields)
+        {
+            if (raw.TryGetValue(field, out var value) && !value.IsBsonNull)
+            {
+                if (value.IsInt32) return value.AsInt32;
+                if (value.IsInt64) return (int)value.AsInt64;
+                if (value.IsDouble) return (int)value.AsDouble;
+                if (int.TryParse(value.ToString(), out var parsed)) return parsed;
+            }
+        }
+        return 0;
+    }
+
+    private static decimal ReadDecimal(BsonDocument raw, params string[] fields)
+    {
+        foreach (var field in fields)
+        {
+            if (raw.TryGetValue(field, out var value) && !value.IsBsonNull)
+            {
+                if (value.IsDecimal128) return (decimal)value.AsDecimal128;
+                if (value.IsDouble) return (decimal)value.AsDouble;
+                if (value.IsInt32) return value.AsInt32;
+                if (value.IsInt64) return value.AsInt64;
+                if (decimal.TryParse(value.ToString(), out var parsed)) return parsed;
+            }
+        }
+        return 0;
+    }
+
+    private static ObjectId? ReadObjectId(BsonDocument raw, params string[] fields)
+    {
+        foreach (var field in fields)
+        {
+            if (raw.TryGetValue(field, out var value) && !value.IsBsonNull)
+            {
+                if (value.IsObjectId) return value.AsObjectId;
+                if (value.IsString && ObjectId.TryParse(value.AsString, out var parsed)) return parsed;
+            }
+        }
+        return null;
     }
 
     private static IEnumerable<OrderModel> ApplyOrderTypeFilter(IEnumerable<OrderModel> orders, string? orderType)

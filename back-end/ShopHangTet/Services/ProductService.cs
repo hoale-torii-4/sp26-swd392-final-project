@@ -14,20 +14,59 @@ namespace ShopHangTet.Services
             _context = context;
         }
 
+        private static int CalculateGiftBoxAvailableStock(GiftBox giftBox, Dictionary<string, Item> itemMap)
+        {
+            if (giftBox.Items == null || giftBox.Items.Count == 0)
+            {
+                return 0;
+            }
+
+            var minAvailable = int.MaxValue;
+
+            foreach (var giftItem in giftBox.Items)
+            {
+                if (giftItem.Quantity <= 0)
+                {
+                    continue;
+                }
+
+                if (!itemMap.TryGetValue(giftItem.ItemId, out var item))
+                {
+                    return 0;
+                }
+
+                var available = Math.Max(0, item.AvailableQuantity / giftItem.Quantity);
+                minAvailable = Math.Min(minAvailable, available);
+            }
+
+            return minAvailable == int.MaxValue ? 0 : minAvailable;
+        }
+
         public async Task<List<Item>> GetItemsAsync(string? name = null)
         {
             var query = _context.Items.Where(x => x.IsActive);
             if (!string.IsNullOrWhiteSpace(name))
             {
-                // Cắt khoảng trắng 2 đầu và đưa về chữ thường
+                // Normalize search keyword.
                 var normalizedName = name.Trim().ToLower();
 
-                // Nếu thích cẩn thận hơn, bạn có thể thay thế dấu gạch ngang thành khoảng trắng để tìm kiếm thoáng hơn
-                // Nhưng tạm thời cứ dùng .ToLower().Contains(normalizedName) kết hợp với Prompt xịn là đủ gánh team rồi!
                 query = query.Where(x => x.Name.ToLower().Contains(normalizedName));
             }
 
-            return await query.ToListAsync();
+            var items = await query.ToListAsync();
+            return items.Select(x => new Item
+            {
+                Id = x.Id,
+                Name = x.Name,
+                Category = x.Category,
+                Price = x.Price,
+                Images = x.Images,
+                IsAlcohol = x.IsAlcohol,
+                StockQuantity = Math.Max(0, x.AvailableQuantity),
+                ReservedQuantity = x.ReservedQuantity,
+                IsActive = x.IsActive,
+                CreatedAt = x.CreatedAt
+            }).ToList();
         }
 
         public async Task<Item?> GetItemByIdAsync(string id)
@@ -42,11 +81,8 @@ namespace ShopHangTet.Services
 
             if (!string.IsNullOrWhiteSpace(name))
             {
-                // Cắt khoảng trắng 2 đầu và đưa về chữ thường
+                // Normalize search keyword.
                 var normalizedName = name.Trim().ToLower();
-
-                // Nếu thích cẩn thận hơn, bạn có thể thay thế dấu gạch ngang thành khoảng trắng để tìm kiếm thoáng hơn
-                // Nhưng tạm thời cứ dùng .ToLower().Contains(normalizedName) kết hợp với Prompt xịn là đủ gánh team rồi!
                 query = query.Where(x => x.Name.ToLower().Contains(normalizedName));
             }
 
@@ -80,6 +116,7 @@ namespace ShopHangTet.Services
                     Name = x.Name,
                     Description = x.Description,
                     Price = x.Price,
+                    StockQuantity = CalculateGiftBoxAvailableStock(x, items),
                     Image = x.Images.FirstOrDefault(),
                     Collection = collections.TryGetValue(x.CollectionId, out var collectionName) ? collectionName : string.Empty,
                     Tags = x.Tags
@@ -163,11 +200,9 @@ namespace ShopHangTet.Services
 
             if (!string.IsNullOrWhiteSpace(name))
             {
-                // Cắt khoảng trắng 2 đầu và đưa về chữ thường
+                // Normalize search keyword.
                 var normalizedName = name.Trim().ToLower();
 
-                // Nếu thích cẩn thận hơn, bạn có thể thay thế dấu gạch ngang thành khoảng trắng để tìm kiếm thoáng hơn
-                // Nhưng tạm thời cứ dùng .ToLower().Contains(normalizedName) kết hợp với Prompt xịn là đủ gánh team rồi!
                 query = query.Where(x => x.Name.ToLower().Contains(normalizedName));
             }
 
@@ -237,9 +272,9 @@ namespace ShopHangTet.Services
             };
         }
 
-        // === GiftBox Pricing ===
+        // GiftBox pricing
 
-        /// Tính giá GiftBox tự động: (sum item cost × multiplier) + packagingFee
+        /// Price = (item cost * multiplier) + packaging fee.
         public async Task<decimal> CalculateGiftBoxPriceAsync(string collectionId, List<GiftBoxItem> items)
         {
             var collection = await _context.Collections.FirstOrDefaultAsync(x => x.Id == collectionId);
@@ -259,12 +294,12 @@ namespace ShopHangTet.Services
                 }
             }
 
-            // price = (sum cost × multiplier) + packagingFee
+            // Apply collection pricing rule.
             var price = (totalCost * collection.PricingMultiplier) + collection.PackagingFee;
-            return Math.Round(price, 0); // Làm tròn VND
+            return Math.Round(price, 0); // Round to VND.
         }
 
-        /// Tạo GiftBox mới — Price tự tính từ collection pricing rule
+        /// Create GiftBox with calculated price by default.
         public async Task<GiftBox> CreateGiftBoxAsync(CreateGiftBoxDto dto)
         {
             decimal price;
@@ -307,7 +342,7 @@ namespace ShopHangTet.Services
             return giftBox;
         }
 
-        /// Cập nhật GiftBox — Price tự tính lại nếu items thay đổi
+        /// Recalculate price when items or collection change.
         public async Task<GiftBox> UpdateGiftBoxAsync(string id, UpdateGiftBoxDto dto)
         {
             var giftBox = await _context.GiftBoxes.FirstOrDefaultAsync(x => x.Id == id);
@@ -334,7 +369,7 @@ namespace ShopHangTet.Services
                 }).ToList();
             }
 
-            // Recalculate price nếu có PriceOverride hoặc items thay đổi
+            // Recalculate price when needed.
             if (dto.PriceOverride.HasValue && dto.PriceOverride.Value > 0)
             {
                 giftBox.Price = dto.PriceOverride.Value;

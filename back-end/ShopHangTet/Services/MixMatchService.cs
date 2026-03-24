@@ -70,7 +70,8 @@ public class MixMatchService : IMixMatchService
 
         var data = items.Select(i =>
         {
-            var (status, label) = GetStockStatus(i.StockQuantity);
+            var availableQty = Math.Max(0, i.AvailableQuantity);
+            var (status, label) = GetStockStatus(availableQty);
             return new MixMatchItemResponseDTO
             {
                 Id = i.Id,
@@ -80,7 +81,7 @@ public class MixMatchService : IMixMatchService
                 CategoryLabel = i.Category.ToString(),
                 Price = i.Price,
                 IsAlcohol = i.IsAlcohol,
-                StockQuantity = i.StockQuantity,
+                StockQuantity = availableQty,
                 StockStatus = status,
                 StockStatusLabel = label,
                 IsActive = i.IsActive,
@@ -105,7 +106,8 @@ public class MixMatchService : IMixMatchService
         var item = await _context.Items.FirstOrDefaultAsync(i => i.Id == id);
         if (item == null) return null;
 
-        var (status, label) = GetStockStatus(item.StockQuantity);
+        var availableQty = Math.Max(0, item.AvailableQuantity);
+        var (status, label) = GetStockStatus(availableQty);
 
         return new MixMatchItemResponseDTO
         {
@@ -116,7 +118,7 @@ public class MixMatchService : IMixMatchService
             CategoryLabel = item.Category.ToString(),
             Price = item.Price,
             IsAlcohol = item.IsAlcohol,
-            StockQuantity = item.StockQuantity,
+            StockQuantity = availableQty,
             StockStatus = status,
             StockStatusLabel = label,
             IsActive = item.IsActive,
