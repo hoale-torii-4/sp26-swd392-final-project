@@ -26,6 +26,9 @@ export interface User {
     Role: number | string;
     Status: number | string;
     CreatedAt: string;
+    BankName?: string | null;
+    BankAccountNumber?: string | null;
+    BankAccountName?: string | null;
 }
 
 export interface LoginData {
