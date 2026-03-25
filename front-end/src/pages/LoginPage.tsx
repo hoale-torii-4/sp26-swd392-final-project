@@ -291,11 +291,6 @@ export default function LoginPage() {
                         </Link>
                     </p>
 
-                    {/* Security badge */}
-                    <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-gray-400">
-                        <FiLock className="w-3.5 h-3.5" />
-                        Hệ thống bảo mật tiêu chuẩn quốc tế
-                    </div>
                 </div>
             </div>
         </div>

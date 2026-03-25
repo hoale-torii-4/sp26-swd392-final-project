@@ -47,9 +47,9 @@ export default function AdminAccountScreen() {
 
             <View style={styles.card}>
                 <Text style={styles.cardTitle}>Tiện ích quản trị</Text>
-                <Item icon="grid-outline" label="Dashboard" />
-                <Item icon="receipt-outline" label="Quản lý đơn hàng" />
-                <Item icon="layers-outline" label="Kho & tồn" />
+                <Item icon="grid-outline" label="Dashboard" onPress={() => router.push('/(admin-tabs)/dashboard' as any)} />
+                <Item icon="receipt-outline" label="Quản lý đơn hàng" onPress={() => router.push('/(admin-tabs)/orders' as any)} />
+                <Item icon="layers-outline" label="Kho & tồn" onPress={() => router.push('/(admin-tabs)/inventory' as any)} />
             </View>
 
             <TouchableOpacity style={styles.logoutBtn} onPress={() => setShowLogoutConfirm(true)}>
@@ -71,13 +71,13 @@ export default function AdminAccountScreen() {
     );
 }
 
-function Item({ icon, label }: { icon: string; label: string }) {
+function Item({ icon, label, onPress }: { icon: string; label: string; onPress?: () => void }) {
     return (
-        <View style={styles.itemRow}>
+        <TouchableOpacity style={styles.itemRow} onPress={onPress} activeOpacity={0.7}>
             <Ionicons name={icon as any} size={18} color={AppColors.textMuted} />
             <Text style={styles.itemText}>{label}</Text>
             <Ionicons name="chevron-forward" size={16} color={AppColors.textMuted} />
-        </View>
+        </TouchableOpacity>
     );
 }
 

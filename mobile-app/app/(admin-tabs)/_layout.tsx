@@ -53,7 +53,41 @@ export default function AdminTabLayout() {
                 />
             )}
 
+            {(isAdmin || isStaff) && (
+                <Tabs.Screen
+                    name="collections"
+                    options={{
+                        title: 'Bộ sưu tập',
+                        tabBarIcon: ({ color, size }) => (
+                            <Ionicons name="albums-outline" size={size} color={color} />
+                        ),
+                    }}
+                />
+            )}
 
+            {(isAdmin || isStaff) && (
+                <Tabs.Screen
+                    name="giftboxes"
+                    options={{
+                        title: 'Giỏ quà',
+                        tabBarIcon: ({ color, size }) => (
+                            <Ionicons name="gift-outline" size={size} color={color} />
+                        ),
+                    }}
+                />
+            )}
+
+            {(isAdmin || isStaff) && (
+                <Tabs.Screen
+                    name="inventory"
+                    options={{
+                        title: 'Kho hàng',
+                        tabBarIcon: ({ color, size }) => (
+                            <Ionicons name="cube-outline" size={size} color={color} />
+                        ),
+                    }}
+                />
+            )}
 
             <Tabs.Screen
                 name="account"

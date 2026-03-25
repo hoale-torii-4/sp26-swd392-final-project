@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
 import apiClient from "../services/apiClient";
+import { fetchProvinces, fetchWardsByProvinceCode, type ProvinceOption, type WardOption } from "../services/locationService";
 import { isValidPhone } from "../utils/validation";
 
 /* ─── Types ─── */
@@ -20,11 +21,71 @@ interface Address {
 interface AddressForm {
     ReceiverName: string;
     ReceiverPhone: string;
-    FullAddress: string;
+    AddressDetail: string;
+    ProvinceCode: string;
+    ProvinceName: string;
+    WardName: string;
     IsDefault: boolean;
 }
 
-const emptyForm: AddressForm = { ReceiverName: "", ReceiverPhone: "", FullAddress: "", IsDefault: false };
+const emptyForm: AddressForm = {
+    ReceiverName: "",
+    ReceiverPhone: "",
+    AddressDetail: "",
+    ProvinceCode: "",
+    ProvinceName: "",
+    WardName: "",
+    IsDefault: false,
+};
+
+function normalizeText(value: string): string {
+    return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+}
+
+function matchProvinceByName(name: string, provinceOptions: ProvinceOption[]): ProvinceOption | undefined {
+    const normalizedName = normalizeText(name);
+    if (!normalizedName) return undefined;
+
+    return provinceOptions.find((option) => {
+        const normalizedOption = normalizeText(option.name);
+        return normalizedOption === normalizedName
+            || normalizedOption.includes(normalizedName)
+            || normalizedName.includes(normalizedOption);
+    });
+}
+
+function parseAddressForForm(fullAddress: string, provinceOptions: ProvinceOption[]): Pick<AddressForm, "AddressDetail" | "ProvinceCode" | "ProvinceName" | "WardName"> {
+    const parts = fullAddress
+        .split(",")
+        .map((part) => part.trim())
+        .filter(Boolean);
+
+    if (parts.length < 3) {
+        return {
+            AddressDetail: fullAddress.trim(),
+            ProvinceCode: "",
+            ProvinceName: "",
+            WardName: "",
+        };
+    }
+
+    const provincePart = parts[parts.length - 1];
+    const wardPart = parts[parts.length - 2];
+    const detailPart = parts.slice(0, -2).join(", ");
+    const matchedProvince = matchProvinceByName(provincePart, provinceOptions);
+
+    return {
+        AddressDetail: detailPart,
+        ProvinceCode: matchedProvince ? String(matchedProvince.code) : "",
+        ProvinceName: matchedProvince?.name ?? provincePart,
+        WardName: wardPart,
+    };
+}
 
 function validateAddressForm(form: AddressForm): string | null {
     if (!form.ReceiverName.trim()) {
@@ -39,10 +100,17 @@ function validateAddressForm(form: AddressForm): string | null {
     if (!isValidPhone(form.ReceiverPhone)) {
         return "Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 0).";
     }
-    if (!form.FullAddress.trim()) {
-        return "Địa chỉ không được để trống.";
+    if (!form.AddressDetail.trim()) {
+        return "Địa chỉ chi tiết không được để trống.";
     }
-    if (form.FullAddress.trim().length < 10) {
+    if (form.AddressDetail.trim().length < 5) {
+        return "Địa chỉ chi tiết quá ngắn, vui lòng nhập cụ thể hơn.";
+    }
+    if (!form.ProvinceCode || !form.ProvinceName || !form.WardName) {
+        return "Vui lòng chọn đầy đủ tỉnh/thành phố và xã/phường.";
+    }
+    const fullAddress = [form.AddressDetail, form.WardName, form.ProvinceName].filter(Boolean).join(", ").trim();
+    if (fullAddress.length < 10) {
         return "Địa chỉ quá ngắn, vui lòng nhập chi tiết hơn.";
     }
     return null;
@@ -91,6 +159,10 @@ export default function AddressesPage() {
     const [form, setForm] = useState<AddressForm>(emptyForm);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState("");
+    const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
+    const [wardOptions, setWardOptions] = useState<WardOption[]>([]);
+    const [locationsLoading, setLocationsLoading] = useState(false);
+    const [locationsError, setLocationsError] = useState<string | null>(null);
 
     // Delete confirm
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -100,6 +172,52 @@ export default function AddressesPage() {
         if (!authService.isAuthenticated()) { navigate("/login"); return; }
         fetchAddresses();
     }, [navigate]);
+
+    useEffect(() => {
+        let mounted = true;
+        setLocationsLoading(true);
+        fetchProvinces()
+            .then((list) => {
+                if (!mounted) return;
+                setProvinceOptions(list);
+                setLocationsError(null);
+            })
+            .catch(() => {
+                if (!mounted) return;
+                setLocationsError("Không thể tải danh sách tỉnh/thành phố.");
+            })
+            .finally(() => {
+                if (mounted) setLocationsLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!showForm) return;
+        if (!form.ProvinceCode) {
+            setWardOptions([]);
+            return;
+        }
+
+        setLocationsLoading(true);
+        fetchWardsByProvinceCode(Number(form.ProvinceCode))
+            .then((list) => {
+                if (form.WardName && !list.some((item) => item.name === form.WardName)) {
+                    setWardOptions([{ code: -1, name: form.WardName }, ...list]);
+                } else {
+                    setWardOptions(list);
+                }
+                setLocationsError(null);
+            })
+            .catch(() => {
+                setWardOptions([]);
+                setLocationsError("Không thể tải danh sách xã/phường.");
+            })
+            .finally(() => setLocationsLoading(false));
+    }, [form.ProvinceCode, form.WardName, showForm]);
 
     const fetchAddresses = () => {
         setLoading(true);
@@ -124,8 +242,17 @@ export default function AddressesPage() {
 
     /* ── Open edit form ── */
     const openEdit = (addr: Address) => {
+        const parsedAddress = parseAddressForForm(addr.FullAddress, provinceOptions);
         setEditingId(addr.Id);
-        setForm({ ReceiverName: addr.ReceiverName, ReceiverPhone: addr.ReceiverPhone, FullAddress: addr.FullAddress, IsDefault: addr.IsDefault });
+        setForm({
+            ReceiverName: addr.ReceiverName,
+            ReceiverPhone: addr.ReceiverPhone,
+            AddressDetail: parsedAddress.AddressDetail,
+            ProvinceCode: parsedAddress.ProvinceCode,
+            ProvinceName: parsedAddress.ProvinceName,
+            WardName: parsedAddress.WardName,
+            IsDefault: addr.IsDefault,
+        });
         setFormError("");
         setShowForm(true);
     };
@@ -139,11 +266,17 @@ export default function AddressesPage() {
         }
         setSaving(true);
         setFormError("");
+        const payload = {
+            ReceiverName: form.ReceiverName.trim(),
+            ReceiverPhone: form.ReceiverPhone.trim(),
+            FullAddress: [form.AddressDetail.trim(), form.WardName.trim(), form.ProvinceName.trim()].filter(Boolean).join(", "),
+            IsDefault: form.IsDefault,
+        };
         try {
             if (editingId) {
-                await apiClient.put(`/Address/${editingId}`, form);
+                await apiClient.put(`/Address/${editingId}`, payload);
             } else {
-                await apiClient.post("/Address", form);
+                await apiClient.post("/Address", payload);
             }
             setShowForm(false);
             fetchAddresses();
@@ -326,12 +459,54 @@ export default function AddressesPage() {
                                     className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors" />
                             </div>
                             <div>
-                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Địa chỉ đầy đủ *</label>
-                                <textarea rows={2} value={form.FullAddress}
-                                    onChange={e => setForm(f => ({ ...f, FullAddress: e.target.value }))}
-                                    placeholder="123 Đường ABC, Phường XYZ, Quận 1, TP.HCM"
+                                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Địa chỉ chi tiết *</label>
+                                <textarea rows={2} value={form.AddressDetail}
+                                    onChange={e => setForm(f => ({ ...f, AddressDetail: e.target.value }))}
+                                    placeholder="123 Đường ABC"
                                     className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors resize-none" />
                             </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Tỉnh / Thành phố *</label>
+                                    <select
+                                        value={form.ProvinceCode}
+                                        onChange={(e) => {
+                                            const selectedCode = e.target.value;
+                                            const selectedProvince = provinceOptions.find((option) => String(option.code) === selectedCode);
+                                            setForm((current) => ({
+                                                ...current,
+                                                ProvinceCode: selectedCode,
+                                                ProvinceName: selectedProvince?.name ?? "",
+                                                WardName: "",
+                                            }));
+                                        }}
+                                        disabled={locationsLoading}
+                                        className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors bg-white"
+                                    >
+                                        <option value="">{locationsLoading ? "Đang tải tỉnh/thành phố..." : "Chọn Tỉnh / Thành phố"}</option>
+                                        {provinceOptions.map((option) => (
+                                            <option key={option.code} value={option.code}>{option.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Xã / Phường *</label>
+                                    <select
+                                        value={form.WardName}
+                                        onChange={(e) => setForm((current) => ({ ...current, WardName: e.target.value }))}
+                                        disabled={!form.ProvinceCode || locationsLoading}
+                                        className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-700 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors bg-white"
+                                    >
+                                        <option value="">
+                                            {!form.ProvinceCode ? "Chọn Tỉnh / Thành phố trước" : locationsLoading ? "Đang tải xã/phường..." : "Chọn Xã / Phường"}
+                                        </option>
+                                        {wardOptions.map((option) => (
+                                            <option key={`${option.code}-${option.name}`} value={option.name}>{option.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            {locationsError && <p className="text-xs text-red-600">{locationsError}</p>}
                             <label className="flex items-center gap-2.5 cursor-pointer">
                                 <input type="checkbox" checked={form.IsDefault}
                                     onChange={e => setForm(f => ({ ...f, IsDefault: e.target.checked }))}

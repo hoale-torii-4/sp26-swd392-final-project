@@ -21,6 +21,7 @@ import { cartService, type CartItemDto } from '../services/cartService';
 import { orderService, OrderItemType } from '../services/orderService';
 import { paymentService } from '../services/paymentService';
 import apiClient from '../services/apiClient';
+import { fetchProvinces, fetchWardsByProvinceCode, type ProvinceOption, type WardOption } from '../services/locationService';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
 import { hasMinLength, isValidDeliveryDate, isValidEmail, isValidPhone, sanitizeDigits } from '../services/validationService';
@@ -92,6 +93,14 @@ export default function CheckoutPaymentScreen() {
 
   const [receiverName, setReceiverName] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
+  const [provinceCode, setProvinceCode] = useState<number | null>(null);
+  const [provinceName, setProvinceName] = useState('');
+  const [wardName, setWardName] = useState('');
+  const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
+  const [wardOptions, setWardOptions] = useState<WardOption[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+  const [showProvincePicker, setShowProvincePicker] = useState(false);
+  const [showWardPicker, setShowWardPicker] = useState(false);
   const [addressDetail, setAddressDetail] = useState('');
   const [greetingMessage, setGreetingMessage] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
@@ -182,6 +191,28 @@ export default function CheckoutPaymentScreen() {
     setReceiverName(addr.ReceiverName ?? '');
     setReceiverPhone(addr.ReceiverPhone ?? '');
     setAddressDetail(addr.FullAddress ?? '');
+    setProvinceCode(null);
+    setProvinceName('');
+    setWardName('');
+    setWardOptions([]);
+  };
+
+  const handleSelectProvince = async (province: ProvinceOption) => {
+    setProvinceCode(province.code);
+    setProvinceName(province.name);
+    setWardName('');
+    setWardOptions([]);
+    setShowProvincePicker(false);
+    setLocationsLoading(true);
+    try {
+      const wards = await fetchWardsByProvinceCode(province.code);
+      setWardOptions(wards);
+    } catch {
+      setWardOptions([]);
+      Toast.show({ type: 'error', text1: 'Địa chỉ', text2: 'Không thể tải danh sách xã/phường.' });
+    } finally {
+      setLocationsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -243,6 +274,27 @@ export default function CheckoutPaymentScreen() {
       .catch(() => setAddressBook([]))
       .finally(() => setLoadingAddresses(false));
   }, [user?.Id]);
+
+  useEffect(() => {
+    let mounted = true;
+    setLocationsLoading(true);
+    fetchProvinces()
+      .then((list) => {
+        if (!mounted) return;
+        setProvinceOptions(list);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        Toast.show({ type: 'error', text1: 'Địa chỉ', text2: 'Không thể tải danh sách tỉnh/thành phố.' });
+      })
+      .finally(() => {
+        if (mounted) setLocationsLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!qrUrl || !orderCode || qrExpired) return;
@@ -308,9 +360,16 @@ export default function CheckoutPaymentScreen() {
     const trimmedReceiverName = receiverName.trim();
     const trimmedReceiverPhone = receiverPhone.trim();
     const trimmedAddressDetail = addressDetail.trim();
+    const trimmedProvinceName = provinceName.trim();
+    const trimmedWardName = wardName.trim();
+    const finalDeliveryAddress = [trimmedAddressDetail, trimmedWardName, trimmedProvinceName].filter(Boolean).join(', ');
 
     if (!trimmedReceiverName || !trimmedReceiverPhone || !trimmedAddressDetail || !deliveryDate) {
       setError('Vui lòng điền đầy đủ thông tin người nhận và ngày giao hàng.');
+      return;
+    }
+    if ((!trimmedProvinceName && trimmedWardName) || (trimmedProvinceName && !trimmedWardName)) {
+      setError('Vui lòng chọn đầy đủ tỉnh/thành phố và xã/phường.');
       return;
     }
     if (!hasMinLength(trimmedReceiverName, 2)) {
@@ -367,7 +426,7 @@ export default function CheckoutPaymentScreen() {
         })),
         ReceiverName: trimmedReceiverName,
         ReceiverPhone: trimmedReceiverPhone,
-        DeliveryAddress: trimmedAddressDetail,
+        DeliveryAddress: finalDeliveryAddress,
         GreetingMessage: greetingMessage || undefined,
         DeliveryDate: new Date(deliveryDate).toISOString(),
       };
@@ -542,12 +601,40 @@ export default function CheckoutPaymentScreen() {
           <View style={styles.fieldGroup}>
             <TextInput
               style={[styles.input, { height: 80 }]}
-              placeholder="Địa chỉ giao hàng"
+              placeholder="Số nhà, tên đường"
               placeholderTextColor={AppColors.textMuted}
               value={addressDetail}
               onChangeText={setAddressDetail}
               multiline
             />
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <TouchableOpacity
+              style={styles.selectorInput}
+              onPress={() => setShowProvincePicker(true)}
+              activeOpacity={0.8}
+              disabled={locationsLoading}
+            >
+              <Text style={[styles.selectorText, !provinceName && styles.selectorPlaceholder]}>
+                {provinceName || (locationsLoading ? 'Đang tải tỉnh/thành phố...' : 'Chọn Tỉnh / Thành phố')}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={AppColors.textMuted} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.fieldGroup}>
+            <TouchableOpacity
+              style={[styles.selectorInput, !provinceCode && styles.selectorDisabled]}
+              onPress={() => provinceCode && setShowWardPicker(true)}
+              activeOpacity={0.8}
+              disabled={!provinceCode || locationsLoading}
+            >
+              <Text style={[styles.selectorText, !wardName && styles.selectorPlaceholder]}>
+                {wardName || (!provinceCode ? 'Chọn Tỉnh / Thành phố trước' : locationsLoading ? 'Đang tải xã/phường...' : 'Chọn Xã / Phường')}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color={AppColors.textMuted} />
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -745,6 +832,61 @@ export default function CheckoutPaymentScreen() {
           </View>
         </View>
       )}
+
+      {showProvincePicker && (
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerCard}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Chọn tỉnh/thành phố</Text>
+              <TouchableOpacity onPress={() => setShowProvincePicker(false)}>
+                <Ionicons name="close" size={20} color={AppColors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.pickerList}>
+              {provinceOptions.map((item) => (
+                <TouchableOpacity
+                  key={item.code}
+                  style={[styles.pickerItem, provinceCode === item.code && styles.pickerItemActive]}
+                  onPress={() => handleSelectProvince(item)}
+                >
+                  <Text style={[styles.pickerItemText, provinceCode === item.code && styles.pickerItemTextActive]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      )}
+
+      {showWardPicker && (
+        <View style={styles.pickerOverlay}>
+          <View style={styles.pickerCard}>
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>Chọn xã/phường</Text>
+              <TouchableOpacity onPress={() => setShowWardPicker(false)}>
+                <Ionicons name="close" size={20} color={AppColors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.pickerList}>
+              {wardOptions.map((item) => (
+                <TouchableOpacity
+                  key={item.code}
+                  style={[styles.pickerItem, wardName === item.name && styles.pickerItemActive]}
+                  onPress={() => {
+                    setWardName(item.name);
+                    setShowWardPicker(false);
+                  }}
+                >
+                  <Text style={[styles.pickerItemText, wardName === item.name && styles.pickerItemTextActive]}>
+                    {item.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -822,6 +964,20 @@ const styles = StyleSheet.create({
   },
   dateText: { fontSize: 14, color: AppColors.text },
   datePlaceholder: { color: AppColors.textMuted },
+  selectorInput: {
+    borderWidth: 1,
+    borderColor: AppColors.border,
+    borderRadius: BorderRadius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFF',
+  },
+  selectorDisabled: { opacity: 0.6 },
+  selectorText: { fontSize: 14, color: AppColors.text },
+  selectorPlaceholder: { color: AppColors.textMuted },
 
   paymentOption: {
     flexDirection: 'row',
@@ -1024,6 +1180,42 @@ const styles = StyleSheet.create({
     gap: 12,
     marginTop: 20
   },
+  pickerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  pickerCard: {
+    backgroundColor: '#FFF',
+    borderRadius: BorderRadius.lg,
+    maxHeight: '70%',
+    paddingVertical: Spacing.md,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.borderLight,
+  },
+  pickerTitle: { fontSize: 16, fontWeight: '700', color: AppColors.text },
+  pickerList: { maxHeight: 420 },
+  pickerItem: {
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: AppColors.borderLight,
+  },
+  pickerItemActive: { backgroundColor: 'rgba(139, 26, 26, 0.06)' },
+  pickerItemText: { fontSize: 13, color: AppColors.textSecondary },
+  pickerItemTextActive: { color: AppColors.primary, fontWeight: '700' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 },
   emptyTitle: { fontSize: 16, fontWeight: '700', color: AppColors.text },

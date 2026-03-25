@@ -6,6 +6,7 @@ import { cartService, type CartDto, type CartItemDto } from "../services/cartSer
 import { orderService, type CreateOrderB2CDto, OrderItemType } from "../services/orderService";
 import { authService } from "../services/authService";
 import apiClient from "../services/apiClient";
+import { fetchProvinces, fetchWardsByProvinceCode, type ProvinceOption, type WardOption } from "../services/locationService";
 import { isValidEmail, isValidFutureOrTodayDate, isValidPhone } from "../utils/validation";
 
 interface Address {
@@ -40,9 +41,13 @@ export default function CheckoutPaymentPage() {
     // ── Form state ──
     const [receiverName, setReceiverName] = useState("");
     const [receiverPhone, setReceiverPhone] = useState("");
-    const [province, setProvince] = useState("");
-    const [district, setDistrict] = useState("");
-    const [ward, setWard] = useState("");
+    const [provinceCode, setProvinceCode] = useState("");
+    const [provinceName, setProvinceName] = useState("");
+    const [wardName, setWardName] = useState("");
+    const [provinceOptions, setProvinceOptions] = useState<ProvinceOption[]>([]);
+    const [wardOptions, setWardOptions] = useState<WardOption[]>([]);
+    const [locationsLoading, setLocationsLoading] = useState(false);
+    const [locationsError, setLocationsError] = useState<string | null>(null);
     const [addressDetail, setAddressDetail] = useState("");
     const [greetingMessage, setGreetingMessage] = useState("");
     const [deliveryDate, setDeliveryDate] = useState("");
@@ -104,6 +109,52 @@ export default function CheckoutPaymentPage() {
                 .finally(() => setAddressesLoading(false));
         }
     }, [user?.Id]);
+
+    useEffect(() => {
+        let mounted = true;
+        setLocationsLoading(true);
+        fetchProvinces()
+            .then((list) => {
+                if (!mounted) return;
+                setProvinceOptions(list);
+                setLocationsError(null);
+            })
+            .catch(() => {
+                if (!mounted) return;
+                setLocationsError("Không thể tải danh sách tỉnh/thành phố.");
+            })
+            .finally(() => {
+                if (mounted) setLocationsLoading(false);
+            });
+
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!provinceCode) {
+            setWardOptions([]);
+            setWardName("");
+            setProvinceName("");
+            return;
+        }
+
+        const selectedProvince = provinceOptions.find((item) => String(item.code) === provinceCode);
+        setProvinceName(selectedProvince?.name ?? "");
+        setWardName("");
+        setLocationsLoading(true);
+        fetchWardsByProvinceCode(Number(provinceCode))
+            .then((list) => {
+                setWardOptions(list);
+                setLocationsError(null);
+            })
+            .catch(() => {
+                setWardOptions([]);
+                setLocationsError("Không thể tải danh sách xã/phường.");
+            })
+            .finally(() => setLocationsLoading(false));
+    }, [provinceCode, provinceOptions]);
 
     // ── Auto-polling: check payment status every 3 sec when QR is shown ──
     useEffect(() => {
@@ -185,7 +236,7 @@ export default function CheckoutPaymentPage() {
     const handleSubmit = async () => {
         let finalReceiverName = receiverName;
         let finalReceiverPhone = receiverPhone;
-        let finalDeliveryAddress = [addressDetail, ward, district, province].filter(Boolean).join(", ");
+        let finalDeliveryAddress = [addressDetail, wardName, provinceName].filter(Boolean).join(", ");
 
         if (user && selectedAddressId !== "new") {
             const addr = addresses.find((a) => a.Id === selectedAddressId);
@@ -205,6 +256,10 @@ export default function CheckoutPaymentPage() {
 
         if (!trimmedReceiverName || !trimmedReceiverPhone || !trimmedDeliveryAddress || !deliveryDate) {
             setError("Vui lòng điền đầy đủ thông tin người nhận, địa chỉ và ngày giao hàng.");
+            return;
+        }
+        if ((!user || selectedAddressId === "new" || addresses.length === 0) && (!provinceName || !wardName)) {
+            setError("Vui lòng chọn tỉnh/thành phố và xã/phường.");
             return;
         }
         if (trimmedReceiverName.length < 2) {
@@ -551,40 +606,37 @@ export default function CheckoutPaymentPage() {
                                     </div>
 
                                     {/* Address dropdowns */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                                         <select
-                                            value={province}
-                                            onChange={(e) => setProvince(e.target.value)}
+                                            value={provinceCode}
+                                            onChange={(e) => setProvinceCode(e.target.value)}
+                                            disabled={locationsLoading}
                                             className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
                                         >
-                                            <option value="">Tỉnh / Thành phố</option>
-                                            <option value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</option>
-                                            <option value="Hà Nội">Hà Nội</option>
-                                            <option value="Đà Nẵng">Đà Nẵng</option>
+                                            <option value="">{locationsLoading ? "Đang tải tỉnh/thành phố..." : "Tỉnh / Thành phố"}</option>
+                                            {provinceOptions.map((option) => (
+                                                <option key={option.code} value={option.code}>{option.name}</option>
+                                            ))}
                                         </select>
                                         <select
-                                            value={district}
-                                            onChange={(e) => setDistrict(e.target.value)}
+                                            value={wardName}
+                                            onChange={(e) => setWardName(e.target.value)}
+                                            disabled={!provinceCode || locationsLoading}
                                             className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
                                         >
-                                            <option value="">Quận / Huyện</option>
-                                            <option value="Quận 1">Quận 1</option>
-                                            <option value="Quận 3">Quận 3</option>
-                                            <option value="Quận 7">Quận 7</option>
-                                        </select>
-                                        <select
-                                            value={ward}
-                                            onChange={(e) => setWard(e.target.value)}
-                                            className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all bg-white appearance-none cursor-pointer"
-                                        >
-                                            <option value="">Phường / Xã</option>
-                                            <option value="Phường Bến Nghé">Phường Bến Nghé</option>
-                                            <option value="Phường Bến Thành">Phường Bến Thành</option>
+                                            <option value="">{!provinceCode ? "Chọn tỉnh/thành phố trước" : locationsLoading ? "Đang tải xã/phường..." : "Xã / Phường"}</option>
+                                            {wardOptions.map((option) => (
+                                                <option key={option.code} value={option.name}>{option.name}</option>
+                                            ))}
                                         </select>
                                     </div>
 
+                                    {locationsError && (
+                                        <p className="text-xs text-red-600 mb-3">{locationsError}</p>
+                                    )}
+
                                     <textarea
-                                        placeholder="Số nhà, tên đường, phường/xã..."
+                                        placeholder="Số nhà, tên đường..."
                                         value={addressDetail}
                                         onChange={(e) => setAddressDetail(e.target.value)}
                                         rows={2}
