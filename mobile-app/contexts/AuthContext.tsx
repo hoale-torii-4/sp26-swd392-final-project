@@ -11,10 +11,7 @@ interface AuthContextType {
     isAuthenticated: boolean;
     siteMode: SiteMode;
     isInternalUser: boolean;
-    siteMode: SiteMode;
-    isInternalUser: boolean;
     login: (data: LoginRequest) => Promise<LoginResponse>;
-    loginWithGoogle: (data: GoogleLoginRequest) => Promise<LoginResponse>;
     loginWithGoogle: (data: GoogleLoginRequest) => Promise<LoginResponse>;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
@@ -28,14 +25,9 @@ const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 const SITE_MODE_KEY = 'site_mode';
 
-const TOKEN_KEY = 'token';
-const USER_KEY = 'user';
-const SITE_MODE_KEY = 'site_mode';
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [token, setToken] = useState<string | null>(null);
-    const [siteMode, setSiteModeState] = useState<SiteMode>('customer');
     const [siteMode, setSiteModeState] = useState<SiteMode>('customer');
     const [isLoading, setIsLoading] = useState(true);
 
@@ -48,10 +40,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         (async () => {
             try {
-                const [storedToken, storedUser, storedSiteMode] = await Promise.all([
-                    AsyncStorage.getItem(TOKEN_KEY),
-                    AsyncStorage.getItem(USER_KEY),
-                    AsyncStorage.getItem(SITE_MODE_KEY),
                 const [storedToken, storedUser, storedSiteMode] = await Promise.all([
                     AsyncStorage.getItem(TOKEN_KEY),
                     AsyncStorage.getItem(USER_KEY),
@@ -184,10 +172,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 isAuthenticated: !!token,
                 siteMode,
                 isInternalUser,
-                siteMode,
-                isInternalUser,
                 login,
-                loginWithGoogle,
                 loginWithGoogle,
                 logout,
                 refreshUser,

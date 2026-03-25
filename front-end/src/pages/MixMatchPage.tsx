@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
-import { mixMatchService, type MixMatchItem } from "../services/mixMatchService";
+import { mixMatchService, type MixMatchItem, type MixMatchRule } from "../services/mixMatchService";
 import { cartService } from "../services/cartService";
 import { authService } from "../services/authService";
 
@@ -17,8 +17,6 @@ const toArray = (value: any) => {
     if (Array.isArray(value?.items)) return value.items;
     return [];
 };
-
-const EMPTY_SLOTS = Array.from({ length: 6 }, () => null as string | null);
 
 type DragSource = {
     id: string;
@@ -35,14 +33,16 @@ export default function MixMatchPage() {
     const [items, setItems] = useState<MixMatchItem[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [selectedCategory, setSelectedCategory] = useState("all");
-    const [slots, setSlots] = useState<Array<string | null>>(EMPTY_SLOTS);
+    const [slots, setSlots] = useState<Array<string | null>>(Array(6).fill(null));
     const [dragSource, setDragSource] = useState<DragSource | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [rules, setRules] = useState<MixMatchRule | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
     // Load initial slots if editing
     useEffect(() => {
         if (initialItems && Array.isArray(initialItems)) {
-            const newSlots = Array.from({ length: 6 }, () => null as string | null);
+            const newSlots = Array<string | null>(6).fill(null);
             let slotIdx = 0;
             initialItems.forEach((it: any) => {
                 const qty = it.Quantity ?? it.quantity ?? 1;
@@ -56,14 +56,29 @@ export default function MixMatchPage() {
     }, [initialItems]);
 
     useEffect(() => {
+        if (rules && slots.length !== rules.MaxItems) {
+            setSlots((prev) => {
+                if (prev.length < rules.MaxItems) {
+                    return [...prev, ...Array(rules.MaxItems - prev.length).fill(null)];
+                } else if (prev.length > rules.MaxItems) {
+                    return prev.slice(0, rules.MaxItems);
+                }
+                return prev;
+            });
+        }
+    }, [rules?.MaxItems]);
+
+    useEffect(() => {
         const load = async () => {
             try {
-                const [itemsRes, categoriesRes] = await Promise.all([
+                const [itemsRes, categoriesRes, rulesRes] = await Promise.all([
                     mixMatchService.getItems({ page: 1, pageSize: 50, isActive: true }),
                     mixMatchService.getCategories(),
+                    mixMatchService.getRules().catch(() => null),
                 ]);
                 setItems(toArray(itemsRes));
                 setCategories(toArray(categoriesRes));
+                if (rulesRes) setRules(rulesRes);
             } catch (err: unknown) {
                 const errMsg = err && typeof err === "object" && "message" in err ? String((err as { message: string }).message) : "Không thể tải dữ liệu Mix & Match.";
                 toast.error(errMsg);
@@ -73,22 +88,82 @@ export default function MixMatchPage() {
     }, []);
 
     const filteredItems = useMemo(() => {
-        if (selectedCategory === "all") return items;
-        return items.filter((item) => item.Category === selectedCategory);
-    }, [items, selectedCategory]);
+        let result = items;
+        if (selectedCategory !== "all") {
+            result = result.filter((item) => item.Category === selectedCategory);
+        }
+        if (searchQuery.trim() !== "") {
+            result = result.filter((item) => item.Name.toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+        return result;
+    }, [items, selectedCategory, searchQuery]);
 
     const slotItems = useMemo(() => {
         return slots.map((id) => items.find((entry) => entry.Id === id) ?? null);
     }, [slots, items]);
 
-    const totals = useMemo(() => {
-        const totalItems = slots.filter(Boolean).length;
-        const totalPrice = slotItems.reduce((sum, item) => sum + (item?.Price ?? 0), 0);
-        return { totalItems, totalPrice };
-    }, [slots, slotItems]);
+    const validation = useMemo(() => {
+        const validItems = slotItems.filter(Boolean);
+        const totalItems = validItems.length;
+        const totalPrice = validItems.reduce((sum, item) => sum + (item?.Price ?? 0), 0);
+
+        const minItems = rules?.MinItems ?? 3;
+        const maxItems = rules?.MaxItems ?? 6;
+        const minDrink = rules?.MinDrink ?? 1;
+        const minSnack = rules?.MinSnack ?? 2;
+        const maxSavory = rules?.MaxSavory ?? 2;
+
+        let drinkCount = 0;
+        let alcoholCount = 0;
+        let nutCount = 0;
+        let foodCount = 0;
+        let savoryCount = 0;
+
+        const savoryNames = ["Khô gà lá chanh", "Khô bò", "Chà bông cá hồi", "Lạp xưởng tươi"];
+
+        validItems.forEach(item => {
+            if (!item) return;
+
+            if (item.Category === "DRINK") drinkCount++;
+            if (item.Category === "ALCOHOL") alcoholCount++;
+            if (item.Category === "NUT") nutCount++;
+            if (item.Category === "FOOD") foodCount++;
+            if (item.Category === "SAVORY") savoryCount++;
+
+            if (savoryNames.includes(item.Name) && item.Category !== "SAVORY") savoryCount++;
+        });
+
+        const beverageCount = drinkCount + alcoholCount;
+        const snackCount = nutCount + foodCount;
+
+        const errors: string[] = [];
+        if (totalItems < minItems) errors.push(`Cần tối thiểu ${minItems} món (hiện có ${totalItems})`);
+        if (totalItems > maxItems) errors.push(`Tối đa ${maxItems} món (hiện có ${totalItems})`);
+        if (totalItems >= minItems && beverageCount < minDrink) errors.push(`Cần ít nhất ${minDrink} đồ uống (Trà/Rượu)`);
+        if (totalItems >= minItems && snackCount < minSnack) errors.push(`Cần ít nhất ${minSnack} snack (Hạt/Bánh/Kẹo)`);
+        if (savoryCount > maxSavory) errors.push(`Tối đa ${maxSavory} món đặc sản mặn (hiện có ${savoryCount})`);
+
+        const isValid = totalItems >= minItems && totalItems <= maxItems && errors.length === 0;
+
+        return { totalItems, totalPrice, isValid, errors, minItems, maxItems };
+    }, [slotItems, rules]);
 
     const handleDropToSlot = (slotIndex: number) => {
         if (!dragSource) return;
+
+        if (dragSource.fromSlot === null) {
+            const itemId = dragSource.id;
+            const item = items.find((i) => i.Id === itemId);
+            if (item && item.StockQuantity !== undefined) {
+                const currentCount = slots.filter((id) => id === itemId).length;
+                if (currentCount >= item.StockQuantity) {
+                    toast.error(`Sản phẩm "${item.Name}" chỉ còn ${item.StockQuantity} cái.`);
+                    setDragSource(null);
+                    return;
+                }
+            }
+        }
+
         setSlots((prev) => {
             const next = [...prev];
             if (dragSource.fromSlot === null) {
@@ -113,53 +188,7 @@ export default function MixMatchPage() {
         });
     };
 
-    const validateMixMatchRules = (): string | null => {
-        const validItems = slotItems.filter(Boolean);
-        const totalItems = validItems.length;
 
-        if (totalItems < 4 || totalItems > 6) {
-            return "Mix & Match phải có tổng từ 4 đến 6 món.";
-        }
-
-        let drinkCount = 0;
-        let alcoholCount = 0;
-        let nutCount = 0;
-        let foodCount = 0;
-        let savoryCount = 0;
-        let hasChivas21 = false;
-
-        const savoryNames = ["Khô gà lá chanh", "Khô bò", "Chà bông cá hồi", "Lạp xưởng tươi"];
-
-        validItems.forEach(item => {
-            if (!item) return;
-
-            if (item.Category === "DRINK") drinkCount++;
-            if (item.Category === "ALCOHOL") alcoholCount++;
-            if (item.Category === "NUT") nutCount++;
-            if (item.Category === "FOOD") foodCount++;
-
-            if (savoryNames.includes(item.Name)) savoryCount++;
-            if (item.Name.toLowerCase().includes("chivas 21")) hasChivas21 = true;
-        });
-
-        const snackCount = nutCount + foodCount;
-
-        if (drinkCount + alcoholCount < 1) {
-            return "Mix & Match phải có ít nhất 1 sản phẩm nhóm đồ uống (Trà hoặc Rượu).";
-        }
-        if (snackCount < 2) {
-            return "Mix & Match phải có ít nhất 2 sản phẩm nhóm snack (Hạt/Bánh/Kẹo).";
-        }
-        if (hasChivas21 && totalItems > 4) {
-            return "Nếu hộp có Chivas 21, tổng số item tối đa là 4.";
-        }
-
-        if (hasChivas21 && savoryCount > 1) {
-            return "Hộp có Chivas 21 chỉ được chọn tối đa 1 món mặn.";
-        }
-
-        return null;
-    };
 
     const buildItemsPayload = () => {
         const payload = slots
@@ -173,9 +202,8 @@ export default function MixMatchPage() {
     };
 
     const handleCreateCustomBox = async () => {
-        const validationError = validateMixMatchRules();
-        if (validationError) {
-            toast.error(validationError);
+        if (!validation.isValid) {
+            toast.error(validation.errors[0] || "Giỏ quà chưa hợp lệ");
             return;
         }
 
@@ -200,9 +228,8 @@ export default function MixMatchPage() {
     };
 
     const handleAddToCart = async () => {
-        const validationError = validateMixMatchRules();
-        if (validationError) {
-            toast.error(validationError);
+        if (!validation.isValid) {
+            toast.error(validation.errors[0] || "Giỏ quà chưa hợp lệ");
             return;
         }
 
@@ -228,9 +255,8 @@ export default function MixMatchPage() {
     };
 
     const handleBuyNow = async () => {
-        const validationError = validateMixMatchRules();
-        if (validationError) {
-            toast.error(validationError);
+        if (!validation.isValid) {
+            toast.error(validation.errors[0] || "Giỏ quà chưa hợp lệ");
             return;
         }
 
@@ -308,33 +334,58 @@ export default function MixMatchPage() {
                         </span>
                         <span className="text-[#8B1A1A]"> giỏ quà</span>
                     </h1>
-                    <p className="text-sm text-gray-500">Kéo thả món quà vào từng ngăn để sắp xếp hộp quà (4 - 6 sản phẩm).</p>
+                    <p className="text-sm text-gray-500">Kéo thả món quà vào từng ngăn để sắp xếp hộp quà ({rules?.MinItems ?? 3} - {rules?.MaxItems ?? 6} sản phẩm).</p>
                 </section>
 
                 <main className="flex-1 max-w-7xl w-full mx-auto px-4 lg:px-8 pb-14">
-                    <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8">
-                        <div>
-                            <div className="bg-white rounded-2xl p-4 shadow-sm mb-6 flex flex-wrap gap-3">
-                                <button
-                                    className={`px-4 py-2 text-sm rounded-full border ${selectedCategory === "all" ? "bg-[#8B1A1A] text-white border-[#8B1A1A]" : "border-gray-200 text-gray-500"}`}
-                                    onClick={() => setSelectedCategory("all")}
-                                >
-                                    Tất cả
-                                </button>
-                                {categories.map((category) => (
-                                    <button
-                                        key={category.value ?? category.Value}
-                                        className={`px-4 py-2 text-sm rounded-full border ${selectedCategory === (category.value ?? category.Value)
-                                            ? "bg-[#8B1A1A] text-white border-[#8B1A1A]"
-                                            : "border-gray-200 text-gray-500"}`}
-                                        onClick={() => setSelectedCategory(category.value ?? category.Value)}
-                                    >
-                                        {category.label ?? category.Label}
-                                    </button>
-                                ))}
-                            </div>
+                    <div className="flex flex-col xl:flex-row gap-6 items-start">
+                        
+                        {/* LEFT SIDEBAR: Search & Filters */}
+                        <aside className="w-full xl:w-[240px] shrink-0 xl:sticky xl:top-6 z-10">
+                            <div className="bg-white rounded-2xl p-5 shadow-sm">
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 mb-4">Tìm kiếm & Lọc</h3>
+                                
+                                <div className="relative mb-5">
+                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <input 
+                                        type="text" 
+                                        placeholder="Nhập tên sản phẩm..." 
+                                        className="w-full pl-9 pr-4 py-2 bg-[#F5F5F0] border-transparent rounded-lg text-sm focus:ring-[#8B1A1A] focus:border-[#8B1A1A] outline-none"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                                <div className="flex xl:flex-col gap-2 overflow-x-auto pb-2 xl:pb-0 hide-scrollbar">
+                                    <button
+                                        className={`shrink-0 xl:w-full text-left px-4 py-2.5 text-sm rounded-lg transition-all ${selectedCategory === "all" ? "bg-[#8B1A1A] text-white font-medium shadow-sm" : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
+                                        onClick={() => setSelectedCategory("all")}
+                                    >
+                                        Tất cả danh mục
+                                    </button>
+                                    {categories.map((category) => (
+                                        <button
+                                            key={category.value ?? category.Value}
+                                            className={`shrink-0 xl:w-full text-left px-4 py-2.5 text-sm rounded-lg transition-all ${selectedCategory === (category.value ?? category.Value)
+                                                ? "bg-[#8B1A1A] text-white font-medium shadow-sm"
+                                                : "bg-gray-50 text-gray-600 hover:bg-gray-100"}`}
+                                            onClick={() => setSelectedCategory(category.value ?? category.Value)}
+                                        >
+                                            {category.label ?? category.Label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </aside>
+
+                        {/* RIGHT WRAPPER: Products & Custom Box Container */}
+                        <div className="flex-1 w-full min-w-0 grid grid-cols-1 lg:grid-cols-[1fr_420px] xl:grid-cols-[1fr_360px] gap-6">
+                            
+                            {/* PRODUCTS LIST */}
+                            <div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5">
                                 {filteredItems.map((item) => (
                                     <div
                                         key={item.Id}
@@ -358,10 +409,11 @@ export default function MixMatchPage() {
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                            </div>
 
-                        <div>
-                            <div className="bg-white rounded-2xl p-6 shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto">
+                            {/* CUSTOM BOX PANEL */}
+                            <div className="max-lg:w-full">
+                                <div className="bg-white rounded-2xl p-6 shadow-sm lg:sticky lg:top-6 lg:max-h-[calc(100vh-96px)] lg:overflow-y-auto">
                                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 mb-4">Hộp quà của bạn</h3>
                                 <p className="text-xs text-gray-500 mb-5">Kéo thả để lấp đầy từng ngăn hoặc đổi vị trí.</p>
 
@@ -407,37 +459,51 @@ export default function MixMatchPage() {
                                 <div className="border-t border-gray-200 mt-5 pt-4 space-y-2 text-sm">
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-500">Tổng sản phẩm</span>
-                                        <span className={`font-semibold ${totals.totalItems >= 4 && totals.totalItems <= 6 ? "text-green-600" : "text-orange-500"}`}>{totals.totalItems}</span>
+                                        <span className={`font-semibold ${validation.totalItems >= validation.minItems && validation.totalItems <= validation.maxItems && validation.errors.length === 0 ? "text-green-600" : "text-orange-500"}`}>{validation.totalItems}</span>
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <span className="text-gray-500">Tổng tiền</span>
-                                        <span className="font-semibold text-[#8B1A1A]">{formatPrice(totals.totalPrice)}</span>
+                                        <span className="font-semibold text-[#8B1A1A]">{formatPrice(validation.totalPrice)}</span>
                                     </div>
                                 </div>
+
+                                {validation.errors.length > 0 && validation.totalItems > 0 && (
+                                    <div className="bg-red-50 border border-red-100 rounded-lg p-3 mt-4 space-y-1.5">
+                                        {validation.errors.map((err, idx) => (
+                                            <div key={idx} className="flex items-start text-red-600 text-xs gap-1.5">
+                                                <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                                <span>{err}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
 
                                 <div className="mt-5 space-y-3">
                                     <button
                                         className="w-full py-3 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors disabled:bg-gray-400"
-                                        disabled={totals.totalItems < 4 || totals.totalItems > 6 || isSubmitting}
+                                        disabled={!validation.isValid || isSubmitting}
                                         onClick={handleCreateCustomBox}
                                     >
                                         {isSubmitting ? "Đang xử lý..." : editBoxId ? "Lưu thay đổi giỏ quà" : "Tạo giỏ quà Mix & Match"}
                                     </button>
                                     <button
                                         className="w-full py-3 border border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/10 transition-colors disabled:bg-gray-100 disabled:text-gray-400 disabled:border-gray-200"
-                                        disabled={totals.totalItems < 4 || totals.totalItems > 6 || isSubmitting}
+                                        disabled={!validation.isValid || isSubmitting}
                                         onClick={handleAddToCart}
                                     >
                                         Thêm vào giỏ hàng
                                     </button>
                                     <button
                                         className="w-full py-3 bg-[#1B3022] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#142318] transition-colors disabled:bg-gray-400"
-                                        disabled={totals.totalItems < 4 || totals.totalItems > 6 || isSubmitting}
+                                        disabled={!validation.isValid || isSubmitting}
                                         onClick={handleBuyNow}
                                     >
                                         Mua ngay
                                     </button>
                                 </div>
+                            </div>
                             </div>
                         </div>
                     </div>

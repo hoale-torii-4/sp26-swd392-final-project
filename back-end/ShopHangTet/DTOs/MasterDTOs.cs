@@ -682,14 +682,8 @@ namespace ShopHangTet.DTOs
         public int AlcoholCount { get; set; }
         public bool HasChivas12 { get; set; }
         public bool HasChivas21 { get; set; }
-        
-        public bool MeetsRules =>
-            TotalItemCount >= 4
-            && TotalItemCount <= 6
-            && (DrinkCount + AlcoholCount) >= 1
-            && SnackCount >= 2
-            && SavoryCount <= 2
-            && (!HasChivas21 || SavoryCount <= 1);
+
+        public bool MeetsRules => IsValid;
     }
 
     // ========== ORDER RESPONSE DTOs ==========

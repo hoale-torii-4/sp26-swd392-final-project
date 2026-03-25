@@ -42,8 +42,8 @@ namespace ShopHangTet.Services
         /// Lấy đơn hàng theo mã đơn (cho frontend polling)
         Task<OrderModel?> GetOrderByCodeAsync(string orderCode);
 
-        // === Inventory Reservation ===
-        /// Release reserved inventory khi cancel/expire
+        // === Inventory ===
+        /// Restock inventory khi cancel/expire
         Task ReleaseInventoryReservationAsync(OrderModel order, string updatedBy);
 
         // === Delivery Management ===

@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     View, Text, FlatList, TouchableOpacity, StyleSheet,
-    Platform, Dimensions, ScrollView, ActivityIndicator, Alert,
+    Platform, Dimensions, ScrollView, ActivityIndicator, Alert, TextInput
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
-import { mixMatchService, type MixMatchItem, type CustomBoxItemResponse } from '../services/mixMatchService';
+import { mixMatchService, type MixMatchItem, type CustomBoxItemResponse, type MixMatchRule } from '../services/mixMatchService';
 import { cartService } from '../services/cartService';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 const { width } = Dimensions.get('window');
 const ITEM_CARD_WIDTH = (width - Spacing.lg * 2 - Spacing.md) / 2;
-const EMPTY_SLOTS = Array.from({ length: 6 }, () => null as string | null);
 
 function formatPrice(v: number) {
     return v.toLocaleString('vi-VN') + '₫';
@@ -28,17 +27,20 @@ export default function MixMatchScreen() {
     const [items, setItems] = useState<MixMatchItem[]>([]);
     const [categories, setCategories] = useState<any[]>([]);
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [rules, setRules] = useState<MixMatchRule | null>(null);
     
     // Initialize slots based on edit mode params if available
     const initialSlots = useMemo(() => {
-        if (!isEditMode || !params.items) return [...EMPTY_SLOTS];
+        const defaultMax = 6;
+        if (!isEditMode || !params.items) return Array(defaultMax).fill(null);
         try {
             const parsedItems: CustomBoxItemResponse[] = JSON.parse(params.items);
-            const loadedSlots = [...EMPTY_SLOTS];
+            const loadedSlots = Array(defaultMax).fill(null);
             let slotIdx = 0;
             parsedItems.forEach((it) => {
                 for (let i = 0; i < it.Quantity; i++) {
-                    if (slotIdx < 6) {
+                    if (slotIdx < defaultMax) {
                         loadedSlots[slotIdx] = it.ItemId;
                         slotIdx++;
                     }
@@ -46,7 +48,7 @@ export default function MixMatchScreen() {
             });
             return loadedSlots;
         } catch {
-            return [...EMPTY_SLOTS];
+            return Array(defaultMax).fill(null);
         }
     }, [isEditMode, params.items]);
 
@@ -56,14 +58,30 @@ export default function MixMatchScreen() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        if (rules && slots.length !== rules.MaxItems) {
+            setSlots((prev) => {
+                if (prev.length < rules.MaxItems) {
+                    return [...prev, ...Array(rules.MaxItems - prev.length).fill(null)];
+                } else if (prev.length > rules.MaxItems) {
+                    // Only truncate if we're not losing items, or we could just force slice, but let's be safe.
+                    return prev.slice(0, rules.MaxItems);
+                }
+                return prev;
+            });
+        }
+    }, [rules?.MaxItems]);
+
+    useEffect(() => {
         const load = async () => {
             try {
-                const [itemsRes, categoriesRes] = await Promise.all([
+                const [itemsRes, categoriesRes, rulesRes] = await Promise.all([
                     mixMatchService.getItems({ page: 1, pageSize: 50, isActive: true }),
                     mixMatchService.getCategories(),
+                    mixMatchService.getRules().catch(() => null),
                 ]);
                 setItems(Array.isArray(itemsRes) ? itemsRes : itemsRes?.Data || itemsRes?.items || []);
                 setCategories(Array.isArray(categoriesRes) ? categoriesRes : categoriesRes?.Data || categoriesRes?.items || []);
+                if (rulesRes) setRules(rulesRes);
             } catch (err: any) {
                 setError(err.message || 'Không thể tải dữ liệu Mix & Match.');
             } finally {
@@ -74,9 +92,15 @@ export default function MixMatchScreen() {
     }, []);
 
     const filteredItems = useMemo(() => {
-        if (selectedCategory === 'all') return items;
-        return items.filter((item) => item.Category === selectedCategory);
-    }, [items, selectedCategory]);
+        let result = items;
+        if (selectedCategory !== 'all') {
+            result = result.filter((item) => item.Category === selectedCategory);
+        }
+        if (searchQuery.trim() !== '') {
+            result = result.filter((item) => item.Name.toLowerCase().includes(searchQuery.toLowerCase()));
+        }
+        return result;
+    }, [items, selectedCategory, searchQuery]);
 
     const slotItems = useMemo(() => {
         return slots.map((id) => items.find((entry) => entry.Id === id) ?? null);
@@ -97,32 +121,44 @@ export default function MixMatchScreen() {
         const snackCount = foodCount + nutCount;
         const savoryCount = filledSlots.filter(i => i.Category === 'SAVORY').length;
 
-        // Chivas rules
-        const hasChivas21 = filledSlots.some(i => i.Name?.toLowerCase().includes('chivas 21') || i.Name?.toLowerCase().includes('chivas21'));
-        const hasChivas12 = filledSlots.some(i => i.Name?.toLowerCase().includes('chivas 12') || i.Name?.toLowerCase().includes('chivas12'));
-        const maxItemsForChivas = hasChivas21 ? 4 : hasChivas12 ? 5 : 6;
+        const maxItems = rules?.MaxItems ?? 6;
+        const minItems = rules?.MinItems ?? 3;
+        const minDrink = rules?.MinDrink ?? 1;
+        const minSnack = rules?.MinSnack ?? 2;
+        const maxSavory = rules?.MaxSavory ?? 2;
 
         const errors: string[] = [];
-        if (totalItems < 4) errors.push(`Cần tối thiểu 4 món (hiện có ${totalItems})`);
-        if (totalItems > 6) errors.push(`Tối đa 6 món (hiện có ${totalItems})`);
-        if (totalItems >= 4 && beverageCount < 1) errors.push('Cần ít nhất 1 đồ uống (Trà hoặc Rượu)');
-        if (totalItems >= 4 && snackCount < 2) errors.push(`Cần ít nhất 2 snack/hạt (hiện có ${snackCount})`);
-        if (savoryCount > 2) errors.push(`Đặc sản mặn tối đa 2 (hiện có ${savoryCount})`);
-        if (hasChivas21 && totalItems > 4) errors.push('Có Chivas 21: tối đa 4 món');
-        if (hasChivas12 && !hasChivas21 && totalItems > 5) errors.push('Có Chivas 12: tối đa 5 món');
+        if (totalItems < minItems) errors.push(`Cần tối thiểu ${minItems} món (hiện có ${totalItems})`);
+        if (totalItems > maxItems) errors.push(`Tối đa ${maxItems} món (hiện có ${totalItems})`);
+        if (totalItems >= minItems && beverageCount < minDrink) errors.push(`Cần ít nhất ${minDrink} đồ uống (Trà hoặc Rượu)`);
+        if (totalItems >= minItems && snackCount < minSnack) errors.push(`Cần ít nhất ${minSnack} snack/hạt (hiện có ${snackCount})`);
+        if (savoryCount > maxSavory) errors.push(`Đặc sản mặn tối đa ${maxSavory} (hiện có ${savoryCount})`);
 
-        const isValid = totalItems >= 4 && totalItems <= 6 && errors.length === 0;
+        const isValid = totalItems >= minItems && totalItems <= maxItems && errors.length === 0;
 
-        return { totalItems, totalPrice, isValid, errors, beverageCount, snackCount, savoryCount, maxItemsForChivas };
-    }, [slotItems]);
+        return { totalItems, totalPrice, isValid, errors, beverageCount, snackCount, savoryCount, maxItems, minItems };
+    }, [slotItems, rules]);
 
     const handleAddItem = (itemId: string) => {
+        const itemInfo = items.find(i => i.Id === itemId);
+        if (itemInfo && itemInfo.StockQuantity !== undefined) {
+             const currentCount = slots.filter(id => id === itemId).length;
+             if (currentCount >= itemInfo.StockQuantity) {
+                  Toast.show({
+                      type: 'error',
+                      text1: 'Vượt quá số lượng',
+                      text2: `Sản phẩm "${itemInfo.Name}" chỉ còn ${itemInfo.StockQuantity} cái.`
+                  });
+                  return;
+             }
+        }
+
         const firstEmptyIndex = slots.findIndex((s) => s === null);
-        if (firstEmptyIndex === -1) {
+        if (firstEmptyIndex === -1 || firstEmptyIndex >= validation.maxItems) {
             Toast.show({
                 type: 'info',
                 text1: 'Hộp quà đã đầy',
-                text2: 'Tối đa 6 sản phẩm.'
+                text2: `Tối đa ${validation.maxItems} sản phẩm.`
             });
             return;
         }
@@ -223,13 +259,13 @@ export default function MixMatchScreen() {
                 </TouchableOpacity>
                 <View style={styles.headerText}>
                     <Text style={styles.headerTitle}>Mix & Match</Text>
-                    <Text style={styles.headerSubtitle}>Tự tạo giỏ quà riêng (4 - 6 món)</Text>
+                    <Text style={styles.headerSubtitle}>Tự tạo giỏ quà riêng ({rules?.MinItems ?? 3} - {rules?.MaxItems ?? 6} món)</Text>
                 </View>
             </View>
 
             {/* Custom Box Slots (Fixed) */}
             <View style={styles.slotsSection}>
-                <Text style={styles.sectionTitle}>Hộp quà của bạn ({validation.totalItems}/{validation.maxItemsForChivas})</Text>
+                <Text style={styles.sectionTitle}>Hộp quà của bạn ({validation.totalItems}/{validation.maxItems})</Text>
                 <View style={styles.slotsGrid}>
                     {slotItems.map((slotItem, index) => (
                         <TouchableOpacity 
@@ -253,8 +289,18 @@ export default function MixMatchScreen() {
             </View>
 
             <ScrollView stickyHeaderIndices={[0]} showsVerticalScrollIndicator={false}>
-                {/* Categories Tab */}
+                {/* Categories Tab and Search */}
                 <View style={styles.categoriesBar}>
+                    <View style={styles.searchContainer}>
+                        <Ionicons name="search" size={20} color={AppColors.textMuted} />
+                        <TextInput 
+                            style={styles.searchInput}
+                            placeholder="Tìm kiếm sản phẩm..."
+                            value={searchQuery}
+                            onChangeText={setSearchQuery}
+                            returnKeyType="search"
+                        />
+                    </View>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContent}>
                         <TouchableOpacity
                             style={[styles.categoryTab, selectedCategory === 'all' && styles.categoryTabActive]}
@@ -297,8 +343,8 @@ export default function MixMatchScreen() {
                         <Text style={styles.totalLabel}>Tổng tiền</Text>
                         <Text style={styles.totalValue}>{formatPrice(validation.totalPrice)}</Text>
                     </View>
-                    <Text style={[styles.itemCount, { color: validation.totalItems >= 4 ? AppColors.success : AppColors.error }]}>
-                        {validation.totalItems}/{validation.maxItemsForChivas} món
+                    <Text style={[styles.itemCount, { color: validation.totalItems >= validation.minItems ? AppColors.success : AppColors.error }]}>
+                        {validation.totalItems}/{validation.maxItems} món
                     </Text>
                 </View>
 
@@ -359,6 +405,11 @@ const styles = StyleSheet.create({
     removeIcon: { position: 'absolute', top: -5, right: -5, backgroundColor: '#FFF', borderRadius: 9 },
 
     categoriesBar: { backgroundColor: AppColors.surface, borderBottomWidth: 1, borderBottomColor: AppColors.borderLight },
+    searchContainer: {
+        flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6',
+        marginHorizontal: Spacing.lg, marginTop: 12, borderRadius: 8, paddingHorizontal: 10, height: 40
+    },
+    searchInput: { flex: 1, marginLeft: 8, fontSize: 13, color: AppColors.text },
     categoriesContent: { paddingHorizontal: Spacing.lg, paddingVertical: 12, gap: 10 },
     categoryTab: {
         paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,

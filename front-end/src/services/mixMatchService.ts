@@ -9,9 +9,16 @@ export interface MixMatchItem {
     Price?: number;
     IsAlcohol?: boolean;
     StockQuantity?: number;
-    StockStatus?: string;
     StockStatusLabel?: string;
     IsActive?: boolean;
+}
+
+export interface MixMatchRule {
+    MinItems: number;
+    MaxItems: number;
+    MinDrink: number;
+    MinSnack: number;
+    MaxSavory: number;
 }
 
 export interface CustomBoxItemPayload {
@@ -26,6 +33,10 @@ export const mixMatchService = {
     },
     getCategories: async () => {
         const res = await apiClient.get("/admin/mix-match/categories");
+        return res.data;
+    },
+    getRules: async (): Promise<MixMatchRule> => {
+        const res = await apiClient.get("/admin/mix-match/rules");
         return res.data;
     },
     createCustomBox: async (items: CustomBoxItemPayload[]) => {

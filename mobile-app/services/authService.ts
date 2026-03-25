@@ -5,7 +5,6 @@ import type {
     RegisterResponse,
     LoginRequest,
     GoogleLoginRequest,
-    GoogleLoginRequest,
     LoginResponse,
     ApiResponse,
     User,
@@ -93,22 +92,6 @@ export const authService = {
     },
 
     getUser: async (): Promise<User | null> => {
-        const token = await AsyncStorage.getItem(TOKEN_KEY);
-        if (!token) return null;
-
-        try {
-            const response = await apiClient.get<ApiResponse<User>>(`${AUTH_ENDPOINT}/me`);
-            const result = response.data;
-
-            if (result.Success && result.Data) {
-                const normalized = normalizeUser(result.Data);
-                await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalized));
-                return normalized;
-            }
-        } catch {
-            // fallback to cached user for temporary network failure
-        }
-
         const token = await AsyncStorage.getItem(TOKEN_KEY);
         if (!token) return null;
 
