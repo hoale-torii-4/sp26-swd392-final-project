@@ -9,7 +9,9 @@ public enum OrderStatus
     PARTIAL_DELIVERY,
     DELIVERY_FAILED,
     COMPLETED,
-    CANCELLED
+    CANCELLED,
+    REFUNDING,
+    REFUNDED
 }
 
 public enum OrderType

@@ -8,6 +8,8 @@ export const OrderStatus = Object.freeze({
   DELIVERY_FAILED: 'DELIVERY_FAILED',
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
+  REFUNDING: 'REFUNDING',
+  REFUNDED: 'REFUNDED',
 });
 
 export const OrderType = Object.freeze({

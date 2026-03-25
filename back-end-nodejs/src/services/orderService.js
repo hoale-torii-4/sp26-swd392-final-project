@@ -63,6 +63,11 @@ export class OrderService {
     const order = await Order.findById(orderId);
     if (!order) throw new Error('Order not found');
 
+    if (status === OrderStatus.CANCELLED && order.status !== OrderStatus.PAYMENT_CONFIRMING && order.status !== OrderStatus.PAYMENT_EXPIRED_INTERNAL) {
+      status = OrderStatus.REFUNDING;
+      notes = notes ? `${notes} [Chuyển tự động sang REFUNDING do đơn đã thanh toán]` : '[Chuyển tự động sang REFUNDING do đơn đã thanh toán]';
+    }
+
     if (!this._isValidStatusTransition(order.status, status)) {
       throw new Error('Invalid order status transition');
     }
@@ -72,8 +77,8 @@ export class OrderService {
       await this._applyInventoryOnPreparing(order, updatedBy);
     }
 
-    // Release reserved inventory when cancelling
-    if (status === OrderStatus.CANCELLED) {
+    // Release reserved inventory when cancelling or refunding
+    if (status === OrderStatus.CANCELLED || status === OrderStatus.REFUNDING) {
       await this.releaseInventoryReservation(order, updatedBy);
     }
 
@@ -450,10 +455,11 @@ export class OrderService {
   _isValidStatusTransition(current, next) {
     const validTransitions = {
       [OrderStatus.PAYMENT_CONFIRMING]: [OrderStatus.PREPARING, OrderStatus.CANCELLED, OrderStatus.PAYMENT_EXPIRED_INTERNAL],
-      [OrderStatus.PREPARING]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED],
-      [OrderStatus.SHIPPING]: [OrderStatus.COMPLETED, OrderStatus.PARTIAL_DELIVERY, OrderStatus.DELIVERY_FAILED],
-      [OrderStatus.PARTIAL_DELIVERY]: [OrderStatus.COMPLETED, OrderStatus.SHIPPING],
-      [OrderStatus.DELIVERY_FAILED]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED],
+      [OrderStatus.PREPARING]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED, OrderStatus.REFUNDING],
+      [OrderStatus.SHIPPING]: [OrderStatus.COMPLETED, OrderStatus.PARTIAL_DELIVERY, OrderStatus.DELIVERY_FAILED, OrderStatus.CANCELLED, OrderStatus.REFUNDING],
+      [OrderStatus.PARTIAL_DELIVERY]: [OrderStatus.COMPLETED, OrderStatus.SHIPPING, OrderStatus.CANCELLED, OrderStatus.REFUNDING],
+      [OrderStatus.DELIVERY_FAILED]: [OrderStatus.SHIPPING, OrderStatus.CANCELLED, OrderStatus.REFUNDING],
+      [OrderStatus.REFUNDING]: [OrderStatus.REFUNDED],
     };
     return validTransitions[current]?.includes(next) || false;
   }

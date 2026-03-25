@@ -655,13 +655,21 @@ namespace ShopHangTet.Services
                 throw new InvalidOperationException("Order not found");
             }
 
+            if (status == Models.OrderStatus.CANCELLED && order.PaymentDate.HasValue)
+            {
+                status = Models.OrderStatus.REFUNDING;
+                notes = string.IsNullOrWhiteSpace(notes) 
+                    ? "[Chuyển tự động sang REFUNDING do đơn đã thanh toán]" 
+                    : notes + " [Chuyển tự động sang REFUNDING do đơn đã thanh toán]";
+            }
+
             if (!IsValidStatusTransition(order.Status, status))
             {
                 throw new InvalidOperationException("Invalid order status transition");
             }
 
             // Cancel flow: stock đã bị trừ ngay khi tạo đơn, nên hủy là hoàn kho.
-            if (status == Models.OrderStatus.CANCELLED)
+            if (status == Models.OrderStatus.CANCELLED || status == Models.OrderStatus.REFUNDING)
             {
                 await RestockOrderInventoryAsync(order, updatedBy);
             }
@@ -1248,7 +1256,13 @@ namespace ShopHangTet.Services
                    || (currentStatus == OrderStatus.DELIVERY_FAILED && nextStatus == OrderStatus.CANCELLED)
                    || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.SHIPPING) // reship remaining
                    || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.COMPLETED)
-                   || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.CANCELLED);
+                   || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.CANCELLED)
+                   // Refund transitions
+                   || (currentStatus == OrderStatus.PREPARING && nextStatus == OrderStatus.REFUNDING)
+                   || (currentStatus == OrderStatus.SHIPPING && nextStatus == OrderStatus.REFUNDING)
+                   || (currentStatus == OrderStatus.PARTIAL_DELIVERY && nextStatus == OrderStatus.REFUNDING)
+                   || (currentStatus == OrderStatus.DELIVERY_FAILED && nextStatus == OrderStatus.REFUNDING)
+                   || (currentStatus == OrderStatus.REFUNDING && nextStatus == OrderStatus.REFUNDED);
         }
 
         private async Task<List<OrderItemSnapshotItem>> BuildGiftBoxSnapshotItemsAsync(GiftBox giftBox)
