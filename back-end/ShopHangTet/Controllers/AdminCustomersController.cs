@@ -30,7 +30,7 @@ namespace ShopHangTet.Controllers
         public async Task<ActionResult<UserResponseDto>> GetCustomerById(string id)
         {
             var user = await _service.GetCustomerByIdAsync(id);
-            if (user == null) return NotFound(new ApiResponse
+            if (user == null) return NotFound(new ApiResponse<object>
             {
                 Success = false,
                 Message = "Không tìm thấy khách hàng này.",
