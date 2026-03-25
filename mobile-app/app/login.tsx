@@ -263,10 +263,6 @@ export default function LoginScreen() {
                         <Text style={styles.registerLink}>Đăng ký ngay</Text>
                     </TouchableOpacity>
                 </View>
-
-                <View style={styles.securityRow}>
-                    <Text style={styles.securityText}>🔒 Hệ thống bảo mật tiêu chuẩn quốc tế</Text>
-                </View>
             </ScrollView>
 
             <Modal visible={sitePickerVisible} transparent animationType="fade">
