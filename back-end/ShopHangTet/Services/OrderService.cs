@@ -621,21 +621,40 @@ namespace ShopHangTet.Services
             // For admin list, we show TotalItems based on the order's total amount
             // since exact item-to-order linking requires more complex logic.
 
+            var userIds = pageItems
+                .Where(o => o.UserId != null)
+                .Select(o => o.UserId.ToString()!)
+                .Distinct()
+                .ToList();
+
+            var userMap = new Dictionary<string, UserModel>();
+            if (userIds.Any())
+            {
+                var users = await _context.Users.Where(u => userIds.Contains(u.Id)).ToListAsync();
+                userMap = users.ToDictionary(u => u.Id, u => u);
+            }
+
             return new AdminOrderListResult
             {
-                Data = pageItems.Select(o => new AdminOrderListItem
+                Data = pageItems.Select(o => 
                 {
-                    Id = o.Id.ToString(),
-                    OrderCode = o.OrderCode ?? string.Empty,
-                    CustomerName = o.CustomerName ?? string.Empty,
-                    CustomerEmail = o.CustomerEmail ?? string.Empty,
-                    CustomerPhone = o.CustomerPhone ?? string.Empty,
-                    OrderType = o.OrderType.ToString(),
-                    Status = o.Status.ToString(),
-                    TotalAmount = o.TotalAmount,
-                    TotalItems = o.Items?.Count > 0 ? o.Items.Sum(i => i.Quantity) : 1,
-                    CreatedAt = o.CreatedAt,
-                    DeliveryDate = o.DeliveryDate,
+                    userMap.TryGetValue(o.UserId?.ToString() ?? string.Empty, out var user);
+                    return new AdminOrderListItem
+                    {
+                        Id = o.Id.ToString(),
+                        OrderCode = o.OrderCode ?? string.Empty,
+                        CustomerName = o.CustomerName ?? string.Empty,
+                        CustomerEmail = o.CustomerEmail ?? string.Empty,
+                        CustomerPhone = o.CustomerPhone ?? string.Empty,
+                        OrderType = o.OrderType.ToString(),
+                        Status = o.Status.ToString(),
+                        TotalAmount = o.TotalAmount,
+                        TotalItems = o.Items?.Count > 0 ? o.Items.Sum(i => i.Quantity) : 1,
+                        CreatedAt = o.CreatedAt,
+                        DeliveryDate = o.DeliveryDate,
+                        BankName = user?.BankName,
+                        BankAccountNumber = user?.BankAccountNumber
+                    };
                 }).ToList(),
                 TotalItems = totalItems,
                 Page = page,
@@ -962,6 +981,10 @@ namespace ShopHangTet.Services
         {
             var enrichedItems = await BuildOrderItemResponsesAsync(order.Items ?? new List<OrderItem>());
 
+            var user = order.UserId != null 
+                ? await _context.Users.FirstOrDefaultAsync(u => u.Id == order.UserId.ToString()) 
+                : null;
+
             var result = new OrderDto
             {
                 Id = order.Id.ToString(),
@@ -975,6 +998,8 @@ namespace ShopHangTet.Services
                 GreetingMessage = order.GreetingMessage,
                 GreetingCardUrl = order.GreetingCardUrl,
                 CreatedAt = order.CreatedAt,
+                CustomerBankName = user?.BankName,
+                CustomerBankAccount = user?.BankAccountNumber,
                 Items = enrichedItems
             };
 

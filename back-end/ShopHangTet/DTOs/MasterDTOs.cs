@@ -719,6 +719,8 @@ namespace ShopHangTet.DTOs
         public string? GreetingMessage { get; set; }
         public string? GreetingCardUrl { get; set; }
         public DateTime CreatedAt { get; set; }
+        public string? CustomerBankName { get; set; }
+        public string? CustomerBankAccount { get; set; }
         public List<OrderItemResponseDto> Items { get; set; } = new();
         public List<DeliveryAddressResponseDto> DeliveryAddresses { get; set; } = new();
         public List<DeliveryShipmentResponseDto> DeliveryShipments { get; set; } = new();

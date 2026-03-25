@@ -98,6 +98,8 @@ namespace ShopHangTet.Services
         public int TotalItems { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime? DeliveryDate { get; set; }
+        public string? BankName { get; set; }
+        public string? BankAccountNumber { get; set; }
     }
 
 }
