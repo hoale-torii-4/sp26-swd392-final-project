@@ -202,9 +202,9 @@ export const authService = {
 
     /**
      * PUT /api/Auth/profile
-     * Updates user's name and phone number.
+     * Updates user's name, phone number, and bank details.
      */
-    updateProfile: async (data: { fullName: string; phone: string | null; bankName?: string | null; bankAccountNumber?: string | null; bankAccountName?: string | null }) => {
+    updateProfile: async (data: { fullName: string; phone: string | null; bankName?: string; bankAccountNumber?: string }) => {
         const response = await apiClient.put<ApiResponse>(
             `${AUTH_ENDPOINT}/profile`,
             data,
@@ -223,14 +223,5 @@ export const authService = {
             store.setItem(USER_KEY, JSON.stringify(loginRes.User));
         }
         return result;
-    },
-
-    /**
-     * Check if user has completed bank account information.
-     */
-    hasBankInfo: (): boolean => {
-        const user = authService.getUser();
-        if (!user) return false;
-        return !!(user.BankName && user.BankAccountNumber && user.BankAccountName);
     },
 };

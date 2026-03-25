@@ -27,10 +27,11 @@ export default function CheckoutPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deliveryMethod, setDeliveryMethod] = useState<"single" | "multi">("single");
-    const [guestAgreedNoRefund, setGuestAgreedNoRefund] = useState(false);
-    const [showBankInfoModal, setShowBankInfoModal] = useState(false);
     const isLoggedIn = authService.isAuthenticated();
-    const hasBankInfo = isLoggedIn ? authService.hasBankInfo() : false;
+    const user = authService.getUser();
+    
+    // Checkbox state for guests
+    const [guestAgreedToNoRefund, setGuestAgreedToNoRefund] = useState(false);
 
     const checkoutState = location.state as
         | {
@@ -279,61 +280,51 @@ export default function CheckoutPage() {
                                 )}
                             </div>
 
+                            {/* ── Bank Account Warning for Logged-In Users ── */}
+                            {isLoggedIn && (!user?.BankName || !user?.BankAccountNumber) && (
+                                <div className="mt-4 p-4 rounded-xl bg-red-50 border border-red-100 flex items-start gap-3">
+                                    <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    <div>
+                                        <p className="text-sm font-bold text-red-800">Cập nhật thông tin ngân hàng</p>
+                                        <p className="text-xs text-red-600 mt-1 leading-relaxed">
+                                            Để tiến hành đặt hàng, bạn cần cập nhật thông tin tên ngân hàng và số tài khoản trong hồ sơ, nhằm hỗ trợ hoàn tiền khi có sự cố giao dịch.
+                                        </p>
+                                        <Link to="/account" className="inline-block mt-2 text-xs font-bold text-red-700 underline hover:text-red-900">
+                                            Đến trang hồ sơ
+                                        </Link>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ── Guest Refund Policy Checkbox ── */}
+                            {!isLoggedIn && (
+                                <div className="mt-4 p-4 rounded-xl bg-amber-50 border border-amber-100 flex items-start gap-3">
+                                    <input 
+                                        type="checkbox" 
+                                        id="guest-refund-policy"
+                                        checked={guestAgreedToNoRefund}
+                                        onChange={(e) => setGuestAgreedToNoRefund(e.target.checked)}
+                                        className="mt-1 w-4 h-4 accent-amber-600 cursor-pointer"
+                                    />
+                                    <label htmlFor="guest-refund-policy" className="cursor-pointer">
+                                        <p className="text-sm font-bold text-amber-800">Lưu ý cho khách không đăng nhập</p>
+                                        <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                                            Bằng cách tiếp tục thanh toán mà không có tài khoản, bạn đồng ý rằng chúng tôi sẽ không thể tự động xử lý hoàn tiền vào tài khoản kỹ thuật số của bạn nếu có sự cố xảy ra.
+                                        </p>
+                                        <p className="text-xs font-bold text-amber-800 mt-1 underline">
+                                            Tôi đã hiểu và đồng ý tiếp tục.
+                                        </p>
+                                    </label>
+                                </div>
+                            )}
+
                             {/* ── Action Buttons ── */}
                             <div className="mt-6 space-y-3">
-                                {/* Guest refund warning */}
-                                {!isLoggedIn && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-2">
-                                        <div className="flex items-start gap-3">
-                                            <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
-                                            </svg>
-                                            <div>
-                                                <p className="text-sm font-bold text-amber-800 mb-1">Lưu ý cho khách vãng lai</p>
-                                                <p className="text-xs text-amber-700 leading-relaxed">
-                                                    Bạn đang mua sắm mà không đăng nhập. Nếu có sự cố xảy ra (đơn hàng bị hủy, lỗi thanh toán...),
-                                                    bạn sẽ <strong>không nhận được hoàn tiền</strong> vì hệ thống không có thông tin tài khoản ngân hàng của bạn.
-                                                </p>
-                                                <label className="flex items-center gap-2 mt-3 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={guestAgreedNoRefund}
-                                                        onChange={(e) => setGuestAgreedNoRefund(e.target.checked)}
-                                                        className="w-4 h-4 rounded border-gray-300 text-[#8B1A1A] accent-[#8B1A1A]"
-                                                    />
-                                                    <span className="text-xs font-semibold text-amber-900">
-                                                        Tôi đã đọc và đồng ý tiếp tục mà không được hoàn tiền
-                                                    </span>
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Logged-in user missing bank info warning */}
-                                {isLoggedIn && !hasBankInfo && (
-                                    <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-2">
-                                        <div className="flex items-start gap-3">
-                                            <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                                            </svg>
-                                            <div>
-                                                <p className="text-sm font-bold text-red-800 mb-1">Chưa cập nhật thông tin ngân hàng</p>
-                                                <p className="text-xs text-red-700 leading-relaxed">
-                                                    Bạn cần cập nhật thông tin tài khoản ngân hàng trước khi mua hàng để đảm bảo quyền lợi hoàn tiền.
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
                                 <button
+                                    disabled={(isLoggedIn && (!user?.BankName || !user?.BankAccountNumber)) || (!isLoggedIn && !guestAgreedToNoRefund)}
                                     onClick={() => {
-                                        // Check bank info for logged-in users
-                                        if (isLoggedIn && !hasBankInfo) {
-                                            setShowBankInfoModal(true);
-                                            return;
-                                        }
                                         if (deliveryMethod === "multi") {
                                             navigate("/checkout/b2b", {
                                                 state: {
@@ -356,7 +347,6 @@ export default function CheckoutPage() {
                                             });
                                         }
                                     }}
-                                    disabled={!isLoggedIn && !guestAgreedNoRefund}
                                     className="w-full py-3.5 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Tiếp tục
@@ -398,40 +388,6 @@ export default function CheckoutPage() {
             </main>
 
             <Footer />
-
-            {/* Bank Info Modal */}
-            {showBankInfoModal && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-4">
-                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-                        <div className="text-center">
-                            <div className="w-14 h-14 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
-                                <svg className="w-7 h-7 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                                </svg>
-                            </div>
-                            <h3 className="text-lg font-bold text-gray-900 mb-2">Cần cập nhật thông tin ngân hàng</h3>
-                            <p className="text-sm text-gray-600 leading-relaxed mb-6">
-                                Bạn cần điền thông tin tài khoản ngân hàng trong trang tài khoản trước khi đặt hàng.
-                                Điều này giúp chúng tôi hoàn tiền nhanh chóng khi cần thiết.
-                            </p>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowBankInfoModal(false)}
-                                    className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
-                                >
-                                    Đóng
-                                </button>
-                                <button
-                                    onClick={() => navigate("/account")}
-                                    className="flex-1 py-2.5 bg-[#8B1A1A] text-white text-sm font-semibold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer"
-                                >
-                                    Cập nhật ngay
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

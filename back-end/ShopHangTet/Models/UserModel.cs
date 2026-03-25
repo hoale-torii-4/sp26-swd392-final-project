@@ -27,6 +27,12 @@ public class UserModel
     [BsonElement("phone")]
     public string? Phone { get; set; } = string.Empty;
     
+    [BsonElement("bankName")]
+    public string? BankName { get; set; } = string.Empty;
+    
+    [BsonElement("bankAccountNumber")]
+    public string? BankAccountNumber { get; set; } = string.Empty;
+    
     [BsonElement("role")]
     public UserRole Role { get; set; } = UserRole.MEMBER;
     

@@ -279,6 +279,8 @@ namespace ShopHangTet.Controllers
                 Email = user.Email,
                 FullName = user.FullName,
                 Phone = user.Phone,
+                BankName = user.BankName,
+                BankAccountNumber = user.BankAccountNumber,
                 Role = user.Role,
                 Status = user.Status,
                 CreatedAt = user.CreatedAt
@@ -313,6 +315,8 @@ namespace ShopHangTet.Controllers
 
             user.FullName = request.FullName;
             user.Phone = request.Phone;
+            user.BankName = request.BankName;
+            user.BankAccountNumber = request.BankAccountNumber;
 
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
@@ -323,6 +327,8 @@ namespace ShopHangTet.Controllers
                 Email = user.Email,
                 FullName = user.FullName,
                 Phone = user.Phone,
+                BankName = user.BankName,
+                BankAccountNumber = user.BankAccountNumber,
                 Role = user.Role,
                 Status = user.Status,
                 CreatedAt = user.CreatedAt

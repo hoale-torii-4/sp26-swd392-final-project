@@ -48,6 +48,15 @@ const sidebarLinks = [
     },
 ];
 
+// ───── Bank Interface ─────
+interface Bank {
+    name: string;
+    code: string;
+    bin: string;
+    short_name: string;
+    supported: boolean;
+}
+
 /* ───── Helper: get stored user data ───── */
 function getStoredUser() {
     const user = authService.getUser();
@@ -58,7 +67,6 @@ function getStoredUser() {
         phone: user.Phone || "",
         bankName: user.BankName || "",
         bankAccountNumber: user.BankAccountNumber || "",
-        bankAccountName: user.BankAccountName || "",
         createdAt: user.CreatedAt
             ? new Date(user.CreatedAt).toLocaleDateString("vi-VN")
             : "",
@@ -85,10 +93,21 @@ export default function AccountPage() {
     const [phone, setPhone] = useState(user?.phone ?? "");
     const [bankName, setBankName] = useState(user?.bankName ?? "");
     const [bankAccountNumber, setBankAccountNumber] = useState(user?.bankAccountNumber ?? "");
-    const [bankAccountName, setBankAccountName] = useState(user?.bankAccountName ?? "");
     const [profileMsg, setProfileMsg] = useState("");
     const [profileError, setProfileError] = useState("");
     const [profileLoading, setProfileLoading] = useState(false);
+    const [banks, setBanks] = useState<Bank[]>([]);
+
+    useEffect(() => {
+        fetch("https://qr.sepay.vn/banks.json")
+            .then(res => res.json())
+            .then(data => {
+                if (data?.data) {
+                    setBanks(data.data);
+                }
+            })
+            .catch(err => console.error("Could not fetch banks", err));
+    }, []);
 
 
     /* ── Password form — Formik + Yup ── */
@@ -154,12 +173,11 @@ export default function AccountPage() {
 
         setProfileLoading(true);
         try {
-            const res = await authService.updateProfile({
-                fullName,
-                phone,
-                bankName: bankName || null,
-                bankAccountNumber: bankAccountNumber || null,
-                bankAccountName: bankAccountName || null,
+            const res = await authService.updateProfile({ 
+                fullName, 
+                phone, 
+                bankName, 
+                bankAccountNumber 
             });
             if (res.Success) {
                 setProfileMsg("Thông tin đã được cập nhật thành công!");
@@ -280,7 +298,7 @@ export default function AccountPage() {
                                     />
                                 </div>
                                 {/* Phone */}
-                                <div>
+                                <div className="md:col-span-2">
                                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                                         Số điện thoại
                                     </label>
@@ -292,32 +310,24 @@ export default function AccountPage() {
                                         className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors"
                                     />
                                 </div>
-                            </div>
-
-                            {/* Bank Info Section */}
-                            <div className="border-t border-gray-100 pt-5 mt-5">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-[#8B1A1A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z" />
-                                    </svg>
-                                    Thông tin ngân hàng (hoàn tiền)
-                                </h3>
-                                <p className="text-xs text-gray-500 mb-4">
-                                    Thông tin này được sử dụng để hoàn tiền khi cần thiết. Vui lòng điền đầy đủ để có thể mua sắm.
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-5">
                                     {/* Bank Name */}
                                     <div>
                                         <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                                            Tên ngân hàng
+                                            Ngân hàng
                                         </label>
-                                        <input
-                                            type="text"
+                                        <select
                                             value={bankName}
                                             onChange={(e) => setBankName(e.target.value)}
-                                            placeholder="VD: Vietcombank"
-                                            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors"
-                                        />
+                                            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors bg-white"
+                                        >
+                                            <option value="">-- Chọn Ngân hàng --</option>
+                                            {banks.map((bank) => (
+                                                <option key={bank.code} value={bank.code}>
+                                                    {bank.short_name} - {bank.name}
+                                                </option>
+                                            ))}
+                                        </select>
                                     </div>
                                     {/* Bank Account Number */}
                                     <div>
@@ -329,19 +339,6 @@ export default function AccountPage() {
                                             value={bankAccountNumber}
                                             onChange={(e) => setBankAccountNumber(e.target.value)}
                                             placeholder="VD: 0123456789"
-                                            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors"
-                                        />
-                                    </div>
-                                    {/* Bank Account Name */}
-                                    <div>
-                                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                                            Tên chủ tài khoản
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={bankAccountName}
-                                            onChange={(e) => setBankAccountName(e.target.value)}
-                                            placeholder="VD: NGUYEN VAN A"
                                             className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-[#8B1A1A] focus:ring-1 focus:ring-[#8B1A1A] transition-colors"
                                         />
                                     </div>

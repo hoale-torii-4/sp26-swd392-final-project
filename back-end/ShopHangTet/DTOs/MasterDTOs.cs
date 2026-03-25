@@ -78,6 +78,9 @@ namespace ShopHangTet.DTOs
 
         [Phone]
         public string? Phone { get; set; }
+        
+        public string? BankName { get; set; }
+        public string? BankAccountNumber { get; set; }
     }
 
     public class GoogleLoginDto
@@ -118,6 +121,8 @@ namespace ShopHangTet.DTOs
         public string Email { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
         public string? Phone { get; set; }
+        public string? BankName { get; set; }
+        public string? BankAccountNumber { get; set; }
         public UserRole Role { get; set; }
         public UserStatus Status { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -682,8 +687,14 @@ namespace ShopHangTet.DTOs
         public int AlcoholCount { get; set; }
         public bool HasChivas12 { get; set; }
         public bool HasChivas21 { get; set; }
-
-        public bool MeetsRules => IsValid;
+        
+        public bool MeetsRules =>
+            TotalItemCount >= 4
+            && TotalItemCount <= 6
+            && (DrinkCount + AlcoholCount) >= 1
+            && SnackCount >= 2
+            && SavoryCount <= 2
+            && (!HasChivas21 || SavoryCount <= 1);
     }
 
     // ========== ORDER RESPONSE DTOs ==========
