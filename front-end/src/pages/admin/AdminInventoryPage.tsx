@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminService, type InventoryItem, type InventoryLog, type InventorySummaryDto } from "../../services/adminService";
+import { FiPlus } from "react-icons/fi";
 
 export default function AdminInventoryPage() {
     const [items, setItems] = useState<InventoryItem[]>([]);
@@ -101,7 +102,7 @@ export default function AdminInventoryPage() {
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-gray-900">Kho hàng</h1>
                 <button onClick={() => { setShowCreate(true); setCreateError(""); }} className="px-4 py-2 bg-[#8B1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center gap-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    <FiPlus className="w-4 h-4" />
                     Thêm sản phẩm
                 </button>
             </div>

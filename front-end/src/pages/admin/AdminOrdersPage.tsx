@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminService, type OrderStatusSummary, type AdminOrderListItem } from "../../services/adminService";
+import { FiEdit2, FiX } from "react-icons/fi";
 
 const STATUS_CONFIG: { key: keyof OrderStatusSummary; label: string; color: string; bgColor: string }[] = [
     { key: "PendingPayment", label: "Chờ thanh toán", color: "text-amber-700", bgColor: "bg-amber-500" },
@@ -245,7 +246,7 @@ export default function AdminOrdersPage() {
                                     <td className="px-4 py-3 text-xs text-gray-500">{formatDate(order.CreatedAt)}</td>
                                     <td className="px-4 py-3 text-right">
                                         <button onClick={() => openUpdateForOrder(order)} className="p-1 text-gray-400 hover:text-[#8B1A1A] cursor-pointer" title="Cập nhật trạng thái">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+                                            <FiEdit2 className="w-4 h-4" />
                                         </button>
                                     </td>
                                 </tr>
@@ -276,7 +277,7 @@ export default function AdminOrdersPage() {
                                 Cập nhật trạng thái — <span className="text-[#8B1A1A] font-mono">{selectedOrder.OrderCode}</span>
                             </h3>
                             <button onClick={() => { setShowUpdate(false); setUpdateResult(null); }} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                <FiX className="w-5 h-5" />
                             </button>
                         </div>
                         <p className="text-sm text-gray-500 mb-4">Khách hàng: <span className="font-semibold">{selectedOrder.CustomerName}</span></p>
@@ -324,7 +325,7 @@ export default function AdminOrdersPage() {
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-lg font-bold text-gray-900">Cập nhật Giao Hàng</h3>
                             <button onClick={() => setShowDelivery(false)} className="text-gray-400 hover:text-gray-600 cursor-pointer">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                <FiX className="w-5 h-5" />
                             </button>
                         </div>
                         

@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { cartService, type CartItemDto, type CartDto } from "../services/cartService";
+import { FiLoader, FiAlertCircle, FiShoppingCart, FiChevronRight, FiInfo, FiCheckCircle, FiTruck, FiBox, FiTrash2, FiMinus, FiPlus } from "react-icons/fi";
 import mixMatchDefault from "../assets/mix-match-default.svg";
 
 /* ═══════════════════ HELPER ═══════════════════ */
@@ -163,10 +164,7 @@ export default function CartPage() {
                 {/* Loading */}
                 {loading && (
                     <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
-                        <svg className="w-10 h-10 mx-auto text-[#8B1A1A] animate-spin mb-4" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
+                        <FiLoader className="w-10 h-10 mx-auto text-[#8B1A1A] animate-spin mb-4" />
                         <p className="text-gray-500 text-sm">Đang tải giỏ hàng...</p>
                     </div>
                 )}
@@ -174,9 +172,7 @@ export default function CartPage() {
                 {/* Error */}
                 {!loading && error && (
                     <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
-                        <svg className="w-16 h-16 mx-auto text-red-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
-                        </svg>
+                        <FiAlertCircle className="w-16 h-16 mx-auto text-red-300 mb-4" />
                         <h2 className="text-lg font-bold text-gray-900 mb-2">Có lỗi xảy ra</h2>
                         <p className="text-sm text-gray-500 mb-4">{error}</p>
                         <button
@@ -191,9 +187,7 @@ export default function CartPage() {
                 {/* Empty cart */}
                 {!loading && !error && items.length === 0 && (
                     <div className="bg-white rounded-2xl p-12 text-center shadow-sm">
-                        <svg className="w-20 h-20 mx-auto text-gray-300 mb-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
-                        </svg>
+                        <FiShoppingCart className="w-20 h-20 mx-auto text-gray-300 mb-5" strokeWidth={1.2} />
                         <h2 className="text-xl font-bold text-gray-900 mb-2">Giỏ hàng trống</h2>
                         <p className="text-sm text-gray-500 mb-6">
                             Hãy khám phá bộ sưu tập quà Tết sang trọng của chúng tôi!
@@ -203,9 +197,7 @@ export default function CartPage() {
                             className="inline-flex items-center gap-2 px-6 py-3 bg-[#8B1A1A] text-white text-sm font-semibold rounded-lg hover:bg-[#701515] transition-colors"
                         >
                             Khám phá giỏ quà
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                            <FiChevronRight className="w-4 h-4" />
                         </Link>
                     </div>
                 )}
@@ -283,31 +275,23 @@ export default function CartPage() {
                                     className="w-full mt-5 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Thanh toán ({selectedItems.length})
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
+                                    <FiChevronRight className="w-4 h-4" />
                                 </button>
 
                                 {/* Helper note */}
                                 <p className="mt-4 text-xs text-gray-400 flex items-start gap-1.5">
-                                    <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                    <FiInfo className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                                     Bạn sẽ chọn hình thức giao hàng và lời chúc ở bước tiếp theo.
                                 </p>
 
                                 {/* Trust badges */}
                                 <div className="mt-6 pt-5 border-t border-gray-100 space-y-3">
                                     <div className="flex items-center gap-2.5 text-xs text-gray-500">
-                                        <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
+                                        <FiCheckCircle className="w-4 h-4 text-green-600 shrink-0" />
                                         Cam kết hàng chính hãng 100%
                                     </div>
                                     <div className="flex items-center gap-2.5 text-xs text-gray-500">
-                                        <svg className="w-4 h-4 text-blue-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H18.75M7.5 14.25v-5.625m0 0H2.25m5.25 0h8.25m0 0v5.625m0-5.625h5.25" />
-                                        </svg>
+                                        <FiTruck className="w-4 h-4 text-blue-600 shrink-0" />
                                         Giao hàng nhanh toàn quốc
                                     </div>
                                 </div>
@@ -364,9 +348,7 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                             className="w-full h-full object-cover"
                         />
                     ) : (
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                        </svg>
+                        <FiBox className="w-10 h-10" />
                     )}
                 </Link>
 
@@ -396,9 +378,7 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                             className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
                             title="Xóa sản phẩm"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
-                            </svg>
+                            <FiTrash2 className="w-5 h-5" />
                         </button>
                     </div>
 
@@ -416,9 +396,7 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                                 disabled={item.Quantity <= 1 || isInactive}
                                 className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                                </svg>
+                                <FiMinus className="w-3.5 h-3.5" />
                             </button>
                             <span className={`w-8 text-center text-sm font-medium ${isInactive ? "text-gray-400" : "text-gray-900"}`}>
                                 {item.Quantity}
@@ -428,9 +406,7 @@ function CartItemCard({ item, selected, onSelect, onQuantityChange, onRemove }: 
                                 disabled={isInactive}
                                 className="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                             >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
+                                <FiPlus className="w-3.5 h-3.5" />
                             </button>
                         </div>
 

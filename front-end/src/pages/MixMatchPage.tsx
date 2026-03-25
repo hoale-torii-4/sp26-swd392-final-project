@@ -6,6 +6,7 @@ import Footer from "../components/Footer";
 import { mixMatchService, type MixMatchItem, type MixMatchRule } from "../services/mixMatchService";
 import { cartService } from "../services/cartService";
 import { authService } from "../services/authService";
+import { FiLock, FiSearch, FiAlertTriangle } from "react-icons/fi";
 
 const formatPrice = (value: number) => value.toLocaleString("vi-VN") + "₫";
 
@@ -301,9 +302,7 @@ export default function MixMatchPage() {
                     <main className="flex-1 flex items-center justify-center px-4 py-20">
                         <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md w-full text-center">
                             <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-[#8B1A1A]/10 flex items-center justify-center">
-                                <svg className="w-8 h-8 text-[#8B1A1A]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                                </svg>
+                                <FiLock className="w-8 h-8 text-[#8B1A1A]" />
                             </div>
                             <h2 className="text-xl font-bold text-gray-900 mb-2">Đăng nhập để tiếp tục</h2>
                             <p className="text-sm text-gray-500 mb-6">
@@ -346,9 +345,7 @@ export default function MixMatchPage() {
                                 <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 mb-4">Tìm kiếm & Lọc</h3>
                                 
                                 <div className="relative mb-5">
-                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                                    </svg>
+                                    <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                                     <input 
                                         type="text" 
                                         placeholder="Nhập tên sản phẩm..." 
@@ -505,9 +502,7 @@ export default function MixMatchPage() {
                                     <div className="bg-red-50 border border-red-100 rounded-lg p-3 mt-4 space-y-1.5">
                                         {validation.errors.map((err, idx) => (
                                             <div key={idx} className="flex items-start text-red-600 text-xs gap-1.5">
-                                                <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                </svg>
+                                                    <FiAlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
                                                 <span>{err}</span>
                                             </div>
                                         ))}

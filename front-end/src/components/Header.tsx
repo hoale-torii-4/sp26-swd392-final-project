@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { authService } from "../services/authService";
 import { cartService } from "../services/cartService";
+import { FiTruck, FiShoppingBag, FiChevronDown, FiUser, FiPackage, FiMapPin, FiBox, FiLogOut, FiMenu, FiX } from "react-icons/fi";
+import { FaGift } from "react-icons/fa6";
 
 const navLinks = [
     { label: "TRANG CHỦ", to: "/" },
@@ -77,9 +79,7 @@ export default function Header() {
                 {/* Logo */}
                 <Link to="/" className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-[#8B1A1A] rounded-full flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2L13.09 8.26L20 9.27L15 14.14L16.18 21.02L12 17.77L7.82 21.02L9 14.14L4 9.27L10.91 8.26L12 2Z" />
-                        </svg>
+                        <FaGift className="w-5 h-5 text-white" />
                     </div>
                     <div>
                         <span className="text-xl font-serif font-bold text-gray-900 tracking-wide">Lộc Xuân</span>
@@ -117,16 +117,12 @@ export default function Header() {
                         title="Theo dõi đơn hàng"
                         className="relative text-gray-600 hover:text-[#8B1A1A] transition-colors flex items-center"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
-                        </svg>
+                        <FiTruck className="w-5 h-5" />
                     </Link>
 
                     {/* Cart */}
                     <Link to="/cart" className="text-gray-600 hover:text-[#8B1A1A] transition-colors relative">
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
-                        </svg>
+                        <FiShoppingBag className="w-5 h-5" />
                         {cartCount > 0 && (
                             <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-[#8B1A1A] rounded-full text-[9px] font-bold text-white flex items-center justify-center">
                                 {cartCount}
@@ -149,14 +145,7 @@ export default function Header() {
                                 <div className="w-9 h-9 bg-[#1B3022] rounded-full flex items-center justify-center text-white text-sm font-bold">
                                     {userName.charAt(0).toUpperCase()}
                                 </div>
-                                <svg
-                                    className={`w-3.5 h-3.5 text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`}
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                                </svg>
+                                <FiChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
                             </button>
 
                             {/* Dropdown Menu */}
@@ -167,28 +156,21 @@ export default function Header() {
                                         to="/account"
                                         className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
-                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                                        </svg>
+                                        <FiUser className="w-5 h-5 text-gray-400" />
                                         Tài khoản của tôi
                                     </Link>
                                     <Link
                                         to="/orders"
                                         className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
-                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                                        </svg>
+                                        <FiPackage className="w-5 h-5 text-gray-400" />
                                         Đơn hàng của tôi
                                     </Link>
                                     <Link
                                         to="/addresses"
                                         className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
-                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-                                        </svg>
+                                        <FiMapPin className="w-5 h-5 text-gray-400" />
                                         Sổ địa chỉ
                                     </Link>
 
@@ -196,11 +178,7 @@ export default function Header() {
                                         to="/custom-box"
                                         className="flex items-center gap-3 px-5 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                                     >
-                                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3.75l8.25 4.5v7.5L12 20.25l-8.25-4.5v-7.5L12 3.75z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3.75v16.5" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 8.25l8.25 4.5 8.25-4.5" />
-                                        </svg>
+                                        <FiBox className="w-5 h-5 text-gray-400" />
                                         Giỏ quà custom
                                     </Link>
 
@@ -214,9 +192,7 @@ export default function Header() {
                                         onClick={handleLogout}
                                         className="flex items-center gap-3 px-5 py-3 text-sm text-[#8B1A1A] hover:bg-red-50 transition-colors w-full cursor-pointer"
                                     >
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                                        </svg>
+                                        <FiLogOut className="w-5 h-5" />
                                         Đăng xuất
                                     </button>
                                 </div>
@@ -224,9 +200,7 @@ export default function Header() {
                         </div>
                     ) : (
                         <Link to="/login" className="text-gray-600 hover:text-[#8B1A1A] transition-colors">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                            </svg>
+                            <FiUser className="w-5 h-5" />
                         </Link>
                     )}
 
@@ -235,9 +209,7 @@ export default function Header() {
                         className="lg:hidden text-gray-600"
                         onClick={() => setMobileOpen(!mobileOpen)}
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
-                        </svg>
+                        {mobileOpen ? <FiX className="w-6 h-6" /> : <FiMenu className="w-6 h-6" />}
                     </button>
                 </div>
             </div>

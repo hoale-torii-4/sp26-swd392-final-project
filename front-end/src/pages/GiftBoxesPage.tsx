@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { productService, type GiftBoxListDto } from "../services/productService";
+import { FiFilter, FiChevronDown, FiLoader, FiChevronLeft, FiChevronRight, FiBox } from "react-icons/fi";
 import heroBg from "../assets/giftbox-hero.png";
 
 /* ═══════════════════ CONSTANTS ═══════════════════ */
@@ -221,9 +222,7 @@ export default function GiftBoxesPage() {
                         onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
                         className="lg:hidden flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-white transition-colors cursor-pointer"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                        </svg>
+                        <FiFilter className="w-4 h-4" />
                         Bộ lọc
                     </button>
 
@@ -309,9 +308,7 @@ export default function GiftBoxesPage() {
                                     <span className="font-medium">
                                         {SORT_OPTIONS.find((s) => s.value === sortBy)?.label}
                                     </span>
-                                    <svg className={`w-4 h-4 transition-transform ${sortOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                    </svg>
+                                    <FiChevronDown className={`w-4 h-4 transition-transform ${sortOpen ? "rotate-180" : ""}`} />
                                 </button>
                                 {sortOpen && (
                                     <div className="absolute right-0 mt-1 w-52 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1">
@@ -338,10 +335,7 @@ export default function GiftBoxesPage() {
                         {/* States */}
                         {loading && (
                             <div className="flex items-center justify-center py-20">
-                                <svg className="w-8 h-8 animate-spin text-[#8B1A1A]" viewBox="0 0 24 24" fill="none">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
+                                <FiLoader className="w-8 h-8 animate-spin text-[#8B1A1A]" />
                             </div>
                         )}
 
@@ -386,9 +380,7 @@ export default function GiftBoxesPage() {
                                     disabled={currentPage === 1}
                                     className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
+                                    <FiChevronLeft className="w-4 h-4" />
                                 </button>
 
                                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -409,9 +401,7 @@ export default function GiftBoxesPage() {
                                     disabled={currentPage === totalPages}
                                     className="w-9 h-9 flex items-center justify-center rounded-lg border border-gray-300 text-gray-500 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                 >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
+                                    <FiChevronRight className="w-4 h-4" />
                                 </button>
                             </nav>
                         )}
@@ -446,9 +436,7 @@ function ProductCard({ box }: { box: GiftBoxListDto }) {
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-300">
-                        <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0l-3-3m3 3l3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                        </svg>
+                            <FiBox className="w-16 h-16" />
                     </div>
                 )}
 

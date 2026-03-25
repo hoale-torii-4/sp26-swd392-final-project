@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { authService } from "../services/authService";
+import { FiMail } from "react-icons/fi";
 
 export default function ForgotPasswordSuccessPage() {
     const location = useLocation();
@@ -102,19 +103,7 @@ export default function ForgotPasswordSuccessPage() {
             <div className="relative z-10 w-full max-w-md rounded-2xl bg-white px-10 py-12 shadow-xl text-center">
                 {/* Envelope Icon */}
                 <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-xl bg-red-50">
-                    <svg
-                        className="w-8 h-8 text-red-700"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
-                        />
-                    </svg>
+                    <FiMail className="w-8 h-8 text-red-700" />
                 </div>
 
                 {/* Title */}

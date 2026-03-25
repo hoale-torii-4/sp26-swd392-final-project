@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useLocation } from "react-router-dom";
 import { chatService, type ChatMessagePayload } from "../services/chatService";
 import { authService } from "../services/authService";
+import { FiMessageSquare, FiChevronDown, FiSend } from "react-icons/fi";
 
 interface Message {
     id: string;
@@ -421,9 +422,7 @@ export default function AIChatBox() {
                     onMouseDown={handleMouseDown}
                 >
                     <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
-                        </svg>
+                        <FiMessageSquare className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1">
                         <h3 className="text-white font-bold text-sm">Trợ lý Lộc Xuân</h3>
@@ -436,9 +435,7 @@ export default function AIChatBox() {
                         onClick={() => setIsOpen(false)}
                         className="text-white/70 hover:text-white transition-colors cursor-pointer"
                     >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                        </svg>
+                        <FiChevronDown className="w-5 h-5" />
                     </button>
                 </div>
 
@@ -450,9 +447,7 @@ export default function AIChatBox() {
                                 {msg.role === "assistant" && (
                                     <div className="flex items-center gap-1.5 mb-1">
                                         <div className="w-5 h-5 bg-[#8B1A1A] rounded-full flex items-center justify-center">
-                                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                                            </svg>
+                                            <FiMessageSquare className="w-3 h-3 text-white" />
                                         </div>
                                         <span className="text-[10px] text-gray-400 font-medium">Trợ lý AI</span>
                                     </div>
@@ -478,9 +473,7 @@ export default function AIChatBox() {
                             <div>
                                 <div className="flex items-center gap-1.5 mb-1">
                                     <div className="w-5 h-5 bg-[#8B1A1A] rounded-full flex items-center justify-center">
-                                        <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                                        </svg>
+                                        <FiMessageSquare className="w-3 h-3 text-white" />
                                     </div>
                                     <span className="text-[10px] text-gray-400 font-medium">Đang trả lời...</span>
                                 </div>
@@ -514,9 +507,7 @@ export default function AIChatBox() {
                             disabled={!input.trim() || isTyping}
                             className="w-10 h-10 bg-[#8B1A1A] rounded-xl flex items-center justify-center text-white hover:bg-[#701515] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
                         >
-                            <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
-                            </svg>
+                            <FiSend className="w-4.5 h-4.5" />
                         </button>
                     </div>
                     <p className="text-[10px] text-gray-400 text-center mt-2">

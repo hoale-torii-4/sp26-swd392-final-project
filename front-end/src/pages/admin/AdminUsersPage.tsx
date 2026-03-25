@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { adminService, type InternalUser } from "../../services/adminService";
+import { FiPlus, FiEdit2 } from "react-icons/fi";
 
 export default function AdminUsersPage() {
     const [users, setUsers] = useState<InternalUser[]>([]);
@@ -79,7 +80,7 @@ export default function AdminUsersPage() {
                     <p className="text-sm text-gray-500">Quản lý tài khoản Admin và Staff</p>
                 </div>
                 <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-[#8B1A1A] text-white text-sm font-semibold rounded-lg hover:bg-[#701515] transition-colors cursor-pointer">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    <FiPlus className="w-4 h-4" />
                     Thêm người dùng
                 </button>
             </div>
@@ -140,7 +141,7 @@ export default function AdminUsersPage() {
                                 <td className="px-4 py-3 text-gray-400 text-xs">{new Date(user.CreatedAt).toLocaleDateString("vi-VN")}</td>
                                 <td className="px-4 py-3 text-right">
                                     <button onClick={() => openEdit(user)} className="text-gray-400 hover:text-[#8B1A1A] transition-colors cursor-pointer p-1">
-                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                                        <FiEdit2 className="w-4 h-4" />
                                     </button>
                                 </td>
                             </tr>

@@ -4,6 +4,7 @@ import { useFormik } from "formik";
 import * as Yup from "yup";
 import { authService } from "../services/authService";
 import type { ApiError } from "../types/auth";
+import { FiKey, FiMail, FiLoader, FiChevronLeft } from "react-icons/fi";
 
 const forgotPasswordSchema = Yup.object({
     email: Yup.string()
@@ -89,19 +90,7 @@ export default function ForgotPasswordPage() {
             <div className="relative z-10 w-full max-w-md rounded-2xl bg-white px-10 py-12 shadow-xl text-center">
                 {/* Key Icon */}
                 <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-full bg-red-600">
-                    <svg
-                        className="w-7 h-7 text-white"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={1.5}
-                            d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z"
-                        />
-                    </svg>
+                    <FiKey className="w-7 h-7 text-white" />
                 </div>
 
                 {/* Title */}
@@ -134,19 +123,7 @@ export default function ForgotPasswordPage() {
                         </label>
                         <div className="relative">
                             <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">
-                                <svg
-                                    className="w-4.5 h-4.5"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    viewBox="0 0 24 24"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={1.5}
-                                        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
-                                    />
-                                </svg>
+                                <FiMail className="w-4.5 h-4.5" />
                             </span>
                             <input
                                 id="email"
@@ -171,10 +148,7 @@ export default function ForgotPasswordPage() {
                         className="w-full rounded-lg bg-red-700 px-4 py-3 text-sm font-bold text-white uppercase tracking-wider shadow-sm hover:bg-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                         {isLoading && (
-                            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                            </svg>
+                            <FiLoader className="w-4 h-4 animate-spin" />
                         )}
                         {isLoading ? "Đang gửi..." : "Gửi liên kết khôi phục"}
                     </button>
@@ -185,19 +159,7 @@ export default function ForgotPasswordPage() {
                     to="/login"
                     className="mt-6 inline-flex items-center gap-1.5 text-sm text-red-600 hover:text-red-700 transition-colors"
                 >
-                    <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                    >
-                        <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M15 19l-7-7 7-7"
-                        />
-                    </svg>
+                    <FiChevronLeft className="w-4 h-4" />
                     Quay lại trang Đăng nhập
                 </Link>
             </div>

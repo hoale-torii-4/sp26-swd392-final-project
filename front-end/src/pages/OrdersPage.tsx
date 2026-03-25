@@ -5,7 +5,9 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
 import { orderService } from "../services/orderService";
-import { reviewService } from "../services/reviewService";
+import { reviewService, type UserReview } from "../services/reviewService";
+import { FiUser, FiShoppingBag, FiMapPin, FiBox, FiLogOut, FiLoader, FiCheck, FiX } from "react-icons/fi";
+import { FaStar } from "react-icons/fa6";
 
 interface MyOrderItemDto {
     Name: string;
@@ -34,37 +36,28 @@ const sidebarLinks = [
         label: "Thông tin tài khoản",
         to: "/account",
         icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-            </svg>
+            <FiUser className="w-5 h-5" />
         ),
     },
     {
         label: "Đơn hàng của tôi",
         to: "/orders",
         icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-            </svg>
+            <FiShoppingBag className="w-5 h-5" />
         ),
     },
     {
         label: "Sổ địa chỉ",
         to: "/addresses",
         icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
-            </svg>
+            <FiMapPin className="w-5 h-5" />
         ),
     },
     {
         label: "Giỏ quà custom",
         to: "/custom-box",
         icon: (
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 3.75l7.5 4.125v8.25L12 20.25l-7.5-4.125v-8.25L12 3.75z" />
-            </svg>
+            <FiBox className="w-5 h-5" />
         ),
     },
 ];
@@ -88,27 +81,34 @@ export default function OrdersPage() {
     const [reviewContent, setReviewContent] = useState("");
     const [submittingReview, setSubmittingReview] = useState(false);
 
+    // Track which items have already been reviewed (to disable the button)
+    const [userReviews, setUserReviews] = useState<UserReview[]>([]);
+
     useEffect(() => {
         if (!authService.isAuthenticated()) {
             navigate("/login");
             return;
         }
 
-        const loadOrders = async () => {
+        const loadData = async () => {
             setLoading(true);
             setError(null);
             try {
-                const res = await orderService.getMyOrders();
-                const payload = res?.Data ?? res?.data ?? [];
+                const [ordersRes, reviewsRes] = await Promise.all([
+                    orderService.getMyOrders(),
+                    reviewService.getUserReviews().catch(() => []) // fail gracefully
+                ]);
+                const payload = ordersRes?.Data ?? ordersRes?.data ?? [];
                 setOrders(payload);
+                setUserReviews(reviewsRes || []);
             } catch (err: any) {
-                setError(err?.message ?? "Không thể tải đơn hàng.");
+                setError(err?.message ?? "Không thể tải dữ liệu.");
             } finally {
                 setLoading(false);
             }
         };
 
-        loadOrders();
+        loadData();
     }, [navigate]);
 
     const handleLogout = () => {
@@ -141,6 +141,9 @@ export default function OrdersPage() {
             });
             toast.success("Đánh giá đã được gửi thành công!");
             setShowReviewModal(false);
+            
+            // Refresh reviews to hide the button immediately
+            reviewService.getUserReviews().then(res => setUserReviews(res)).catch(() => {});
         } catch (err: any) {
             toast.error(err.message || "Không thể gửi đánh giá.");
         } finally {
@@ -188,9 +191,7 @@ export default function OrdersPage() {
                                 onClick={handleLogout}
                                 className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm text-gray-500 hover:bg-red-50 hover:text-[#8B1A1A] transition-colors w-full cursor-pointer"
                             >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                                </svg>
+                                <FiLogOut className="w-5 h-5" />
                                 Đăng xuất
                             </button>
                         </nav>
@@ -204,10 +205,7 @@ export default function OrdersPage() {
 
                         {loading ? (
                             <div className="flex items-center justify-center py-20">
-                                <svg className="w-8 h-8 text-[#8B1A1A] animate-spin" fill="none" viewBox="0 0 24 24">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
+                                <FiLoader className="w-8 h-8 text-[#8B1A1A] animate-spin" />
                             </div>
                         ) : error ? (
                             <div className="bg-white rounded-2xl p-8 shadow-sm">
@@ -215,9 +213,7 @@ export default function OrdersPage() {
                             </div>
                         ) : orders.length === 0 ? (
                             <div className="bg-white rounded-2xl p-12 shadow-sm text-center">
-                                <svg className="w-16 h-16 mx-auto text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.2} d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-                                </svg>
+                                <FiShoppingBag className="w-16 h-16 mx-auto text-gray-200 mb-4" />
                                 <p className="text-gray-400 text-sm">Bạn chưa có đơn hàng nào.</p>
                             </div>
                         ) : (
@@ -246,7 +242,17 @@ export default function OrdersPage() {
                                         </div>
 
                                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-                                            {order.Items.map((item, idx) => (
+                                            {order.Items.map((item, idx) => {
+                                                const extractedGiftBoxId = item.GiftBoxId || (item as any).giftBoxId || item.ProductId || (item as any).Id || (item as any).id || "";
+                                                // Check if there is already a review by this user for this specific order + giftbox
+                                                // The backend doesn't return OrderId in UserReviewDto right now, but since a user
+                                                // generally only reviews a giftbox once, checking by GiftBoxId is a good proxy.
+                                                // To be perfectly accurate we'd need OrderId in the user reviews response.
+                                                // For now, if they've reviewed this gift box id AT ALL, they can't review it again here.
+                                                // Or if the backend UserReviewDTO has OrderId (it doesn't currently), we'd check that.
+                                                const hasReviewed = userReviews.some(r => r.GiftBoxId === extractedGiftBoxId);
+
+                                                return (
                                                     <div key={`${order.Id}-${idx}`} className="rounded-xl border border-gray-100 p-4 bg-gray-50">
                                                         <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name}</p>
                                                         <p className="text-xs text-gray-500">Số lượng: {item.Quantity}</p>
@@ -256,19 +262,25 @@ export default function OrdersPage() {
                                                                 {item.TotalPrice.toLocaleString("vi-VN")}₫
                                                             </p>
                                                             {(order.Status === "COMPLETED" || order.Status === "Completed" || order.Status === "Hoàn thành") && (
-                                                                <button
-                                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openReviewModal(order.Id, item); }}
-                                                                    className="px-3 py-1.5 text-xs font-bold text-[#8B1A1A] bg-[#8B1A1A]/10 rounded-lg hover:bg-[#8B1A1A]/20 transition-colors cursor-pointer flex items-center gap-1"
-                                                                >
-                                                                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                                                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                                                    </svg>
-                                                                    Đánh giá
-                                                                </button>
+                                                                hasReviewed ? (
+                                                                    <span className="px-3 py-1.5 text-xs font-semibold text-gray-400 bg-gray-100 rounded-lg flex items-center gap-1">
+                                                                        <FiCheck className="w-3.5 h-3.5" />
+                                                                        Đã đánh giá
+                                                                    </span>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); openReviewModal(order.Id, item); }}
+                                                                        className="px-3 py-1.5 text-xs font-bold text-[#8B1A1A] bg-[#8B1A1A]/10 rounded-lg hover:bg-[#8B1A1A]/20 transition-colors cursor-pointer flex items-center gap-1"
+                                                                    >
+                                                                        <FaStar className="w-3.5 h-3.5" />
+                                                                        Đánh giá
+                                                                    </button>
+                                                                )
                                                             )}
                                                         </div>
                                                     </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </Link>
                                 ))}
@@ -287,9 +299,7 @@ export default function OrdersPage() {
                             onClick={() => setShowReviewModal(false)}
                             className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                            <FiX className="w-5 h-5" />
                         </button>
 
                         <h3 className="font-serif text-xl font-bold text-[#8B1A1A] italic mb-2">Đánh giá sản phẩm</h3>
@@ -305,9 +315,7 @@ export default function OrdersPage() {
                                         onClick={() => setReviewRating(s)}
                                         className="cursor-pointer transition-transform hover:scale-110"
                                     >
-                                        <svg className={`w-8 h-8 ${s <= reviewRating ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                        </svg>
+                                        <FaStar className={`w-8 h-8 ${s <= reviewRating ? 'text-amber-400' : 'text-gray-200'}`} />
                                     </button>
                                 ))}
                             </div>

@@ -103,6 +103,8 @@ export interface OrderItemResponseDto {
     UnitPrice?: number;
     TotalPrice?: number;
     Name?: string | null;
+    Image?: string | null;
+    StockQuantity?: number;
 }
 
 export interface DeliveryAddressResponseDto {
@@ -144,12 +146,14 @@ export interface OrderDto {
     OrderType: OrderType | string;
     Status: OrderStatus | string;
     TotalAmount: number;
-    DeliveryDate: string;
-    GreetingMessage: string | null;
-    GreetingCardUrl: string | null;
-    CreatedAt: string;
+    DeliveryDate?: string | null;
+    GreetingMessage?: string | null;
+    GreetingCardUrl?: string | null;
+    CreatedAt?: string | null;
+    CustomerBankName?: string | null;
+    CustomerBankAccount?: string | null;
     Items: OrderItemResponseDto[];
-    DeliveryAddresses: DeliveryAddressResponseDto[];
+    DeliveryAddresses?: DeliveryAddressResponseDto[];
     DeliveryShipments?: DeliveryShipmentResponseDto[];
 }
 
@@ -199,6 +203,8 @@ const normalizeOrderDetail = (raw: any): OrderDto => {
         UnitPrice: i?.UnitPrice ?? i?.unitPrice,
         TotalPrice: i?.TotalPrice ?? i?.totalPrice,
         Name: i?.Name ?? i?.name ?? i?.ProductName ?? i?.productName,
+        Image: i?.Image ?? i?.image ?? null,
+        StockQuantity: i?.StockQuantity ?? i?.stockQuantity ?? null,
     }));
 
     return {
@@ -213,6 +219,8 @@ const normalizeOrderDetail = (raw: any): OrderDto => {
         GreetingMessage: src?.GreetingMessage ?? src?.greetingMessage ?? null,
         GreetingCardUrl: src?.GreetingCardUrl ?? src?.greetingCardUrl ?? null,
         CreatedAt: src?.CreatedAt ?? src?.createdAt ?? "",
+        CustomerBankName: src?.CustomerBankName ?? src?.customerBankName ?? null,
+        CustomerBankAccount: src?.CustomerBankAccount ?? src?.customerBankAccount ?? null,
         Items: normalizedItems,
         DeliveryAddresses: src?.DeliveryAddresses ?? src?.deliveryAddresses ?? [],
         DeliveryShipments: shipments,
