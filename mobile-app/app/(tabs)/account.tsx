@@ -27,7 +27,7 @@ export default function AccountScreen() {
     const [bankAccountNumber, setBankAccountNumber] = useState(user?.BankAccountNumber || '');
     const [profileMsg, setProfileMsg] = useState('');
     const [profileLoading, setProfileLoading] = useState(false);
-    const [banks, setBanks] = useState<Array<{ name: string; code: string; short_name: string }>>([]);
+    const [banks, setBanks] = useState<{ name: string; code: string; short_name: string }[]>([]);
     const [showBankPicker, setShowBankPicker] = useState(false);
 
     // Password state
