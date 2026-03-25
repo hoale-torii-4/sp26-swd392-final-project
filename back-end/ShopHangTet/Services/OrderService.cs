@@ -627,18 +627,43 @@ namespace ShopHangTet.Services
                 .Distinct()
                 .ToList();
 
+            var emails = pageItems
+                .Where(o => !string.IsNullOrWhiteSpace(o.CustomerEmail))
+                .Select(o => o.CustomerEmail.Trim())
+                .Distinct()
+                .ToList();
+
             var userMap = new Dictionary<string, UserModel>();
-            if (userIds.Any())
+            var emailUserMap = new Dictionary<string, UserModel>(StringComparer.OrdinalIgnoreCase);
+
+            if (userIds.Any() || emails.Any())
             {
-                var users = await _context.Users.Where(u => userIds.Contains(u.Id)).ToListAsync();
-                userMap = users.ToDictionary(u => u.Id, u => u);
+                var lowerEmails = emails.Select(e => e.ToLower()).ToList();
+                var users = await _context.Users.Where(u => userIds.Contains(u.Id) || lowerEmails.Contains(u.Email)).ToListAsync();
+                foreach (var u in users)
+                {
+                    userMap[u.Id] = u;
+                    if (!string.IsNullOrWhiteSpace(u.Email))
+                    {
+                        emailUserMap[u.Email.Trim()] = u;
+                    }
+                }
             }
 
             return new AdminOrderListResult
             {
                 Data = pageItems.Select(o => 
                 {
-                    userMap.TryGetValue(o.UserId?.ToString() ?? string.Empty, out var user);
+                    UserModel? user = null;
+                    if (o.UserId != null && userMap.TryGetValue(o.UserId.ToString()!, out var u1))
+                    {
+                        user = u1;
+                    }
+                    
+                    if (user == null && !string.IsNullOrWhiteSpace(o.CustomerEmail))
+                    {
+                        emailUserMap.TryGetValue(o.CustomerEmail.Trim(), out user);
+                    }
                     return new AdminOrderListItem
                     {
                         Id = o.Id.ToString(),
@@ -981,9 +1006,17 @@ namespace ShopHangTet.Services
         {
             var enrichedItems = await BuildOrderItemResponsesAsync(order.Items ?? new List<OrderItem>());
 
-            var user = order.UserId != null 
-                ? await _context.Users.FirstOrDefaultAsync(u => u.Id == order.UserId.ToString()) 
-                : null;
+            UserModel? user = null;
+            if (order.UserId != null)
+            {
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Id == order.UserId.ToString());
+            }
+            
+            if (user == null && !string.IsNullOrWhiteSpace(order.CustomerEmail))
+            {
+                var lowerEmail = order.CustomerEmail.Trim().ToLower();
+                user = await _context.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == lowerEmail);
+            }
 
             var result = new OrderDto
             {

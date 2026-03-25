@@ -410,6 +410,8 @@ export interface AdminOrderListItem {
     TotalItems: number;
     CreatedAt: string;
     DeliveryDate?: string;
+    BankName?: string;
+    BankAccountNumber?: string;
 }
 
 /* ═══════════════════════════════════════════════════════════

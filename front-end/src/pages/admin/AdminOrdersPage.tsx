@@ -18,6 +18,8 @@ const ALL_STATUSES = [
     { value: "SHIPPING", label: "Đang giao" },
     { value: "COMPLETED", label: "Hoàn tất" },
     { value: "CANCELLED", label: "Đã hủy" },
+    { value: "REFUNDING", label: "Đang hoàn tiền" },
+    { value: "REFUNDED", label: "Đã hoàn tiền" },
     { value: "DELIVERY_FAILED", label: "Giao thất bại" },
     { value: "PARTIAL_DELIVERY", label: "Giao một phần" },
 ];
@@ -27,6 +29,7 @@ const STATUS_UPDATE_OPTIONS = [
     { value: "SHIPPING", label: "Đang giao" },
     { value: "COMPLETED", label: "Hoàn tất" },
     { value: "CANCELLED", label: "Đã hủy" },
+    { value: "REFUNDED", label: "Đã hoàn tiền" },
 ];
 
 const STATUS_BADGE: Record<string, { text: string; cls: string }> = {
@@ -38,6 +41,8 @@ const STATUS_BADGE: Record<string, { text: string; cls: string }> = {
     COMPLETED: { text: "Hoàn tất", cls: "bg-emerald-100 text-emerald-700" },
     CANCELLED: { text: "Đã hủy", cls: "bg-gray-100 text-gray-600" },
     PAYMENT_EXPIRED_INTERNAL: { text: "Hết hạn TT", cls: "bg-gray-100 text-gray-500" },
+    REFUNDING: { text: "Đang hoàn tiền", cls: "bg-red-100 text-red-700" },
+    REFUNDED: { text: "Đã hoàn tiền", cls: "bg-purple-100 text-purple-700" },
 };
 
 function formatPrice(v: number) { return v.toLocaleString("vi-VN") + "₫"; }
@@ -285,6 +290,33 @@ export default function AdminOrdersPage() {
                             <span className="text-sm font-medium text-gray-600">Trạng thái hiện tại:</span>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${getStatusInfo(selectedOrder.Status).cls}`}>{getStatusInfo(selectedOrder.Status).text}</span>
                         </div>
+
+                        {selectedOrder.Status === "REFUNDING" && (
+                            <div className="mb-6 p-4 border border-red-200 rounded-lg bg-red-50 flex flex-col items-center">
+                                <p className="text-sm font-bold text-red-800 mb-2">Quét mã QR để hoàn tiền</p>
+                                {selectedOrder.BankName && selectedOrder.BankAccountNumber ? (
+                                    <>
+                                        <p className="text-xs text-red-700 mb-3 text-center">
+                                            Ngân hàng: <strong>{selectedOrder.BankName}</strong><br/>
+                                            STK: <strong>{selectedOrder.BankAccountNumber}</strong><br/>
+                                            Số tiền: <strong>{formatPrice(selectedOrder.TotalAmount)}</strong>
+                                        </p>
+                                        <div className="p-2 bg-white rounded-lg shadow-sm">
+                                            <img
+                                                src={`https://qr.sepay.vn/img?acc=${selectedOrder.BankAccountNumber}&bank=${selectedOrder.BankName}&amount=${selectedOrder.TotalAmount}&des=Hoan tien don hang ${selectedOrder.OrderCode}`}
+                                                alt="QR Code Hoàn Tiền"
+                                                className="w-48 h-48 object-contain"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-red-600 mt-2 text-center">Scan mã bằng App Ngân Hàng / ZaloPay / MoMo</p>
+                                    </>
+                                ) : (
+                                    <p className="text-sm text-red-700 text-center">
+                                        Khách hàng chưa cung cấp thông tin tài khoản ngân hàng trong hồ sơ cá nhân. Vui lòng liên hệ trực tiếp để hoàn tiền.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         <div className="space-y-4">
                             <div>

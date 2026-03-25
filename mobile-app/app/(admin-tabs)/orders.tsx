@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     RefreshControl,
     Alert,
+    Image,
 } from 'react-native';
 import { AppColors, BorderRadius, Spacing } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
@@ -54,7 +55,7 @@ export default function AdminOrdersScreen() {
         if (isStaff) {
             return ['PREPARING', 'SHIPPING', 'PARTIAL_DELIVERY', 'DELIVERY_FAILED'];
         }
-        return ['PREPARING', 'SHIPPING', 'PARTIAL_DELIVERY', 'COMPLETED', 'CANCELLED', 'DELIVERY_FAILED'];
+        return ['PREPARING', 'SHIPPING', 'PARTIAL_DELIVERY', 'COMPLETED', 'CANCELLED', 'DELIVERY_FAILED', 'REFUNDING', 'REFUNDED'];
     }, [isStaff]);
 
     const handleStaffUpdateOrderStatus = async (orderId: string, nextStatus: string) => {
@@ -139,6 +140,40 @@ export default function AdminOrdersScreen() {
                                         >
                                             <Text style={styles.actionBtnText}>Xác nhận đã giao</Text>
                                         </TouchableOpacity>
+                                    )}
+                                </View>
+                            )}
+
+                            {status === 'REFUNDING' && isAdmin && (
+                                <View style={styles.refundContainer}>
+                                    <Text style={styles.refundTitle}>Quét mã QR để hoàn tiền</Text>
+                                    {(item?.bankName || item?.BankName) && (item?.bankAccountNumber || item?.BankAccountNumber) ? (
+                                        <>
+                                            <Text style={styles.refundText}>
+                                                Ngân hàng: {item?.bankName || item?.BankName}
+                                            </Text>
+                                            <Text style={styles.refundText}>
+                                                STK: {item?.bankAccountNumber || item?.BankAccountNumber}
+                                            </Text>
+                                            <Text style={styles.refundText}>
+                                                Số tiền: {Number(total).toLocaleString('vi-VN')}đ
+                                            </Text>
+                                            <View style={styles.qrCodeWrapper}>
+                                                <Image 
+                                                    source={{ uri: `https://qr.sepay.vn/img?acc=${item?.bankAccountNumber || item?.BankAccountNumber}&bank=${item?.bankName || item?.BankName}&amount=${total}&des=Hoan tien don hang ${code}` }} 
+                                                    style={styles.qrCode}
+                                                    resizeMode="contain"
+                                                />
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.actionBtn, styles.refundBtn]}
+                                                onPress={() => handleStaffUpdateOrderStatus(orderId, 'REFUNDED')}
+                                            >
+                                                <Text style={styles.actionBtnText}>Xác nhận đã hoàn tiền</Text>
+                                            </TouchableOpacity>
+                                        </>
+                                    ) : (
+                                        <Text style={styles.refundWarning}>Khách hàng chưa cung cấp STK trong hồ sơ.</Text>
                                     )}
                                 </View>
                             )}
@@ -232,10 +267,52 @@ const styles = StyleSheet.create({
         color: '#FFF',
         fontSize: 12,
         fontWeight: '700',
+        textAlign: 'center',
     },
     emptyText: {
         color: AppColors.textMuted,
         fontSize: 13,
         marginTop: 20,
+    },
+    refundContainer: {
+        marginTop: 12,
+        padding: 12,
+        backgroundColor: '#FEF2F2',
+        borderRadius: BorderRadius.md,
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        alignItems: 'center',
+    },
+    refundTitle: {
+        fontSize: 14,
+        fontWeight: 'bold',
+        color: '#991B1B',
+        marginBottom: 8,
+    },
+    refundText: {
+        fontSize: 12,
+        color: '#B91C1C',
+        textAlign: 'center',
+    },
+    qrCodeWrapper: {
+        backgroundColor: '#FFF',
+        padding: 4,
+        borderRadius: 8,
+        marginVertical: 10,
+    },
+    qrCode: {
+        width: 150,
+        height: 150,
+    },
+    refundBtn: {
+        backgroundColor: '#7E22CE',
+        width: '100%',
+        marginTop: 4,
+    },
+    refundWarning: {
+        fontSize: 13,
+        color: '#B91C1C',
+        textAlign: 'center',
+        marginTop: 4,
     },
 });
