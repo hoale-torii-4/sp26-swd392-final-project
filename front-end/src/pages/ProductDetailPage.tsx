@@ -46,6 +46,16 @@ export default function ProductDetailPage() {
 
     const handleAddToCart = async () => {
         if (!product || addingToCart) return;
+        const stock = product.StockQuantity ?? 0;
+        if (stock <= 0) {
+            toast.error("Sản phẩm đã hết hàng.");
+            return;
+        }
+        if (quantity > stock) {
+            toast.error(`Số lượng tối đa có thể đặt là ${stock}.`);
+            setQuantity(stock);
+            return;
+        }
         setAddingToCart(true);
         setCartMsg(null);
         setBuyNowError(null);
@@ -70,6 +80,16 @@ export default function ProductDetailPage() {
 
     const handleBuyNow = async () => {
         if (!product || addingToCart) return;
+        const stock = product.StockQuantity ?? 0;
+        if (stock <= 0) {
+            toast.error("Sản phẩm đã hết hàng.");
+            return;
+        }
+        if (quantity > stock) {
+            toast.error(`Số lượng tối đa có thể đặt là ${stock}.`);
+            setQuantity(stock);
+            return;
+        }
         setAddingToCart(true);
         setCartMsg(null);
         setBuyNowError(null);
@@ -245,6 +265,27 @@ export default function ProductDetailPage() {
                         {/* Action buttons and Quantity logic block */}
                         {type !== 'item' && (
                             <>
+                                {/* Stock status */}
+                                {(() => {
+                                    const stock = product.StockQuantity ?? 0;
+                                    const isOutOfStock = stock <= 0;
+                                    const isLowStock = !isOutOfStock && stock <= 10;
+                                    return (
+                                        <div className={`mb-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
+                                            isOutOfStock
+                                                ? "bg-red-100 text-red-700"
+                                                : isLowStock
+                                                    ? "bg-amber-100 text-amber-700"
+                                                    : "bg-green-100 text-green-700"
+                                        }`}>
+                                            <span className={`w-2 h-2 rounded-full ${
+                                                isOutOfStock ? "bg-red-500" : isLowStock ? "bg-amber-500" : "bg-green-500"
+                                            }`} />
+                                            {isOutOfStock ? "Hết hàng" : `Còn ${stock} sản phẩm`}
+                                        </div>
+                                    );
+                                })()}
+
                                 {/* Quantity selector */}
                                 <div className="mb-6">
                                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
@@ -253,19 +294,19 @@ export default function ProductDetailPage() {
                                     <div className="flex items-center border border-gray-200 rounded-lg w-fit">
                                         <button
                                             onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                                            disabled={quantity <= 1 || !product.IsActive}
+                                            disabled={quantity <= 1 || !product.IsActive || (product.StockQuantity ?? 0) <= 0}
                                             className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                                             </svg>
                                         </button>
-                                        <span className={`w-12 text-center text-base font-semibold ${!product.IsActive ? "text-gray-400" : "text-gray-900"}`}>
+                                        <span className={`w-12 text-center text-base font-semibold ${!product.IsActive || (product.StockQuantity ?? 0) <= 0 ? "text-gray-400" : "text-gray-900"}`}>
                                             {quantity}
                                         </span>
                                         <button
-                                            onClick={() => setQuantity((q) => q + 1)}
-                                            disabled={!product.IsActive}
+                                            onClick={() => setQuantity((q) => Math.min((product.StockQuantity ?? 0), q + 1))}
+                                            disabled={!product.IsActive || (product.StockQuantity ?? 0) <= 0 || quantity >= (product.StockQuantity ?? 0)}
                                             className="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                                         >
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -273,13 +314,16 @@ export default function ProductDetailPage() {
                                             </svg>
                                         </button>
                                     </div>
+                                    {quantity >= (product.StockQuantity ?? 0) && (product.StockQuantity ?? 0) > 0 && (
+                                        <p className="mt-1.5 text-xs text-amber-600">Đã đạt số lượng tối đa trong kho</p>
+                                    )}
                                 </div>
 
                                 {/* Action buttons */}
                                 <div className="flex flex-col sm:flex-row gap-3 mb-5">
                                     <button
                                         onClick={handleAddToCart}
-                                        disabled={addingToCart || !product.IsActive}
+                                        disabled={addingToCart || !product.IsActive || (product.StockQuantity ?? 0) <= 0}
                                         className="flex-1 py-3.5 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                                     >
                                         {addingToCart ? (
@@ -290,8 +334,8 @@ export default function ProductDetailPage() {
                                                 </svg>
                                                 Đang thêm...
                                             </>
-                                        ) : !product.IsActive ? (
-                                            "Ngừng kinh doanh"
+                                        ) : !product.IsActive || (product.StockQuantity ?? 0) <= 0 ? (
+                                            "Hết hàng"
                                         ) : (
                                             <>
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -303,10 +347,10 @@ export default function ProductDetailPage() {
                                     </button>
                                     <button
                                         onClick={handleBuyNow}
-                                        disabled={addingToCart || !product.IsActive}
+                                        disabled={addingToCart || !product.IsActive || (product.StockQuantity ?? 0) <= 0}
                                         className="flex-1 py-3.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#8B1A1A]/5 transition-colors text-center flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                                     >
-                                        {product.IsActive ? (
+                                        {product.IsActive && (product.StockQuantity ?? 0) > 0 ? (
                                             <>
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5" />
@@ -315,7 +359,7 @@ export default function ProductDetailPage() {
                                                 Mua ngay
                                             </>
                                         ) : (
-                                            "Ngừng kinh doanh"
+                                            "Hết hàng"
                                         )}
                                     </button>
                                 </div>
@@ -367,7 +411,16 @@ export default function ProductDetailPage() {
                                 <InfoRow label="Bộ sưu tập" value={product.Collection} />
                             )}
                             <InfoRow label="Số lượng sản phẩm" value={`${product.Items.length} món`} />
-                            <InfoRow label="Tình trạng" value={product.IsActive ? "Còn hàng" : "Hết hàng"} />
+                            <InfoRow 
+                                label="Tình trạng kho" 
+                                value={
+                                    (product.StockQuantity ?? 0) <= 0 
+                                        ? "Hết hàng" 
+                                        : (product.StockQuantity ?? 0) <= 10 
+                                            ? `Sắp hết — Còn ${product.StockQuantity} sp` 
+                                            : `Còn hàng (${product.StockQuantity})`
+                                } 
+                            />
                         </div>
                     </div>
 

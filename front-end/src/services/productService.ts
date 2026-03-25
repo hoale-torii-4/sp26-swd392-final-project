@@ -15,6 +15,7 @@ export interface GiftBoxDetailDto {
     Name: string;
     Description: string;
     Price: number;
+    StockQuantity: number;
     Images: string[];
     Image: string | null;
     Collection: string | null;
@@ -29,6 +30,7 @@ export interface GiftBoxListDto {
     Name: string;
     Description: string;
     Price: number;
+    StockQuantity: number;
     Image: string | null;
     CollectionId: string;
     CollectionName: string;
@@ -73,6 +75,7 @@ export const productService = {
             Name: data.Name || data.name,
             Description: 'Thành phần cấu tạo hộp quà Mix & Match của bạn.',
             Price: data.Price || data.price,
+            StockQuantity: data.StockQuantity ?? data.stockQuantity ?? 0,
             Images: data.Images || data.images || [],
             Image: data.Images?.[0] || data.images?.[0] || null,
             Collection: data.Category || data.category || 'Vật phẩm lẻ',

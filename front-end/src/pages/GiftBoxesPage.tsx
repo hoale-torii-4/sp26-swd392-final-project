@@ -431,16 +431,18 @@ export default function GiftBoxesPage() {
 function ProductCard({ box }: { box: GiftBoxListDto }) {
     const mainImage = box.Image || "";
     const hasImage = mainImage.length > 0;
+    const isOutOfStock = (box.StockQuantity ?? 0) <= 0;
+    const isLowStock = !isOutOfStock && (box.StockQuantity ?? 0) <= 10;
 
     return (
-        <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+        <div className={`group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow ${isOutOfStock ? "opacity-75" : ""}`}>
             {/* Image */}
             <div className="relative aspect-square overflow-hidden bg-gray-100">
                 {hasImage ? (
                     <img
                         src={mainImage}
                         alt={box.Name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className={`w-full h-full object-cover transition-transform duration-500 ${isOutOfStock ? "grayscale" : "group-hover:scale-105"}`}
                     />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-300">
@@ -450,15 +452,31 @@ function ProductCard({ box }: { box: GiftBoxListDto }) {
                     </div>
                 )}
 
+                {/* Out of stock overlay */}
+                {isOutOfStock && (
+                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <span className="px-4 py-2 bg-gray-800 text-white text-sm font-bold tracking-wider uppercase rounded-lg">
+                            Hết hàng
+                        </span>
+                    </div>
+                )}
+
                 {/* Badge — based on price tiers for visual variety */}
-                {box.Price >= 3_000_000 && (
+                {!isOutOfStock && box.Price >= 3_000_000 && (
                     <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#D4AF37] text-white text-[10px] font-bold tracking-wider uppercase rounded">
                         Premium
                     </span>
                 )}
-                {box.Price < 1_000_000 && (
+                {!isOutOfStock && box.Price < 1_000_000 && (
                     <span className="absolute top-3 left-3 px-2.5 py-1 bg-[#8B1A1A] text-white text-[10px] font-bold tracking-wider uppercase rounded">
                         Best Seller
+                    </span>
+                )}
+
+                {/* Low stock warning badge */}
+                {isLowStock && (
+                    <span className="absolute top-3 right-3 px-2.5 py-1 bg-amber-500 text-white text-[10px] font-bold tracking-wider rounded">
+                        Còn {box.StockQuantity} sp
                     </span>
                 )}
             </div>
@@ -468,9 +486,16 @@ function ProductCard({ box }: { box: GiftBoxListDto }) {
                 <h3 className="font-bold text-gray-900 uppercase text-sm tracking-wide mb-2 line-clamp-2 min-h-[2.5rem]">
                     {box.Name}
                 </h3>
-                <p className="text-[#8B1A1A] font-bold text-lg mb-4">
-                    {formatPrice(box.Price)}
-                </p>
+                <div className="flex items-center justify-between mb-4">
+                    <p className="text-[#8B1A1A] font-bold text-lg">
+                        {formatPrice(box.Price)}
+                    </p>
+                    {!isOutOfStock && (
+                        <p className={`text-xs font-medium ${isLowStock ? "text-amber-600" : "text-green-600"}`}>
+                            Kho: {box.StockQuantity}
+                        </p>
+                    )}
+                </div>
                 <Link
                     to={`/gift-boxes/${box.Id}`}
                     className="inline-flex items-center justify-center w-full py-2.5 border-2 border-[#8B1A1A] text-[#8B1A1A] text-xs font-bold tracking-[0.15em] uppercase rounded-lg hover:bg-[#8B1A1A] hover:text-white transition-colors"

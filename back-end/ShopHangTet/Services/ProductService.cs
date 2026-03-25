@@ -170,6 +170,7 @@ namespace ShopHangTet.Services
                 Name = giftBox.Name,
                 Description = giftBox.Description,
                 Price = giftBox.Price,
+                StockQuantity = CalculateGiftBoxAvailableStock(giftBox, items),
                 Image = giftBox.Images.FirstOrDefault(),
                 Images = giftBox.Images,
                 Collection = collection?.Name ?? string.Empty,
