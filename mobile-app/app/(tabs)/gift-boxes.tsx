@@ -212,7 +212,7 @@ export default function GiftBoxesScreen() {
             </View>
 
             {/* Mix & Match Banner */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={styles.mixMatchBanner}
                 activeOpacity={0.9}
                 onPress={() => router.push('/mix-match' as any)}
@@ -224,7 +224,7 @@ export default function GiftBoxesScreen() {
                             <Text style={styles.mixMatchBadgeText}>MỚI</Text>
                         </View>
                     </View>
-                    <Text style={styles.mixMatchDesc}>Mix & Match theo ý thích (4-6 món)</Text>
+                    <Text style={styles.mixMatchDesc}>Mix & Match theo ý thích</Text>
                 </View>
                 <View style={styles.mixMatchAction}>
                     <Text style={styles.mixMatchActionText}>Thử ngay</Text>
