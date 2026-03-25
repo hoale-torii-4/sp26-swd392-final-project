@@ -74,8 +74,12 @@ export default function ProductDetailScreen() {
         };
     }, [id, type]);
 
+    const stock = product?.StockQuantity;
+    const isOutOfStock = stock !== undefined && stock <= 0;
+    const isLowStock = stock !== undefined && stock > 0 && stock <= 5;
+
     const handleAddToCart = async () => {
-        if (!product || addingToCart) return;
+        if (!product || addingToCart || isOutOfStock) return;
         setAddingToCart(true);
         setCartMsg(null);
         try {
@@ -179,6 +183,14 @@ export default function ProductDetailScreen() {
                     )}
 
                     <Text style={styles.price}>{formatPrice(product.Price)}</Text>
+                    {stock !== undefined && (
+                        <View style={[styles.stockBadge, isOutOfStock ? styles.stockBadgeOut : isLowStock ? styles.stockBadgeLow : styles.stockBadgeOk]}>
+                            <Ionicons name={isOutOfStock ? 'cube-outline' : 'cube'} size={14} color={isOutOfStock ? AppColors.error : isLowStock ? '#E67E22' : AppColors.success} />
+                            <Text style={[styles.stockBadgeText, isOutOfStock && { color: AppColors.error }, isLowStock && { color: '#E67E22' }]}>
+                                {isOutOfStock ? 'Hết hàng' : `Kho: ${stock} sản phẩm`}
+                            </Text>
+                        </View>
+                    )}
                     <Text style={styles.description}>{product.Description}</Text>
 
                     <View style={styles.divider} />
@@ -202,10 +214,11 @@ export default function ProductDetailScreen() {
                                 </TouchableOpacity>
                                 <Text style={styles.qtyText}>{quantity}</Text>
                                 <TouchableOpacity
-                                    style={styles.qtyBtn}
-                                    onPress={() => setQuantity((q) => q + 1)}
+                                    style={[styles.qtyBtn, (stock !== undefined && quantity >= stock) && styles.qtyBtnDisabled]}
+                                    onPress={() => setQuantity((q) => stock !== undefined ? Math.min(stock, q + 1) : q + 1)}
+                                    disabled={stock !== undefined && quantity >= stock}
                                 >
-                                    <Ionicons name="add" size={18} color={AppColors.text} />
+                                    <Ionicons name="add" size={18} color={(stock !== undefined && quantity >= stock) ? AppColors.textMuted : AppColors.text} />
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -241,7 +254,8 @@ export default function ProductDetailScreen() {
                         <InfoRow label="Giá niêm yết" value={formatPrice(product.Price)} />
                         {product.Collection && <InfoRow label="Bộ sưu tập" value={product.Collection} />}
                         <InfoRow label="Số lượng món" value={`${product.Items.length} món`} />
-                        <InfoRow label="Tình trạng" value={product.IsActive ? 'Còn hàng' : 'Hết hàng'} />
+                        <InfoRow label="Tồn kho" value={stock !== undefined ? `${stock} sản phẩm` : 'N/A'} />
+                        <InfoRow label="Tình trạng" value={isOutOfStock ? 'Hết hàng' : 'Còn hàng'} />
                     </View>
 
                     {/* Items card */}
@@ -272,12 +286,14 @@ export default function ProductDetailScreen() {
             {type !== 'item' && (
                 <View style={[styles.stickyFooter, { paddingBottom: Platform.OS === 'ios' ? 34 : 16 }]}>
                     <TouchableOpacity
-                        style={[styles.addToCartBtn, addingToCart && styles.btnDisabled]}
-                        disabled={addingToCart}
+                        style={[styles.addToCartBtn, (addingToCart || isOutOfStock) && styles.btnDisabled]}
+                        disabled={addingToCart || isOutOfStock}
                         onPress={handleAddToCart}
                     >
                         {addingToCart ? (
                             <LoadingSpinner />
+                        ) : isOutOfStock ? (
+                            <Text style={styles.addToCartText}>Hết hàng</Text>
                         ) : (
                             <>
                                 <Ionicons name="cart-outline" size={20} color="#FFF" />
@@ -351,7 +367,16 @@ const styles = StyleSheet.create({
     tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
     tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, backgroundColor: '#6B7280' },
     tagText: { color: '#FFF', fontSize: 9, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase' },
-    price: { fontSize: 26, fontWeight: '800', color: AppColors.primary, marginBottom: 12 },
+    price: { fontSize: 26, fontWeight: '800', color: AppColors.primary, marginBottom: 8 },
+    stockBadge: {
+        flexDirection: 'row', alignItems: 'center', gap: 6,
+        paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6,
+        alignSelf: 'flex-start', marginBottom: 12,
+    },
+    stockBadgeOk: { backgroundColor: '#F0FDF4' },
+    stockBadgeLow: { backgroundColor: '#FFF7ED' },
+    stockBadgeOut: { backgroundColor: '#FEF2F2' },
+    stockBadgeText: { fontSize: 12, fontWeight: '600', color: AppColors.success },
     description: { fontSize: 14, color: AppColors.textSecondary, lineHeight: 22, marginBottom: 16 },
     divider: { height: 1, backgroundColor: AppColors.border, marginVertical: 16 },
 

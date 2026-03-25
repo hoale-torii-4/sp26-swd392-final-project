@@ -1,4 +1,5 @@
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // TODO: Replace with your actual API URL or use env config
@@ -10,7 +11,16 @@ const apiClient = axios.create({
         'Content-Type': 'application/json',
         Accept: '*/*',
     },
-    timeout: 15000,
+    timeout: 30000, // 30s to handle Render cold starts
+});
+
+// Retry up to 3 times on network errors / 5xx with exponential backoff
+axiosRetry(apiClient, {
+    retries: 3,
+    retryDelay: axiosRetry.exponentialDelay,
+    retryCondition: (error) =>
+        axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+        (error.response?.status ? error.response.status >= 500 : false),
 });
 
 // ── Request interceptor (attach JWT) ──

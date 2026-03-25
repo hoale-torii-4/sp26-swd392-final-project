@@ -29,7 +29,7 @@ export default function MixMatchScreen() {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [rules, setRules] = useState<MixMatchRule | null>(null);
-    
+
     // Initialize slots based on edit mode params if available
     const initialSlots = useMemo(() => {
         const defaultMax = 6;
@@ -142,15 +142,15 @@ export default function MixMatchScreen() {
     const handleAddItem = (itemId: string) => {
         const itemInfo = items.find(i => i.Id === itemId);
         if (itemInfo && itemInfo.StockQuantity !== undefined) {
-             const currentCount = slots.filter(id => id === itemId).length;
-             if (currentCount >= itemInfo.StockQuantity) {
-                  Toast.show({
-                      type: 'error',
-                      text1: 'Vượt quá số lượng',
-                      text2: `Sản phẩm "${itemInfo.Name}" chỉ còn ${itemInfo.StockQuantity} cái.`
-                  });
-                  return;
-             }
+            const currentCount = slots.filter(id => id === itemId).length;
+            if (currentCount >= itemInfo.StockQuantity) {
+                Toast.show({
+                    type: 'error',
+                    text1: 'Vượt quá số lượng',
+                    text2: `Sản phẩm "${itemInfo.Name}" chỉ còn ${itemInfo.StockQuantity} cái.`
+                });
+                return;
+            }
         }
 
         const firstEmptyIndex = slots.findIndex((s) => s === null);
@@ -193,7 +193,7 @@ export default function MixMatchScreen() {
             Toast.show({
                 type: 'error',
                 text1: 'Chưa đạt yêu cầu',
-                text2: validation.errors[0], 
+                text2: validation.errors[0],
                 visibilityTime: 4000
             });
             return;
@@ -226,27 +226,44 @@ export default function MixMatchScreen() {
     };
 
 
-    const renderItemCard = ({ item }: { item: MixMatchItem }) => (
-        <TouchableOpacity 
-            style={styles.itemCard}
-            onPress={() => handleAddItem(item.Id)}
-        >
-            <View style={styles.itemImageWrap}>
-                {item.Image ? (
-                    <Image source={{ uri: item.Image }} style={styles.itemImage} contentFit="cover" />
-                ) : (
-                    <View style={styles.itemPlaceholder}><Text>🎁</Text></View>
+    const renderItemCard = ({ item }: { item: MixMatchItem }) => {
+        const stock = item.StockQuantity;
+        const isOutOfStock = stock !== undefined && stock <= 0;
+        const isLowStock = stock !== undefined && stock > 0 && stock <= 5;
+        return (
+            <TouchableOpacity
+                style={[styles.itemCard, isOutOfStock && { opacity: 0.6 }]}
+                onPress={() => !isOutOfStock && handleAddItem(item.Id)}
+            >
+                <View style={styles.itemImageWrap}>
+                    {item.Image ? (
+                        <Image source={{ uri: item.Image }} style={styles.itemImage} contentFit="cover" />
+                    ) : (
+                        <View style={styles.itemPlaceholder}><Text>🎁</Text></View>
+                    )}
+                    {isOutOfStock && (
+                        <View style={styles.outOfStockOverlay}>
+                            <Text style={styles.outOfStockText}>Hết hàng</Text>
+                        </View>
+                    )}
+                </View>
+                <View style={styles.itemInfo}>
+                    <Text style={styles.itemName} numberOfLines={1}>{item.Name}</Text>
+                    <Text style={styles.itemPrice}>{item.Price ? formatPrice(item.Price) : '--'}</Text>
+                    {stock !== undefined && (
+                        <Text style={[styles.stockText, isLowStock && styles.stockLow, isOutOfStock && styles.stockOut]}>
+                            {isOutOfStock ? 'Hết hàng' : `Kho: ${stock} sản phẩm`}
+                        </Text>
+                    )}
+                </View>
+                {!isOutOfStock && (
+                    <TouchableOpacity style={styles.addIcon} onPress={() => handleAddItem(item.Id)}>
+                        <Ionicons name="add-circle" size={24} color={AppColors.primary} />
+                    </TouchableOpacity>
                 )}
-            </View>
-            <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={1}>{item.Name}</Text>
-                <Text style={styles.itemPrice}>{item.Price ? formatPrice(item.Price) : '--'}</Text>
-            </View>
-            <TouchableOpacity style={styles.addIcon} onPress={() => handleAddItem(item.Id)}>
-                <Ionicons name="add-circle" size={24} color={AppColors.primary} />
             </TouchableOpacity>
-        </TouchableOpacity>
-    );
+        );
+    };
 
     if (loading) return <LoadingSpinner />;
 
@@ -268,7 +285,7 @@ export default function MixMatchScreen() {
                 <Text style={styles.sectionTitle}>Hộp quà của bạn ({validation.totalItems}/{validation.maxItems})</Text>
                 <View style={styles.slotsGrid}>
                     {slotItems.map((slotItem, index) => (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             key={`slot-${index}`}
                             style={[styles.slot, slotItem && styles.slotFilled]}
                             onPress={() => slotItem && handleRemoveItem(index)}
@@ -293,7 +310,7 @@ export default function MixMatchScreen() {
                 <View style={styles.categoriesBar}>
                     <View style={styles.searchContainer}>
                         <Ionicons name="search" size={20} color={AppColors.textMuted} />
-                        <TextInput 
+                        <TextInput
                             style={styles.searchInput}
                             placeholder="Tìm kiếm sản phẩm..."
                             value={searchQuery}
@@ -360,16 +377,16 @@ export default function MixMatchScreen() {
                     </View>
                 )}
 
-                <TouchableOpacity 
+                <TouchableOpacity
                     style={[styles.addToCartBtn, (!validation.isValid || submitting) && styles.btnDisabled]}
                     disabled={!validation.isValid || submitting}
                     onPress={handleAddToCart}
                 >
-                    {submitting 
-                        ? <ActivityIndicator color="#FFF" /> 
+                    {submitting
+                        ? <ActivityIndicator color="#FFF" />
                         : <Text style={styles.addToCartBtnText}>
                             {isEditMode ? 'Cập nhật giỏ quà' : 'Thêm vào giỏ hàng'}
-                          </Text>
+                        </Text>
                     }
                 </TouchableOpacity>
             </View>
@@ -434,6 +451,22 @@ const styles = StyleSheet.create({
     itemInfo: { padding: 8 },
     itemName: { fontSize: 12, fontWeight: '700', color: AppColors.text, marginBottom: 4 },
     itemPrice: { fontSize: 13, fontWeight: '800', color: AppColors.primary },
+    stockText: {
+        fontSize: 10, color: AppColors.textSecondary, marginTop: 2, fontWeight: '500',
+    },
+    stockLow: {
+        color: '#E67E22', fontWeight: '700',
+    },
+    stockOut: {
+        color: AppColors.error, fontWeight: '700',
+    },
+    outOfStockOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center',
+    },
+    outOfStockText: {
+        color: '#FFF', fontSize: 12, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1,
+    },
     addIcon: { position: 'absolute', bottom: 5, right: 5 },
 
     footer: {

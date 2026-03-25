@@ -486,12 +486,12 @@ function ProductCard({ box }: { box: GiftBoxListDto }) {
                 <h3 className="font-bold text-gray-900 uppercase text-sm tracking-wide mb-2 line-clamp-2 min-h-[2.5rem]">
                     {box.Name}
                 </h3>
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex-wrap flex items-center justify-between mb-4 gap-1">
                     <p className="text-[#8B1A1A] font-bold text-lg">
                         {formatPrice(box.Price)}
                     </p>
                     {!isOutOfStock && (
-                        <p className={`text-xs font-medium ${isLowStock ? "text-amber-600" : "text-green-600"}`}>
+                        <p className={`text-xs font-bold px-1.5 py-0.5 rounded-md ${isLowStock ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
                             Kho: {box.StockQuantity}
                         </p>
                     )}

@@ -386,28 +386,62 @@ export default function MixMatchPage() {
                             {/* PRODUCTS LIST */}
                             <div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-5">
-                                {filteredItems.map((item) => (
-                                    <div
-                                        key={item.Id}
-                                        draggable
-                                        onDragStart={() => setDragSource({ id: item.Id, fromSlot: null })}
-                                        className="bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-[#8B1A1A]/40 transition-all cursor-grab"
-                                    >
-                                        <div className="w-full h-40 rounded-xl bg-[#F5F5F0] flex items-center justify-center overflow-hidden mb-4">
-                                            {item.Image ? (
-                                                <img src={item.Image} alt={item.Name} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <span className="text-xs text-gray-400">No image</span>
-                                            )}
+                                {filteredItems.map((item) => {
+                                    const isOutOfStock = (item.StockQuantity ?? 0) <= 0;
+                                    const isLowStock = !isOutOfStock && (item.StockQuantity ?? 0) <= 10;
+                                    
+                                    return (
+                                        <div
+                                            key={item.Id}
+                                            draggable={!isOutOfStock}
+                                            onDragStart={() => !isOutOfStock && setDragSource({ id: item.Id, fromSlot: null })}
+                                            className={`bg-white rounded-2xl p-4 shadow-sm border border-transparent hover:border-[#8B1A1A]/40 transition-all ${isOutOfStock ? "opacity-75 cursor-not-allowed" : "cursor-grab"}`}
+                                        >
+                                            <div className="relative w-full h-40 rounded-xl bg-[#F5F5F0] flex items-center justify-center overflow-hidden mb-4">
+                                                {item.Image ? (
+                                                    <img src={item.Image} alt={item.Name} className={`w-full h-full object-cover ${isOutOfStock ? "grayscale" : ""}`} />
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">No image</span>
+                                                )}
+
+                                                {/* Out of stock overlay */}
+                                                {isOutOfStock && (
+                                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                        <span className="px-3 py-1.5 bg-gray-800 text-white text-xs font-bold tracking-wider uppercase rounded-lg">
+                                                            Hết hàng
+                                                        </span>
+                                                    </div>
+                                                )}
+
+                                                {/* Low stock warning badge */}
+                                                {isLowStock && (
+                                                    <span className="absolute top-2 right-2 px-2 py-1 bg-amber-500 text-white text-[10px] font-bold tracking-wider rounded">
+                                                        Còn {item.StockQuantity} sp
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name}</p>
+                                            <p className="text-xs text-gray-500 mb-3">{item.CategoryLabel ?? item.Category}</p>
+                                            <div className="flex flex-wrap items-center justify-between gap-1 mt-1">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-[#8B1A1A]">{item.Price ? formatPrice(item.Price) : "--"}</span>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    {!isOutOfStock ? (
+                                                        <>
+                                                            <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-md ${isLowStock ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                                                                Kho: {item.StockQuantity ?? 0}
+                                                            </span>
+                                                            <span className="text-[10px] text-gray-400">Kéo để đặt</span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400 mt-0.5">Không thể chọn</span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name}</p>
-                                        <p className="text-xs text-gray-500 mb-3">{item.CategoryLabel ?? item.Category}</p>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-bold text-[#8B1A1A]">{item.Price ? formatPrice(item.Price) : "--"}</span>
-                                            <span className="text-xs text-gray-400">Kéo để đặt</span>
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                             </div>
 

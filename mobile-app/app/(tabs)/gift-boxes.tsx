@@ -168,11 +168,14 @@ export default function GiftBoxesScreen() {
 
     const renderProduct = ({ item }: { item: GiftBoxListDto }) => {
         const badge = getBadge(item.Price);
+        const stock = item.StockQuantity;
+        const isOutOfStock = stock !== undefined && stock <= 0;
+        const isLowStock = stock !== undefined && stock > 0 && stock <= 5;
         return (
             <TouchableOpacity
-                style={styles.productCard}
+                style={[styles.productCard, isOutOfStock && { opacity: 0.6 }]}
                 activeOpacity={0.7}
-                onPress={() => router.push(`/product/${item.Id}` as any)}
+                onPress={() => !isOutOfStock && router.push(`/product/${item.Id}` as any)}
             >
                 <View style={styles.productImageWrap}>
                     {item.Image ? (
@@ -187,12 +190,24 @@ export default function GiftBoxesScreen() {
                             <Text style={styles.badgeText}>{badge.text}</Text>
                         </View>
                     )}
+                    {isOutOfStock && (
+                        <View style={styles.outOfStockOverlay}>
+                            <Text style={styles.outOfStockText}>Hết hàng</Text>
+                        </View>
+                    )}
                 </View>
                 <View style={styles.productInfo}>
                     <Text style={styles.productName} numberOfLines={2}>{item.Name}</Text>
                     <Text style={styles.productPrice}>{formatPrice(item.Price)}</Text>
-                    <View style={styles.detailBtn}>
-                        <Text style={styles.detailBtnText}>Chi tiết</Text>
+                    {stock !== undefined && (
+                        <Text style={[styles.stockText, isLowStock && styles.stockLow, isOutOfStock && styles.stockOut]}>
+                            {isOutOfStock ? 'Hết hàng' : `Kho: ${stock} sản phẩm`}
+                        </Text>
+                    )}
+                    <View style={[styles.detailBtn, isOutOfStock && { borderColor: AppColors.textMuted }]}>
+                        <Text style={[styles.detailBtnText, isOutOfStock && { color: AppColors.textMuted }]}>
+                            {isOutOfStock ? 'Hết hàng' : 'Chi tiết'}
+                        </Text>
                     </View>
                 </View>
             </TouchableOpacity>
@@ -572,7 +587,23 @@ const styles = StyleSheet.create({
         textTransform: 'uppercase', letterSpacing: 0.3, marginBottom: 4, minHeight: 32,
     },
     productPrice: {
-        fontSize: 16, fontWeight: '800', color: AppColors.primary, marginBottom: 10,
+        fontSize: 16, fontWeight: '800', color: AppColors.primary, marginBottom: 4,
+    },
+    stockText: {
+        fontSize: 11, color: AppColors.textSecondary, marginBottom: 8, fontWeight: '500',
+    },
+    stockLow: {
+        color: '#E67E22', fontWeight: '700',
+    },
+    stockOut: {
+        color: AppColors.error, fontWeight: '700',
+    },
+    outOfStockOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center',
+    },
+    outOfStockText: {
+        color: '#FFF', fontSize: 14, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1,
     },
     detailBtn: {
         borderWidth: 1.5, borderColor: AppColors.primary, borderRadius: BorderRadius.sm,

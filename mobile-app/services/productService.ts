@@ -15,6 +15,7 @@ export interface GiftBoxDetailDto {
     Name: string;
     Description: string;
     Price: number;
+    StockQuantity?: number;
     Images: string[];
     Image: string | null;
     Collection: string | null;
@@ -29,6 +30,7 @@ export interface GiftBoxListDto {
     Name: string;
     Description: string;
     Price: number;
+    StockQuantity?: number;
     Image: string | null;
     CollectionId: string;
     CollectionName: string;
