@@ -65,7 +65,7 @@ namespace ShopHangTet.Controllers
 
         /// Create GiftBox with calculated price.
         [HttpPost("gift-boxes")]
-        [Authorize(Roles = "ADMIN")]
+        [Authorize(Roles = "ADMIN,STAFF")]
         public async Task<IActionResult> CreateGiftBox([FromBody] CreateGiftBoxDto dto)
         {
             try
@@ -87,7 +87,7 @@ namespace ShopHangTet.Controllers
 
         /// Update GiftBox and recalculate price when needed.
         [HttpPut("gift-boxes/{id}")]
-        [Authorize(Roles = "ADMIN")]
+        [Authorize(Roles = "ADMIN,STAFF")]
         public async Task<IActionResult> UpdateGiftBox(string id, [FromBody] UpdateGiftBoxDto dto)
         {
             try
@@ -109,7 +109,7 @@ namespace ShopHangTet.Controllers
 
         /// Preview GiftBox price without saving.
         [HttpPost("gift-boxes/calculate-price")]
-        [Authorize(Roles = "ADMIN")]
+        [Authorize(Roles = "ADMIN,STAFF")]
         public async Task<IActionResult> CalculateGiftBoxPrice([FromBody] CalculateGiftBoxPriceDto dto)
         {
             try
