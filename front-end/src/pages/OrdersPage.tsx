@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
 import { orderService } from "../services/orderService";
+import { reviewService } from "../services/reviewService";
 
 interface MyOrderItemDto {
     Name: string;
@@ -11,6 +13,8 @@ interface MyOrderItemDto {
     UnitPrice: number;
     TotalPrice: number;
     Type: string;
+    GiftBoxId?: string;
+    ProductId?: string;
 }
 
 interface MyOrderResponseDto {
@@ -75,6 +79,15 @@ export default function OrdersPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Review modal state
+    const [showReviewModal, setShowReviewModal] = useState(false);
+    const [reviewOrderId, setReviewOrderId] = useState("");
+    const [reviewGiftBoxId, setReviewGiftBoxId] = useState("");
+    const [reviewItemName, setReviewItemName] = useState("");
+    const [reviewRating, setReviewRating] = useState(5);
+    const [reviewContent, setReviewContent] = useState("");
+    const [submittingReview, setSubmittingReview] = useState(false);
+
     useEffect(() => {
         if (!authService.isAuthenticated()) {
             navigate("/login");
@@ -101,6 +114,38 @@ export default function OrdersPage() {
     const handleLogout = () => {
         authService.logout();
         navigate("/login");
+    };
+
+    const openReviewModal = (orderId: string, item: MyOrderItemDto) => {
+        setReviewOrderId(orderId);
+        setReviewGiftBoxId(item.GiftBoxId || item.ProductId || "");
+        setReviewItemName(item.Name);
+        setReviewRating(5);
+        setReviewContent("");
+        setShowReviewModal(true);
+    };
+
+    const handleSubmitReview = async () => {
+        if (!reviewOrderId) return;
+        if (!reviewGiftBoxId) {
+            toast.error("Không tìm thấy mã sản phẩm. Vui lòng thử lại sau.");
+            return;
+        }
+        setSubmittingReview(true);
+        try {
+            await reviewService.createReview({
+                OrderId: reviewOrderId,
+                GiftBoxId: reviewGiftBoxId,
+                Rating: reviewRating,
+                Content: reviewContent,
+            });
+            toast.success("Đánh giá đã được gửi thành công!");
+            setShowReviewModal(false);
+        } catch (err: any) {
+            toast.error(err.message || "Không thể gửi đánh giá.");
+        } finally {
+            setSubmittingReview(false);
+        }
     };
 
     const formatDate = (value: string) => {
@@ -202,14 +247,27 @@ export default function OrdersPage() {
 
                                         <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                                             {order.Items.map((item, idx) => (
-                                                <div key={`${order.Id}-${idx}`} className="rounded-xl border border-gray-100 p-4 bg-gray-50">
-                                                    <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name}</p>
-                                                    <p className="text-xs text-gray-500">Số lượng: {item.Quantity}</p>
-                                                    <p className="text-xs text-gray-500">Đơn giá: {item.UnitPrice.toLocaleString("vi-VN")}₫</p>
-                                                    <p className="text-sm font-semibold text-[#8B1A1A] mt-2">
-                                                        {item.TotalPrice.toLocaleString("vi-VN")}₫
-                                                    </p>
-                                                </div>
+                                                    <div key={`${order.Id}-${idx}`} className="rounded-xl border border-gray-100 p-4 bg-gray-50">
+                                                        <p className="text-sm font-semibold text-gray-900 mb-1">{item.Name}</p>
+                                                        <p className="text-xs text-gray-500">Số lượng: {item.Quantity}</p>
+                                                        <p className="text-xs text-gray-500">Đơn giá: {item.UnitPrice.toLocaleString("vi-VN")}₫</p>
+                                                        <div className="flex items-center justify-between mt-2">
+                                                            <p className="text-sm font-semibold text-[#8B1A1A]">
+                                                                {item.TotalPrice.toLocaleString("vi-VN")}₫
+                                                            </p>
+                                                            {(order.Status === "COMPLETED" || order.Status === "Completed" || order.Status === "Hoàn thành") && (
+                                                                <button
+                                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); openReviewModal(order.Id, item); }}
+                                                                    className="px-3 py-1.5 text-xs font-bold text-[#8B1A1A] bg-[#8B1A1A]/10 rounded-lg hover:bg-[#8B1A1A]/20 transition-colors cursor-pointer flex items-center gap-1"
+                                                                >
+                                                                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                                    </svg>
+                                                                    Đánh giá
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                             ))}
                                         </div>
                                     </Link>
@@ -219,6 +277,64 @@ export default function OrdersPage() {
                     </div>
                 </div>
             </main>
+
+            {/* ════════ REVIEW MODAL ════════ */}
+            {showReviewModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowReviewModal(false)} />
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 z-10">
+                        <button
+                            onClick={() => setShowReviewModal(false)}
+                            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 cursor-pointer"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+
+                        <h3 className="font-serif text-xl font-bold text-[#8B1A1A] italic mb-2">Đánh giá sản phẩm</h3>
+                        <p className="text-sm text-gray-500 mb-5 truncate">{reviewItemName}</p>
+
+                        {/* Star rating */}
+                        <div className="mb-4">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Chấm điểm</label>
+                            <div className="flex gap-1">
+                                {[1,2,3,4,5].map(s => (
+                                    <button
+                                        key={s}
+                                        onClick={() => setReviewRating(s)}
+                                        className="cursor-pointer transition-transform hover:scale-110"
+                                    >
+                                        <svg className={`w-8 h-8 ${s <= reviewRating ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20">
+                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                        </svg>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Comment */}
+                        <div className="mb-5">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Nhận xét</label>
+                            <textarea
+                                value={reviewContent}
+                                onChange={(e) => setReviewContent(e.target.value)}
+                                placeholder="Chia sẻ trải nghiệm của bạn về sản phẩm..."
+                                rows={4}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/20 focus:border-[#8B1A1A] resize-none"
+                            />
+                        </div>
+
+                        <button
+                            disabled={submittingReview}
+                            onClick={handleSubmitReview}
+                            className="w-full py-3 bg-[#8B1A1A] text-white text-sm font-bold uppercase tracking-wider rounded-lg hover:bg-[#701515] transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {submittingReview ? "Đang gửi..." : "Gửi đánh giá"}
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <Footer />
         </div>

@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { productService, type GiftBoxDetailDto } from "../services/productService";
 import { cartService } from "../services/cartService";
+import { reviewService, type GiftBoxReviewsResponse } from "../services/reviewService";
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 
@@ -30,6 +31,10 @@ export default function ProductDetailPage() {
     const [cartMsgSuccess, setCartMsgSuccess] = useState(false);
     const [buyNowError, setBuyNowError] = useState<string | null>(null);
 
+    // ── Reviews ──
+    const [reviews, setReviews] = useState<GiftBoxReviewsResponse | null>(null);
+    const [reviewsLoading, setReviewsLoading] = useState(false);
+
     useEffect(() => {
         if (!id) return;
         setLoading(true);
@@ -43,6 +48,16 @@ export default function ProductDetailPage() {
             .catch(() => setError("Không tìm thấy sản phẩm."))
             .finally(() => setLoading(false));
     }, [id]);
+
+    // Fetch reviews for this product
+    useEffect(() => {
+        if (!id || type === "item") return;
+        setReviewsLoading(true);
+        reviewService.getGiftBoxReviews(id)
+            .then(setReviews)
+            .catch(() => {/* silently ignore */})
+            .finally(() => setReviewsLoading(false));
+    }, [id, type]);
 
     const handleAddToCart = async () => {
         if (!product || addingToCart) return;
@@ -485,6 +500,123 @@ export default function ProductDetailPage() {
                     </div>
                 </div>
             </section>
+
+            {/* ════════ REVIEWS SECTION ════════ */}
+            {type !== "item" && (
+                <section className="max-w-7xl w-full mx-auto px-4 lg:px-8 pb-14">
+                    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                        {/* Header */}
+                        <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                                <h3 className="font-serif text-xl font-bold text-[#8B1A1A] italic flex items-center gap-2">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.562.562 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                                    </svg>
+                                    Đánh giá từ khách hàng
+                                </h3>
+                                {reviews && reviews.TotalReviews > 0 && (
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        {reviews.TotalReviews} đánh giá · Trung bình {reviews.AverageRating.toFixed(1)}/5
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Rating Summary */}
+                        {reviews && reviews.TotalReviews > 0 && (
+                            <div className="px-6 py-5 border-b border-gray-100 flex flex-col sm:flex-row gap-8">
+                                {/* Average rating */}
+                                <div className="flex flex-col items-center justify-center min-w-[120px]">
+                                    <span className="text-5xl font-bold text-[#8B1A1A]">{reviews.AverageRating.toFixed(1)}</span>
+                                    <div className="flex gap-0.5 mt-2">
+                                        {[1,2,3,4,5].map(s => (
+                                            <svg key={s} className={`w-5 h-5 ${s <= Math.round(reviews.AverageRating) ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20">
+                                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                            </svg>
+                                        ))}
+                                    </div>
+                                    <span className="text-xs text-gray-400 mt-1">{reviews.TotalReviews} đánh giá</span>
+                                </div>
+
+                                {/* Star distribution bars */}
+                                <div className="flex-1 space-y-1.5">
+                                    {[5,4,3,2,1].map(star => {
+                                        const count = reviews.Reviews.filter(r => r.Rating === star).length;
+                                        const pct = reviews.TotalReviews > 0 ? (count / reviews.TotalReviews) * 100 : 0;
+                                        return (
+                                            <div key={star} className="flex items-center gap-2 text-sm">
+                                                <span className="w-8 text-right text-gray-500 font-medium">{star} ★</span>
+                                                <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                                                    <div className="bg-amber-400 h-full rounded-full transition-all" style={{ width: `${pct}%` }} />
+                                                </div>
+                                                <span className="w-8 text-gray-400 text-xs">{count}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Reviews list */}
+                        <div className="px-6 py-5">
+                            {reviewsLoading ? (
+                                <div className="text-center py-8">
+                                    <svg className="w-8 h-8 mx-auto text-[#8B1A1A] animate-spin mb-3" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                    </svg>
+                                    <p className="text-sm text-gray-400">Đang tải đánh giá...</p>
+                                </div>
+                            ) : !reviews || reviews.TotalReviews === 0 ? (
+                                <div className="text-center py-10">
+                                    <svg className="w-16 h-16 mx-auto text-gray-200 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                                    </svg>
+                                    <p className="text-gray-500 font-medium mb-1">Chưa có đánh giá nào</p>
+                                    <p className="text-xs text-gray-400">Hãy là người đầu tiên đánh giá sản phẩm này!</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {reviews.Reviews.map((review) => (
+                                        <div key={review.ReviewId} className="p-4 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                                            <div className="flex items-start justify-between gap-3 mb-2">
+                                                <div className="flex items-center gap-3">
+                                                    {/* Avatar */}
+                                                    <div className="w-10 h-10 rounded-full bg-[#8B1A1A]/10 flex items-center justify-center shrink-0">
+                                                        <span className="text-sm font-bold text-[#8B1A1A]">
+                                                            {review.UserName?.charAt(0)?.toUpperCase() || "K"}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-gray-900">{review.UserName || "Khách hàng"}</p>
+                                                        <div className="flex gap-0.5 mt-0.5">
+                                                            {[1,2,3,4,5].map(s => (
+                                                                <svg key={s} className={`w-3.5 h-3.5 ${s <= review.Rating ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20">
+                                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                                                </svg>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs text-gray-400 shrink-0">
+                                                    {new Date(review.CreatedAt).toLocaleDateString("vi-VN")}
+                                                </span>
+                                            </div>
+                                            {review.Content && (
+                                                <p className="text-sm text-gray-600 leading-relaxed ml-[52px]">
+                                                    {review.Content}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </section>
+            )}
+
+
 
             <Footer />
         </div>

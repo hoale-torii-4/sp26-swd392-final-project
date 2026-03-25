@@ -238,7 +238,9 @@ namespace ShopHangTet.Services
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice,
                     TotalPrice = i.TotalPrice,
-                    Type = i.Type
+                    Type = i.Type,
+                    GiftBoxId = i.GiftBoxId?.ToString(),
+                    CustomBoxId = i.CustomBoxId?.ToString()
                 }).ToList()
             }).ToList();
         }

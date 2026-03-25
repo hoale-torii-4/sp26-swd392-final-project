@@ -9,6 +9,8 @@ public class MyOrderItemDto
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
     public OrderItemType Type { get; set; }
+    public string? GiftBoxId { get; set; }
+    public string? CustomBoxId { get; set; }
 }
 
 public class MyOrderResponseDto
