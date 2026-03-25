@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import { authService } from '../services/authService';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
+import { isValidEmail } from '../services/validationService';
 
 export default function ForgotPasswordScreen() {
     const router = useRouter();
@@ -15,6 +16,7 @@ export default function ForgotPasswordScreen() {
 
     const handleSubmit = async () => {
         if (!email.trim()) { setError('Vui lòng nhập email'); return; }
+        if (!isValidEmail(email)) { setError('Email không hợp lệ'); return; }
         setError('');
         setIsLoading(true);
         try {

@@ -4,6 +4,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
 import apiClient from "../services/apiClient";
+import { isValidEmail, isValidOrderCode } from "../utils/validation";
 
 /* ═══════════════════ HELPERS ═══════════════════ */
 function formatPrice(v: number) {
@@ -38,10 +39,37 @@ export default function OrderTrackingPage() {
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<any>(null);
     const [error, setError] = useState<string | null>(null);
+    const [orderCodeError, setOrderCodeError] = useState("");
+    const [emailError, setEmailError] = useState("");
 
     const handleSearch = async (e: FormEvent) => {
         e.preventDefault();
-        if (!orderCode.trim() || !email.trim()) return;
+        const nextOrderCode = orderCode.trim().toUpperCase();
+        const nextEmail = email.trim();
+
+        let valid = true;
+        setOrderCodeError("");
+        setEmailError("");
+
+        if (!nextOrderCode) {
+            setOrderCodeError("Vui lòng nhập mã đơn hàng.");
+            valid = false;
+        } else if (!isValidOrderCode(nextOrderCode)) {
+            setOrderCodeError("Mã đơn hàng không hợp lệ.");
+            valid = false;
+        }
+
+        if (!nextEmail) {
+            setEmailError("Vui lòng nhập email đặt hàng.");
+            valid = false;
+        } else if (!isValidEmail(nextEmail)) {
+            setEmailError("Email không hợp lệ.");
+            valid = false;
+        }
+
+        if (!valid) {
+            return;
+        }
 
         setLoading(true);
         setError(null);
@@ -49,7 +77,7 @@ export default function OrderTrackingPage() {
 
         try {
             const res = await apiClient.get("/Orders/track", {
-                params: { orderCode: orderCode.trim().toUpperCase(), email: email.trim() }
+                params: { orderCode: nextOrderCode, email: nextEmail }
             });
             setResult(res.data);
         } catch (err: any) {
@@ -93,10 +121,17 @@ export default function OrderTrackingPage() {
                                     type="text"
                                     placeholder="VD: SHT2603123002"
                                     value={orderCode}
-                                    onChange={e => setOrderCode(e.target.value)}
+                                    onChange={e => {
+                                        setOrderCode(e.target.value);
+                                        setOrderCodeError("");
+                                    }}
                                     required
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all font-mono"
+                                    className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all font-mono ${orderCodeError
+                                        ? "border-red-400 focus:ring-red-200 focus:border-red-500"
+                                        : "border-gray-200 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A]"
+                                        }`}
                                 />
+                                {orderCodeError && <p className="mt-1 text-xs text-red-500">{orderCodeError}</p>}
                             </div>
                             <div>
                                 <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
@@ -106,10 +141,17 @@ export default function OrderTrackingPage() {
                                     type="email"
                                     placeholder="email@example.com"
                                     value={email}
-                                    onChange={e => setEmail(e.target.value)}
+                                    onChange={e => {
+                                        setEmail(e.target.value);
+                                        setEmailError("");
+                                    }}
                                     required
-                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A] transition-all"
+                                    className={`w-full px-4 py-3 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all ${emailError
+                                        ? "border-red-400 focus:ring-red-200 focus:border-red-500"
+                                        : "border-gray-200 focus:ring-[#8B1A1A]/30 focus:border-[#8B1A1A]"
+                                        }`}
                                 />
+                                {emailError && <p className="mt-1 text-xs text-red-500">{emailError}</p>}
                             </div>
                         </div>
                         <button

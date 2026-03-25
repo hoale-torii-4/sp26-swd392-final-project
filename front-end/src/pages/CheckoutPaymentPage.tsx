@@ -6,6 +6,7 @@ import { cartService, type CartDto, type CartItemDto } from "../services/cartSer
 import { orderService, type CreateOrderB2CDto, OrderItemType } from "../services/orderService";
 import { authService } from "../services/authService";
 import apiClient from "../services/apiClient";
+import { isValidEmail, isValidFutureOrTodayDate, isValidPhone } from "../utils/validation";
 
 interface Address {
     Id: string;
@@ -195,12 +196,47 @@ export default function CheckoutPaymentPage() {
             }
         }
 
-        if (!finalReceiverName || !finalReceiverPhone || !finalDeliveryAddress || !deliveryDate) {
+        const trimmedCustomerEmail = customerEmail.trim();
+        const trimmedCustomerName = customerName.trim();
+        const trimmedCustomerPhone = customerPhone.trim();
+        const trimmedReceiverName = finalReceiverName.trim();
+        const trimmedReceiverPhone = finalReceiverPhone.trim();
+        const trimmedDeliveryAddress = finalDeliveryAddress.trim();
+
+        if (!trimmedReceiverName || !trimmedReceiverPhone || !trimmedDeliveryAddress || !deliveryDate) {
             setError("Vui lòng điền đầy đủ thông tin người nhận, địa chỉ và ngày giao hàng.");
             return;
         }
-        if (!customerEmail) {
+        if (trimmedReceiverName.length < 2) {
+            setError("Tên người nhận phải có ít nhất 2 ký tự.");
+            return;
+        }
+        if (!isValidPhone(trimmedReceiverPhone)) {
+            setError("Số điện thoại người nhận không hợp lệ.");
+            return;
+        }
+        if (trimmedDeliveryAddress.length < 10) {
+            setError("Địa chỉ giao hàng quá ngắn, vui lòng nhập chi tiết hơn.");
+            return;
+        }
+        if (!isValidFutureOrTodayDate(deliveryDate)) {
+            setError("Ngày giao hàng phải từ hôm nay trở đi.");
+            return;
+        }
+        if (!trimmedCustomerEmail) {
             setError("Vui lòng nhập email để nhận thông tin đơn hàng.");
+            return;
+        }
+        if (!isValidEmail(trimmedCustomerEmail)) {
+            setError("Email nhận thông tin đơn hàng không hợp lệ.");
+            return;
+        }
+        if (trimmedCustomerName && trimmedCustomerName.length < 2) {
+            setError("Tên người đặt phải có ít nhất 2 ký tự.");
+            return;
+        }
+        if (trimmedCustomerPhone && !isValidPhone(trimmedCustomerPhone)) {
+            setError("Số điện thoại người đặt không hợp lệ.");
             return;
         }
 
@@ -209,9 +245,9 @@ export default function CheckoutPaymentPage() {
         try {
             const orderData: CreateOrderB2CDto = {
                 UserId: user?.Id,
-                CustomerEmail: customerEmail,
-                CustomerName: customerName || receiverName,
-                CustomerPhone: customerPhone || receiverPhone,
+                CustomerEmail: trimmedCustomerEmail,
+                CustomerName: trimmedCustomerName || trimmedReceiverName,
+                CustomerPhone: trimmedCustomerPhone || trimmedReceiverPhone,
                 Items: items.map((item) => ({
                     Type: item.Type as OrderItemType,
                     Id: item.ProductId || item.Id,
@@ -219,9 +255,9 @@ export default function CheckoutPaymentPage() {
                     Price: item.UnitPrice,
                     Name: item.Name ?? undefined,
                 })),
-                ReceiverName: finalReceiverName,
-                ReceiverPhone: finalReceiverPhone,
-                DeliveryAddress: finalDeliveryAddress,
+                ReceiverName: trimmedReceiverName,
+                ReceiverPhone: trimmedReceiverPhone,
+                DeliveryAddress: trimmedDeliveryAddress,
                 GreetingMessage: greetingMessage || undefined,
                 DeliveryDate: new Date(deliveryDate).toISOString(),
             };

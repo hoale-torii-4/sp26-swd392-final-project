@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     View, Text, ScrollView, TextInput, TouchableOpacity,
-    StyleSheet, Platform,
+    StyleSheet, Platform, Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,10 +11,11 @@ import { authService } from '../../services/authService';
 import { AppColors, Spacing, BorderRadius } from '../../constants/theme';
 import ConfirmModal from '../../components/ConfirmModal';
 import { isInternalRole } from '../../types/auth';
+import { hasMinLength, isValidPhone, sanitizeDigits } from '../../services/validationService';
 
 export default function AccountScreen() {
     const router = useRouter();
-    const { user, isAuthenticated, logout, siteMode, setSiteMode } = useAuth();
+    const { user, isAuthenticated, logout, siteMode, setSiteMode, refreshUser } = useAuth();
 
     const initials = user?.FullName?.charAt(0).toUpperCase() || 'U';
     const canSwitchSite = isInternalRole(user?.Role);
@@ -22,7 +23,12 @@ export default function AccountScreen() {
     // Profile state
     const [fullName, setFullName] = useState(user?.FullName || '');
     const [phone, setPhone] = useState(user?.Phone || '');
+    const [bankName, setBankName] = useState(user?.BankName || '');
+    const [bankAccountNumber, setBankAccountNumber] = useState(user?.BankAccountNumber || '');
     const [profileMsg, setProfileMsg] = useState('');
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [banks, setBanks] = useState<Array<{ name: string; code: string; short_name: string }>>([]);
+    const [showBankPicker, setShowBankPicker] = useState(false);
 
     // Password state
     const [oldPw, setOldPw] = useState('');
@@ -33,6 +39,25 @@ export default function AccountScreen() {
     const [pwIsSuccess, setPwIsSuccess] = useState(false);
 
     const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+    useEffect(() => {
+        fetch('https://qr.sepay.vn/banks.json')
+            .then((res) => res.json())
+            .then((data) => {
+                if (Array.isArray(data?.data)) {
+                    setBanks(data.data);
+                }
+            })
+            .catch(() => {
+                setBanks([]);
+            });
+    }, []);
+
+    const selectedBankLabel = useMemo(() => {
+        if (!bankName) return 'Chọn ngân hàng';
+        const bank = banks.find((b) => b.code === bankName);
+        return bank ? `${bank.short_name} - ${bank.name}` : bankName;
+    }, [bankName, banks]);
 
     const handleSwitchSite = async () => {
         if (!canSwitchSite) return;
@@ -82,14 +107,56 @@ export default function AccountScreen() {
         );
     }
 
-    const handleProfileSave = () => {
-        setProfileMsg('Thông tin đã được cập nhật thành công!');
-        setTimeout(() => setProfileMsg(''), 3000);
+    const handleProfileSave = async () => {
+        if (!fullName.trim()) {
+            Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Vui lòng nhập họ và tên.' });
+            return;
+        }
+        if (!hasMinLength(fullName, 2)) {
+            Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Họ và tên phải có ít nhất 2 ký tự.' });
+            return;
+        }
+        if (phone.trim() && !isValidPhone(phone)) {
+            Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Số điện thoại không hợp lệ.' });
+            return;
+        }
+        if (bankAccountNumber.trim() && !/^\d{6,20}$/.test(bankAccountNumber.trim())) {
+            Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Số tài khoản phải từ 6 đến 20 chữ số.' });
+            return;
+        }
+        if (bankAccountNumber.trim() && !bankName) {
+            Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Vui lòng chọn ngân hàng cho số tài khoản.' });
+            return;
+        }
+
+        setProfileLoading(true);
+        try {
+            const res = await authService.updateProfile({
+                fullName: fullName.trim(),
+                phone: phone.trim() || null,
+                bankName: bankName || undefined,
+                bankAccountNumber: bankAccountNumber.trim() || undefined,
+            });
+            if (res.Success) {
+                await refreshUser();
+                setProfileMsg('Thông tin đã được cập nhật thành công!');
+                Toast.show({ type: 'success', text1: 'Thành công', text2: 'Đã cập nhật thông tin tài khoản.' });
+                setTimeout(() => setProfileMsg(''), 3000);
+            } else {
+                Toast.show({ type: 'error', text1: 'Lỗi', text2: res.Message || 'Cập nhật thất bại.' });
+            }
+        } catch (error) {
+            const apiError = error as { message?: string };
+            Toast.show({ type: 'error', text1: 'Lỗi', text2: apiError.message || 'Cập nhật thất bại.' });
+        } finally {
+            setProfileLoading(false);
+        }
     };
 
     const handleChangePassword = async () => {
         if (!oldPw) { setPwMsg('Vui lòng nhập mật khẩu hiện tại'); setPwIsSuccess(false); return; }
         if (!newPw || newPw.length < 6) { setPwMsg('Mật khẩu mới phải có ít nhất 6 ký tự'); setPwIsSuccess(false); return; }
+        if (!confirmPw) { setPwMsg('Vui lòng xác nhận mật khẩu mới'); setPwIsSuccess(false); return; }
         if (newPw !== confirmPw) { setPwMsg('Mật khẩu xác nhận không khớp'); setPwIsSuccess(false); return; }
 
         setPwLoading(true);
@@ -199,15 +266,44 @@ export default function AccountScreen() {
                     <TextInput
                         style={styles.input}
                         value={phone}
-                        onChangeText={setPhone}
+                        onChangeText={(text) => setPhone(sanitizeDigits(text).slice(0, 11))}
                         placeholder="0909 123 456"
                         placeholderTextColor={AppColors.textMuted}
                         keyboardType="phone-pad"
                     />
                 </View>
+
+                <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>Ngân hàng</Text>
+                    <TouchableOpacity style={styles.inputButton} onPress={() => setShowBankPicker(true)}>
+                        <Text style={bankName ? styles.inputButtonText : styles.inputButtonPlaceholder}>{selectedBankLabel}</Text>
+                        <Ionicons name="chevron-down" size={16} color={AppColors.textMuted} />
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.fieldGroup}>
+                    <Text style={styles.label}>Số tài khoản</Text>
+                    <TextInput
+                        style={styles.input}
+                        value={bankAccountNumber}
+                        onChangeText={(text) => setBankAccountNumber(sanitizeDigits(text).slice(0, 20))}
+                        placeholder="VD: 0123456789"
+                        placeholderTextColor={AppColors.textMuted}
+                        keyboardType="number-pad"
+                    />
+                </View>
+
+                {!user.BankName || !user.BankAccountNumber ? (
+                    <View style={styles.warnBox}>
+                        <Text style={styles.warnText}>
+                            Bạn chưa có thông tin ngân hàng. Khi đơn ở trạng thái hoàn tiền, admin sẽ chưa thể tạo QR hoàn tiền cho bạn.
+                        </Text>
+                    </View>
+                ) : null}
+
                 {profileMsg ? <Text style={styles.successMsg}>{profileMsg}</Text> : null}
-                <TouchableOpacity style={styles.saveBtn} onPress={handleProfileSave}>
-                    <Text style={styles.saveBtnText}>Cập nhật thông tin</Text>
+                <TouchableOpacity style={[styles.saveBtn, profileLoading && styles.btnDisabled]} onPress={handleProfileSave} disabled={profileLoading}>
+                    <Text style={styles.saveBtnText}>{profileLoading ? 'Đang lưu...' : 'Cập nhật thông tin'}</Text>
                 </TouchableOpacity>
             </View>
 
@@ -291,6 +387,36 @@ export default function AccountScreen() {
                 onCancel={() => setShowLogoutConfirm(false)}
                 isDestructive={true}
             />
+
+            <Modal visible={showBankPicker} transparent animationType="fade" onRequestClose={() => setShowBankPicker(false)}>
+                <View style={styles.pickerOverlay}>
+                    <View style={styles.pickerCard}>
+                        <View style={styles.pickerHeader}>
+                            <Text style={styles.pickerTitle}>Chọn ngân hàng</Text>
+                            <TouchableOpacity onPress={() => setShowBankPicker(false)}>
+                                <Ionicons name="close" size={18} color={AppColors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView style={styles.pickerList}>
+                            <TouchableOpacity style={styles.pickerItem} onPress={() => { setBankName(''); setShowBankPicker(false); }}>
+                                <Text style={styles.pickerItemText}>-- Bỏ chọn --</Text>
+                            </TouchableOpacity>
+                            {banks.map((bank) => (
+                                <TouchableOpacity
+                                    key={bank.code}
+                                    style={[styles.pickerItem, bankName === bank.code && styles.pickerItemActive]}
+                                    onPress={() => { setBankName(bank.code); setShowBankPicker(false); }}
+                                >
+                                    <Text style={[styles.pickerItemText, bankName === bank.code && styles.pickerItemTextActive]}>
+                                        {bank.short_name} - {bank.name}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
         </ScrollView>
     );
 }
@@ -381,6 +507,27 @@ const styles = StyleSheet.create({
         borderWidth: 1, borderColor: AppColors.border, borderRadius: BorderRadius.sm,
         paddingHorizontal: Spacing.md, paddingVertical: 10, fontSize: 14, color: AppColors.text,
     },
+    inputButton: {
+        borderWidth: 1,
+        borderColor: AppColors.border,
+        borderRadius: BorderRadius.sm,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    inputButtonText: { fontSize: 14, color: AppColors.text, flex: 1, paddingRight: 8 },
+    inputButtonPlaceholder: { fontSize: 14, color: AppColors.textMuted, flex: 1, paddingRight: 8 },
+    warnBox: {
+        backgroundColor: '#FEF2F2',
+        borderWidth: 1,
+        borderColor: '#FECACA',
+        borderRadius: BorderRadius.sm,
+        padding: Spacing.md,
+        marginBottom: 10,
+    },
+    warnText: { fontSize: 12, color: '#B91C1C', lineHeight: 18 },
     inputDisabled: { backgroundColor: '#F9FAFB', color: AppColors.textMuted },
     successMsg: { fontSize: 13, color: AppColors.success, fontWeight: '600', marginBottom: 10 },
     pwMsg: { fontSize: 13, fontWeight: '600', marginBottom: 10 },
@@ -421,4 +568,33 @@ const styles = StyleSheet.create({
         paddingHorizontal: 40, paddingVertical: 14, width: '100%', alignItems: 'center',
     },
     registerBtnText: { color: AppColors.primary, fontSize: 14, fontWeight: '700' },
+
+    pickerOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'center',
+        paddingHorizontal: Spacing.lg,
+    },
+    pickerCard: {
+        backgroundColor: AppColors.surface,
+        borderRadius: BorderRadius.lg,
+        maxHeight: '70%',
+        padding: Spacing.lg,
+    },
+    pickerHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: Spacing.md,
+    },
+    pickerTitle: { fontSize: 16, fontWeight: '700', color: AppColors.text },
+    pickerList: { maxHeight: 420 },
+    pickerItem: {
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: AppColors.borderLight,
+    },
+    pickerItemActive: { backgroundColor: 'rgba(139, 26, 26, 0.06)' },
+    pickerItemText: { fontSize: 13, color: AppColors.textSecondary },
+    pickerItemTextActive: { color: AppColors.primary, fontWeight: '700' },
 });

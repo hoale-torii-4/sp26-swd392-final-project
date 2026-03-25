@@ -33,6 +33,8 @@ const normalizeUser = (input: any): User => {
         Email: input?.Email ?? input?.email ?? '',
         FullName: input?.FullName ?? input?.fullName ?? '',
         Phone: input?.Phone ?? input?.phone ?? '',
+        BankName: input?.BankName ?? input?.bankName ?? '',
+        BankAccountNumber: input?.BankAccountNumber ?? input?.bankAccountNumber ?? '',
         Role: normalizedRole,
         Status: normalizedStatus,
         CreatedAt: input?.CreatedAt ?? input?.createdAt ?? new Date().toISOString(),
@@ -170,6 +172,19 @@ export const authService = {
             { headers: { Authorization: `Bearer ${token}` } },
         );
         return response.data;
+    },
+
+    updateProfile: async (data: { fullName: string; phone: string | null; bankName?: string; bankAccountNumber?: string }) => {
+        const response = await apiClient.put<ApiResponse<User>>(
+            `${AUTH_ENDPOINT}/profile`,
+            data,
+        );
+        const result = response.data;
+        if (result.Success && result.Data) {
+            const normalized = normalizeUser(result.Data);
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalized));
+        }
+        return result;
     },
 
     verifyOtp: async (data: { email: string; otp: string }): Promise<ApiResponse> => {

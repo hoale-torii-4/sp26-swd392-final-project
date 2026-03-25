@@ -155,7 +155,9 @@ public class DashboardService : IDashboardService
             DeliveryFailed = orders.Count(o => o.Status == OrderStatus.DELIVERY_FAILED),
             PartiallyDelivered = orders.Count(o => o.Status == OrderStatus.PARTIAL_DELIVERY),
             Completed = orders.Count(o => o.Status == OrderStatus.COMPLETED),
-            Cancelled = orders.Count(o => o.Status == OrderStatus.CANCELLED)
+            Cancelled = orders.Count(o => o.Status == OrderStatus.CANCELLED),
+            Refunding = orders.Count(o => o.Status == OrderStatus.REFUNDING),
+            Refunded = orders.Count(o => o.Status == OrderStatus.REFUNDED)
         };
     }
 

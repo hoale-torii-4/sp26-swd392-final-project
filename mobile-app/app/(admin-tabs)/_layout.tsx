@@ -30,17 +30,16 @@ export default function AdminTabLayout() {
                 },
             }}
         >
-            {isAdmin && (
-                <Tabs.Screen
-                    name="dashboard"
-                    options={{
-                        title: 'Báo cáo',
-                        tabBarIcon: ({ color, size }) => (
-                            <Ionicons name="analytics" size={size} color={color} />
-                        ),
-                    }}
-                />
-            )}
+            <Tabs.Screen
+                name="dashboard"
+                options={{
+                    title: 'Báo cáo',
+                    href: isAdmin ? undefined : null,
+                    tabBarIcon: ({ color, size }) => (
+                        <Ionicons name="analytics" size={size} color={color} />
+                    ),
+                }}
+            />
 
             {(isAdmin || isStaff || isInternalRole(user?.Role)) && (
                 <Tabs.Screen
@@ -53,6 +52,8 @@ export default function AdminTabLayout() {
                     }}
                 />
             )}
+
+
 
             <Tabs.Screen
                 name="account"

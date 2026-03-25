@@ -893,6 +893,8 @@ namespace ShopHangTet.DTOs
         public int PartiallyDelivered { get; set; }
         public int Completed { get; set; }
         public int Cancelled { get; set; }
+        public int Refunding { get; set; }
+        public int Refunded { get; set; }
     }
 
     public class OrderTypeSummaryDTO

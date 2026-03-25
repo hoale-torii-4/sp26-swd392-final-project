@@ -33,6 +33,8 @@ export interface OrderStatusSummary {
     PartiallyDelivered: number;
     Completed: number;
     Cancelled: number;
+    Refunding: number;
+    Refunded: number;
 }
 
 export interface OrderTypeSummary {

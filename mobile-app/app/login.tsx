@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
 import type { ApiError, User } from '../types/auth';
 import { isInternalRole } from '../types/auth';
+import { isValidEmailOrPhone } from '../services/validationService';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -53,7 +54,10 @@ export default function LoginScreen() {
         setPasswordError('');
 
         if (!email.trim()) {
-            setEmailError('Vui lòng nhập email');
+            setEmailError('Vui lòng nhập email hoặc số điện thoại');
+            valid = false;
+        } else if (!isValidEmailOrPhone(email)) {
+            setEmailError('Email hoặc số điện thoại không hợp lệ');
             valid = false;
         }
         if (!password) {

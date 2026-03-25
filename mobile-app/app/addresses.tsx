@@ -15,6 +15,7 @@ import apiClient from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
 import ConfirmModal from '../components/ConfirmModal';
+import { hasMinLength, isValidPhone, sanitizeDigits } from '../services/validationService';
 
 interface Address {
   Id: string;
@@ -37,6 +38,16 @@ const emptyForm: AddressForm = {
   FullAddress: '',
   IsDefault: false,
 };
+
+function validateAddressForm(form: AddressForm): string | null {
+  if (!form.ReceiverName.trim()) return 'Tên người nhận không được để trống.';
+  if (!hasMinLength(form.ReceiverName, 2)) return 'Tên người nhận phải có ít nhất 2 ký tự.';
+  if (!form.ReceiverPhone.trim()) return 'Vui lòng nhập số điện thoại người nhận.';
+  if (!isValidPhone(form.ReceiverPhone)) return 'Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 0).';
+  if (!form.FullAddress.trim()) return 'Địa chỉ không được để trống.';
+  if (!hasMinLength(form.FullAddress, 10)) return 'Địa chỉ quá ngắn, vui lòng nhập chi tiết hơn.';
+  return null;
+}
 
 export default function AddressesScreen() {
   const router = useRouter();
@@ -87,8 +98,9 @@ export default function AddressesScreen() {
   };
 
   const handleSave = async () => {
-    if (!form.ReceiverName.trim() || !form.FullAddress.trim()) {
-      setFormError('Tên người nhận và địa chỉ không được để trống.');
+    const validationError = validateAddressForm(form);
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
     setSaving(true);
@@ -208,7 +220,9 @@ export default function AddressesScreen() {
               placeholder="Số điện thoại"
               placeholderTextColor={AppColors.textMuted}
               value={form.ReceiverPhone}
-              onChangeText={(t) => setForm((f) => ({ ...f, ReceiverPhone: t }))}
+              onChangeText={(t) => setForm((f) => ({ ...f, ReceiverPhone: sanitizeDigits(t) }))}
+              keyboardType="phone-pad"
+              maxLength={11}
             />
             <TextInput
               style={[styles.input, { height: 80 }]}

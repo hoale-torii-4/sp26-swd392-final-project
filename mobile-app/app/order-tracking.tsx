@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { orderService } from '../services/orderService';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
+import { isValidEmail, isValidOrderCode, sanitizeOrderCode } from '../services/validationService';
 
 function formatPrice(v: number) {
   return v.toLocaleString('vi-VN') + '₫';
@@ -52,14 +53,40 @@ export default function OrderTrackingScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<any>(null);
+  const [orderCodeError, setOrderCodeError] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   const handleSearch = async () => {
-    if (!orderCode.trim() || !email.trim()) return;
+    const nextOrderCode = orderCode.trim().toUpperCase();
+    const nextEmail = email.trim();
+
+    let valid = true;
+    setOrderCodeError('');
+    setEmailError('');
+
+    if (!nextOrderCode) {
+      setOrderCodeError('Vui lòng nhập mã đơn hàng');
+      valid = false;
+    } else if (!isValidOrderCode(nextOrderCode)) {
+      setOrderCodeError('Mã đơn hàng không hợp lệ');
+      valid = false;
+    }
+
+    if (!nextEmail) {
+      setEmailError('Vui lòng nhập email đặt hàng');
+      valid = false;
+    } else if (!isValidEmail(nextEmail)) {
+      setEmailError('Email không hợp lệ');
+      valid = false;
+    }
+
+    if (!valid) return;
+
     setLoading(true);
     setError(null);
     setResult(null);
     try {
-      const data = await orderService.trackOrder(orderCode.trim().toUpperCase(), email.trim());
+      const data = await orderService.trackOrder(nextOrderCode, nextEmail);
       setResult(data);
     } catch (err: any) {
       const msg = err?.message ?? 'Không tìm thấy đơn hàng. Vui lòng kiểm tra lại.';
@@ -89,25 +116,34 @@ export default function OrderTrackingScreen() {
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Mã đơn hàng</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, orderCodeError ? styles.inputError : null]}
             placeholder="VD: SHT2603123002"
             placeholderTextColor={AppColors.textMuted}
             value={orderCode}
-            onChangeText={setOrderCode}
+            onChangeText={(text) => {
+              setOrderCode(sanitizeOrderCode(text));
+              setOrderCodeError('');
+            }}
             autoCapitalize="characters"
+            maxLength={30}
           />
+          {orderCodeError ? <Text style={styles.fieldError}>{orderCodeError}</Text> : null}
         </View>
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>Email đặt hàng</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, emailError ? styles.inputError : null]}
             placeholder="email@example.com"
             placeholderTextColor={AppColors.textMuted}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              setEmailError('');
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
           />
+          {emailError ? <Text style={styles.fieldError}>{emailError}</Text> : null}
         </View>
         <TouchableOpacity
           style={[styles.primaryBtn, loading && styles.btnDisabled]}
@@ -203,7 +239,7 @@ export default function OrderTrackingScreen() {
           {result.GreetingMessage && (
             <View style={styles.greetingBanner}>
               <Text style={styles.greetingTitle}>Lời chúc gửi kèm 💌</Text>
-              <Text style={styles.greetingText}>"{result.GreetingMessage}"</Text>
+              <Text style={styles.greetingText}>{`“${result.GreetingMessage}”`}</Text>
             </View>
           )}
         </>
@@ -272,6 +308,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 14,
     color: AppColors.text,
+  },
+  inputError: {
+    borderColor: AppColors.error,
+  },
+  fieldError: {
+    fontSize: 12,
+    color: AppColors.error,
+    marginTop: 4,
   },
   primaryBtn: {
     backgroundColor: AppColors.primary,

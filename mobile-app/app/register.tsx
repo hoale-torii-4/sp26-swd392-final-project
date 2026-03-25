@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import { authService } from '../services/authService';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
 import type { ApiError } from '../types/auth';
+import { hasMinLength, isValidEmail, isValidPhone, sanitizeDigits } from '../services/validationService';
 
 export default function RegisterScreen() {
     const router = useRouter();
@@ -23,11 +24,14 @@ export default function RegisterScreen() {
     const validate = () => {
         const e: Record<string, string> = {};
         if (!fullName.trim()) e.fullName = 'Vui lòng nhập họ và tên';
+        else if (!hasMinLength(fullName, 2)) e.fullName = 'Họ và tên phải có ít nhất 2 ký tự';
         if (!email.trim()) e.email = 'Vui lòng nhập email';
-        else if (!/\S+@\S+\.\S+/.test(email)) e.email = 'Email không hợp lệ';
+        else if (!isValidEmail(email)) e.email = 'Email không hợp lệ';
+        if (phone.trim() && !isValidPhone(phone)) e.phone = 'Số điện thoại không hợp lệ';
         if (!password) e.password = 'Vui lòng nhập mật khẩu';
         else if (password.length < 6) e.password = 'Mật khẩu phải có ít nhất 6 ký tự';
-        if (password !== confirmPassword) e.confirmPassword = 'Mật khẩu xác nhận không khớp';
+        if (!confirmPassword) e.confirmPassword = 'Vui lòng xác nhận mật khẩu';
+        else if (password !== confirmPassword) e.confirmPassword = 'Mật khẩu xác nhận không khớp';
         setErrors(e);
         return Object.keys(e).length === 0;
     };
@@ -70,7 +74,11 @@ export default function RegisterScreen() {
                 placeholder={opts?.placeholder || ''}
                 placeholderTextColor={AppColors.textMuted}
                 value={value}
-                onChangeText={(t) => { onChange(t); setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; }); }}
+                onChangeText={(t) => {
+                    const normalized = key === 'phone' ? sanitizeDigits(t).slice(0, 11) : t;
+                    onChange(normalized);
+                    setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
+                }}
                 secureTextEntry={opts?.secureTextEntry && !showPassword}
                 keyboardType={opts?.keyboardType || 'default'}
                 autoCapitalize={opts?.autoCapitalize || 'none'}

@@ -23,6 +23,7 @@ import { paymentService } from '../services/paymentService';
 import apiClient from '../services/apiClient';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
+import { hasMinLength, isValidDeliveryDate, isValidEmail, isValidPhone, sanitizeDigits } from '../services/validationService';
 
 function formatPrice(v: number) {
   return v.toLocaleString('vi-VN') + '₫';
@@ -301,12 +302,47 @@ export default function CheckoutPaymentScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!receiverName || !receiverPhone || !addressDetail || !deliveryDate) {
+    const trimmedCustomerEmail = customerEmail.trim();
+    const trimmedCustomerName = customerName.trim();
+    const trimmedCustomerPhone = customerPhone.trim();
+    const trimmedReceiverName = receiverName.trim();
+    const trimmedReceiverPhone = receiverPhone.trim();
+    const trimmedAddressDetail = addressDetail.trim();
+
+    if (!trimmedReceiverName || !trimmedReceiverPhone || !trimmedAddressDetail || !deliveryDate) {
       setError('Vui lòng điền đầy đủ thông tin người nhận và ngày giao hàng.');
       return;
     }
-    if (!customerEmail) {
+    if (!hasMinLength(trimmedReceiverName, 2)) {
+      setError('Tên người nhận phải có ít nhất 2 ký tự.');
+      return;
+    }
+    if (!isValidPhone(trimmedReceiverPhone)) {
+      setError('Số điện thoại người nhận không hợp lệ.');
+      return;
+    }
+    if (!hasMinLength(trimmedAddressDetail, 10)) {
+      setError('Địa chỉ giao hàng quá ngắn, vui lòng nhập chi tiết hơn.');
+      return;
+    }
+    if (!isValidDeliveryDate(deliveryDate)) {
+      setError('Ngày giao hàng phải từ hôm nay trở đi.');
+      return;
+    }
+    if (!trimmedCustomerEmail) {
       setError('Vui lòng nhập email để nhận thông tin đơn hàng.');
+      return;
+    }
+    if (!isValidEmail(trimmedCustomerEmail)) {
+      setError('Email nhận đơn không hợp lệ.');
+      return;
+    }
+    if (trimmedCustomerName && !hasMinLength(trimmedCustomerName, 2)) {
+      setError('Tên người đặt phải có ít nhất 2 ký tự.');
+      return;
+    }
+    if (trimmedCustomerPhone && !isValidPhone(trimmedCustomerPhone)) {
+      setError('Số điện thoại người đặt không hợp lệ.');
       return;
     }
 
@@ -316,9 +352,9 @@ export default function CheckoutPaymentScreen() {
     try {
       const orderData = {
         UserId: user?.Id,
-        CustomerEmail: customerEmail,
-        CustomerName: customerName || receiverName,
-        CustomerPhone: customerPhone || receiverPhone,
+        CustomerEmail: trimmedCustomerEmail,
+        CustomerName: trimmedCustomerName || trimmedReceiverName,
+        CustomerPhone: trimmedCustomerPhone || trimmedReceiverPhone,
         Items: items.map((item) => ({
           Type: item.Type as OrderItemType,
           Id: item.ProductId
@@ -329,9 +365,9 @@ export default function CheckoutPaymentScreen() {
           Price: item.UnitPrice,
           Name: item.Name ?? undefined,
         })),
-        ReceiverName: receiverName,
-        ReceiverPhone: receiverPhone,
-        DeliveryAddress: addressDetail,
+        ReceiverName: trimmedReceiverName,
+        ReceiverPhone: trimmedReceiverPhone,
+        DeliveryAddress: trimmedAddressDetail,
         GreetingMessage: greetingMessage || undefined,
         DeliveryDate: new Date(deliveryDate).toISOString(),
       };
@@ -437,7 +473,7 @@ export default function CheckoutPaymentScreen() {
                 placeholder="Số điện thoại"
                 placeholderTextColor={AppColors.textMuted}
                 value={customerPhone}
-                onChangeText={setCustomerPhone}
+                onChangeText={(text) => setCustomerPhone(sanitizeDigits(text).slice(0, 11))}
                 keyboardType="phone-pad"
               />
             </View>
@@ -499,7 +535,7 @@ export default function CheckoutPaymentScreen() {
               placeholder="Số điện thoại"
               placeholderTextColor={AppColors.textMuted}
               value={receiverPhone}
-              onChangeText={setReceiverPhone}
+              onChangeText={(text) => setReceiverPhone(sanitizeDigits(text).slice(0, 11))}
               keyboardType="phone-pad"
             />
           </View>

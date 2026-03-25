@@ -317,18 +317,12 @@ public class OrdersController : ControllerBase
         }
     }
 
-    [Authorize(Roles = "STAFF")]
+    [Authorize(Roles = "STAFF,ADMIN")]
     [HttpPut("{orderId}/status")]
     public async Task<IActionResult> UpdateOrderStatus(string orderId, [FromBody] UpdateOrderStatusDto request)
     {
         try
         {
-            var userRole = User.FindFirst(ClaimTypes.Role)?.Value ?? "MEMBER";
-            if (userRole != "STAFF")
-            {
-                return Forbid("Only STAFF can update order status. Admin cannot modify orders.");
-            }
-
             var updatedBy = User.FindFirst("name")?.Value ?? User.Identity?.Name ?? "Staff";
             var order = await _orderService.UpdateStatusAsync(orderId, request.Status, updatedBy, request.Note);
 

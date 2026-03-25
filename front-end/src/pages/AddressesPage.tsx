@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import { authService } from "../services/authService";
 import apiClient from "../services/apiClient";
+import { isValidPhone } from "../utils/validation";
 
 /* ─── Types ─── */
 interface Address {
@@ -24,6 +25,28 @@ interface AddressForm {
 }
 
 const emptyForm: AddressForm = { ReceiverName: "", ReceiverPhone: "", FullAddress: "", IsDefault: false };
+
+function validateAddressForm(form: AddressForm): string | null {
+    if (!form.ReceiverName.trim()) {
+        return "Tên người nhận không được để trống.";
+    }
+    if (form.ReceiverName.trim().length < 2) {
+        return "Tên người nhận phải có ít nhất 2 ký tự.";
+    }
+    if (!form.ReceiverPhone.trim()) {
+        return "Vui lòng nhập số điện thoại người nhận.";
+    }
+    if (!isValidPhone(form.ReceiverPhone)) {
+        return "Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 0).";
+    }
+    if (!form.FullAddress.trim()) {
+        return "Địa chỉ không được để trống.";
+    }
+    if (form.FullAddress.trim().length < 10) {
+        return "Địa chỉ quá ngắn, vui lòng nhập chi tiết hơn.";
+    }
+    return null;
+}
 
 /* ─── Sidebar shared links (same as AccountPage) ─── */
 const sidebarLinks = [
@@ -109,8 +132,9 @@ export default function AddressesPage() {
 
     /* ── Submit add/edit ── */
     const handleSave = async () => {
-        if (!form.ReceiverName.trim() || !form.FullAddress.trim()) {
-            setFormError("Tên người nhận và địa chỉ không được để trống.");
+        const validationError = validateAddressForm(form);
+        if (validationError) {
+            setFormError(validationError);
             return;
         }
         setSaving(true);

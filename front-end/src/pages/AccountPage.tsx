@@ -6,6 +6,7 @@ import Header from "../components/Header";
 import Footer from "../components/Footer";
 import NotificationModal from "../components/NotificationModal";
 import { authService } from "../services/authService";
+import { isValidPhone } from "../utils/validation";
 
 /* ───── Sidebar Links ───── */
 const sidebarLinks = [
@@ -168,6 +169,18 @@ export default function AccountPage() {
         setProfileError("");
         if (!fullName.trim()) {
             setProfileError("Họ và tên không được để trống.");
+            return;
+        }
+        if (fullName.trim().length < 2) {
+            setProfileError("Họ và tên phải có ít nhất 2 ký tự.");
+            return;
+        }
+        if (phone.trim() && !isValidPhone(phone)) {
+            setProfileError("Số điện thoại không hợp lệ (10-11 chữ số, bắt đầu bằng 0).");
+            return;
+        }
+        if (bankAccountNumber.trim() && !/^\d{6,20}$/.test(bankAccountNumber.trim())) {
+            setProfileError("Số tài khoản phải từ 6 đến 20 chữ số.");
             return;
         }
 

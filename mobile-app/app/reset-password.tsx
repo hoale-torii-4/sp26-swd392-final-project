@@ -7,6 +7,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import { authService } from '../services/authService';
 import { AppColors, Spacing, BorderRadius } from '../constants/theme';
+import { isValidOtp, sanitizeDigits } from '../services/validationService';
 
 export default function ResetPasswordScreen() {
     const router = useRouter();
@@ -21,6 +22,7 @@ export default function ResetPasswordScreen() {
 
     const handleReset = async () => {
         if (!otp.trim()) { setError('Vui lòng nhập mã OTP'); return; }
+        if (!isValidOtp(otp)) { setError('Mã OTP gồm đúng 6 chữ số'); return; }
         if (!newPassword) { setError('Vui lòng nhập mật khẩu mới'); return; }
         if (newPassword.length < 6) { setError('Mật khẩu phải có ít nhất 6 ký tự'); return; }
         if (newPassword !== confirmPassword) { setError('Mật khẩu xác nhận không khớp'); return; }
@@ -79,7 +81,7 @@ export default function ResetPasswordScreen() {
                         placeholder="Nhập mã 6 số"
                         placeholderTextColor={AppColors.textMuted}
                         value={otp}
-                        onChangeText={(t) => { setOtp(t); setError(''); }}
+                        onChangeText={(t) => { setOtp(sanitizeDigits(t).slice(0, 6)); setError(''); }}
                         keyboardType="number-pad"
                         maxLength={6}
                     />
