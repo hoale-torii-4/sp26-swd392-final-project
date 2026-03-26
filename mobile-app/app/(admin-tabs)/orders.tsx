@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppColors, BorderRadius, Spacing } from '../../constants/theme';
 import { adminService } from '../../services/adminService';
 import { useAuth } from '../../contexts/AuthContext';
+import { orderService, type OrderDto } from '../../services/orderService';
 
 const STATUS_LABELS: Record<string, string> = {
     PAYMENT_CONFIRMING: 'Chờ thanh toán',
@@ -87,6 +88,25 @@ export default function AdminOrdersScreen() {
     const [newStatus, setNewStatus] = useState('PREPARING');
     const [statusNote, setStatusNote] = useState('');
     const [updating, setUpdating] = useState(false);
+
+    // Detail modal state
+    const [detailVisible, setDetailVisible] = useState(false);
+    const [detailLoading, setDetailLoading] = useState(false);
+    const [detailOrder, setDetailOrder] = useState<OrderDto | null>(null);
+
+    const openDetailModal = async (orderId: string) => {
+        setDetailVisible(true);
+        setDetailLoading(true);
+        setDetailOrder(null);
+        try {
+            const data = await orderService.getOrderDetailById(orderId);
+            setDetailOrder(data);
+        } catch {
+            // ignore
+        } finally {
+            setDetailLoading(false);
+        }
+    };
 
     const loadOrders = async () => {
         setLoading(true);
@@ -201,10 +221,11 @@ export default function AdminOrdersScreen() {
                     const statusColor = getStatusColor(status);
 
                     return (
-                        <TouchableOpacity
-                            style={styles.orderCard}
-                            onPress={() => openModal(item)}
-                            activeOpacity={0.7}
+                        <View
+                            style={[
+                                styles.orderCard,
+                                status === 'REFUNDING' && { backgroundColor: '#FEF2F2', borderColor: '#FECACA' }
+                            ]}
                         >
                             <View style={styles.orderHeader}>
                                 <Text style={styles.orderCode}>#{String(code)}</Text>
@@ -235,11 +256,128 @@ export default function AdminOrdersScreen() {
                                     </TouchableOpacity>
                                 );
                             })()}
-                        </TouchableOpacity>
+
+                            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+                                <TouchableOpacity style={[styles.cancelBtn, { paddingVertical: 8 }]} onPress={() => openDetailModal(orderId)}>
+                                    <Text style={styles.cancelBtnText}>Chi tiết</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity style={[styles.updateBtn, { paddingVertical: 8 }]} onPress={() => openModal(item)}>
+                                    <Text style={styles.updateBtnText}>Cập nhật</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
                     );
                 }}
                 ListEmptyComponent={!loading ? <Text style={styles.emptyText}>Không có đơn hàng.</Text> : null}
             />
+
+            {/* ─── Detail Modal ─── */}
+            <Modal
+                visible={detailVisible}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setDetailVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Chi tiết đơn hàng</Text>
+                            <TouchableOpacity onPress={() => setDetailVisible(false)}>
+                                <Ionicons name="close" size={22} color={AppColors.textMuted} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <ScrollView showsVerticalScrollIndicator={false}>
+                            {detailLoading ? (
+                                <Text style={{ textAlign: 'center', padding: 20, color: AppColors.textMuted }}>Đang tải...</Text>
+                            ) : !detailOrder ? (
+                                <Text style={{ textAlign: 'center', padding: 20, color: AppColors.textMuted }}>Không thể tải thông tin</Text>
+                            ) : (
+                                <>
+                                    <View style={styles.modalInfoBox}>
+                                        <Text style={styles.modalInfoLabel}>Mã đơn hàng</Text>
+                                        <Text style={styles.modalInfoValue}>{detailOrder.OrderCode}</Text>
+
+                                        <Text style={styles.modalInfoLabel}>Khách hàng</Text>
+                                        <Text style={styles.modalInfoValue}>{detailOrder.Email}</Text>
+
+                                        <Text style={styles.modalInfoLabel}>Trạng thái</Text>
+                                        <Text style={styles.modalInfoValue}>{getStatusLabel(String(detailOrder.Status))}</Text>
+                                        
+                                        <Text style={styles.modalInfoLabel}>Ngày đặt</Text>
+                                        <Text style={styles.modalInfoValue}>{detailOrder.CreatedAt ? new Date(detailOrder.CreatedAt).toLocaleString('vi-VN') : ''}</Text>
+                                        
+                                        {(detailOrder.CustomerBankName || detailOrder.CustomerBankAccount) && (
+                                            <>
+                                                <Text style={styles.modalInfoLabel}>Ngân hàng</Text>
+                                                <Text style={styles.modalInfoValue}>{detailOrder.CustomerBankName} - STK: {detailOrder.CustomerBankAccount}</Text>
+                                            </>
+                                        )}
+                                        {detailOrder.GreetingMessage && (
+                                            <>
+                                                <Text style={styles.modalInfoLabel}>Lời chúc</Text>
+                                                <Text style={styles.modalInfoValue}>{detailOrder.GreetingMessage}</Text>
+                                            </>
+                                        )}
+                                    </View>
+
+                                    <Text style={styles.sectionLabel}>Sản phẩm ({detailOrder.Items.length})</Text>
+                                    <View style={styles.modalInfoBox}>
+                                        {detailOrder.Items.map((item, idx) => (
+                                            <View key={idx} style={{ flexDirection: 'row', gap: 10, paddingVertical: 8, borderBottomWidth: idx === detailOrder.Items.length - 1 ? 0 : 1, borderBottomColor: AppColors.borderLight }}>
+                                                {item.Image ? (
+                                                    <Image source={{ uri: item.Image }} style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: '#eee' }} />
+                                                ) : (
+                                                    <View style={{ width: 40, height: 40, borderRadius: 6, backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' }}>
+                                                        <Ionicons name="image-outline" size={20} color={AppColors.textMuted} />
+                                                    </View>
+                                                )}
+                                                <View style={{ flex: 1, justifyContent: 'center' }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '600', color: AppColors.text }} numberOfLines={2}>
+                                                        {item.Name || 'Sản phẩm'}
+                                                    </Text>
+                                                    <Text style={{ fontSize: 11, color: AppColors.textSecondary }}>Loại: {item.Type}</Text>
+                                                </View>
+                                                <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                                                    <Text style={{ fontSize: 13, fontWeight: '700', color: AppColors.text }}>
+                                                        {Number(item.UnitPrice ?? item.Price ?? 0).toLocaleString('vi-VN')}đ
+                                                    </Text>
+                                                    <Text style={{ fontSize: 11, color: AppColors.textSecondary }}>x{item.Quantity}</Text>
+                                                </View>
+                                            </View>
+                                        ))}
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: AppColors.borderLight }}>
+                                            <Text style={{ fontSize: 14, fontWeight: '700', color: AppColors.text }}>Tổng cộng</Text>
+                                            <Text style={{ fontSize: 16, fontWeight: '700', color: AppColors.primary }}>
+                                                {Number(detailOrder.TotalAmount).toLocaleString('vi-VN')}đ
+                                            </Text>
+                                        </View>
+                                    </View>
+
+                                    {detailOrder.DeliveryAddresses && detailOrder.DeliveryAddresses.length > 0 && (
+                                        <>
+                                            <Text style={styles.sectionLabel}>Giao hàng</Text>
+                                            <View style={styles.modalInfoBox}>
+                                                {detailOrder.DeliveryAddresses.map((addr, idx) => (
+                                                    <View key={addr.Id || idx} style={{ marginBottom: idx === detailOrder.DeliveryAddresses!.length - 1 ? 0 : 12 }}>
+                                                        <Text style={{ fontSize: 13, fontWeight: '600', color: AppColors.text }}>{addr.ReceiverName} - {addr.ReceiverPhone}</Text>
+                                                        <Text style={{ fontSize: 12, color: AppColors.textSecondary, marginTop: 4 }}>{addr.FullAddress}</Text>
+                                                        {addr.GreetingMessage && (
+                                                            <View style={{ marginTop: 6, backgroundColor: '#fff', padding: 6, borderRadius: 4, borderWidth: 1, borderColor: '#eee' }}>
+                                                                <Text style={{ fontSize: 11, fontStyle: 'italic', color: AppColors.textSecondary }}>"{addr.GreetingMessage}"</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+                                                ))}
+                                            </View>
+                                        </>
+                                    )}
+                                </>
+                            )}
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
 
             {/* ─── Update Status Modal ─── */}
             <Modal
