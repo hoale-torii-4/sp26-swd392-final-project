@@ -16,6 +16,8 @@ public static class SeedData
         await SeedTagsAsync(context);
         await SeedCollectionsAsync(context);
         await SeedGiftBoxesAsync(context);
+        await SeedUsersAsync(context);
+        await SeedReviewsAsync(context);
 
         await context.SaveChangesAsync();
     }
@@ -444,6 +446,118 @@ public static class SeedData
             "https://i.ibb.co/Fk0ft0d3/5-8.jpg");
 
         await context.GiftBoxes.AddRangeAsync(boxes);
+    }
+
+    private static async Task SeedUsersAsync(ShopHangTetDbContext context)
+    {
+        if (await context.Users.AnyAsync()) return;
+
+        var users = new List<UserModel>
+        {
+            new()
+            {
+                Email = "admin@shophangtet.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123456"),
+                FullName = "Admin Shop Hàng Tết",
+                Phone = "0987654321",
+                Role = UserRole.ADMIN,
+                Status = UserStatus.ACTIVE,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new()
+            {
+                Email = "staff@shophangtet.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Staff@123456"),
+                FullName = "Nhân viên Bán Hàng",
+                Phone = "0987654322",
+                Role = UserRole.STAFF,
+                Status = UserStatus.ACTIVE,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            },
+            new()
+            {
+                Email = "member@shophangtet.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Member@123456"),
+                FullName = "Khách hàng thân thiết",
+                Phone = "0987654323",
+                Role = UserRole.MEMBER,
+                Status = UserStatus.ACTIVE,
+                IsEmailVerified = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }
+        };
+
+        await context.Users.AddRangeAsync(users);
+
+        // Seed some default addresses for member
+        if (!await context.Addresses.AnyAsync())
+        {
+            var memberUser = users.First(x => x.Role == UserRole.MEMBER);
+            var addresses = new List<Address>
+            {
+                new()
+                {
+                    UserId = memberUser.Id,
+                    ReceiverName = "Nguyễn Văn Khách",
+                    ReceiverPhone = "0987654323",
+                    FullAddress = "Số 123 Đường Lê Lợi, Phường Bến Thành, Quận 1, TP. Hồ Chí Minh",
+                    IsDefault = true,
+                    CreatedAt = DateTime.UtcNow
+                },
+                new()
+                {
+                    UserId = memberUser.Id,
+                    ReceiverName = "Trần Thị Khách",
+                    ReceiverPhone = "0912345678",
+                    FullAddress = "Số 456 Đường Nguyễn Huệ, Quận Hải Châu, TP. Đà Nẵng",
+                    IsDefault = false,
+                    CreatedAt = DateTime.UtcNow
+                }
+            };
+            await context.Addresses.AddRangeAsync(addresses);
+        }
+    }
+
+    private static async Task SeedReviewsAsync(ShopHangTetDbContext context)
+    {
+        if (await context.Reviews.AnyAsync()) return;
+
+        var memberUser = await context.Users.FirstOrDefaultAsync(u => u.Role == UserRole.MEMBER);
+        if (memberUser == null) return;
+
+        var giftBoxes = await context.GiftBoxes.Take(5).ToListAsync();
+        if (!giftBoxes.Any()) return;
+
+        var reviews = new List<Review>();
+        var sampleComments = new[]
+        {
+            "Hộp quà rất đẹp, đóng gói cẩn thận. Sản phẩm bên trong chất lượng cao, hạn sử dụng còn xa. Rất hài lòng!",
+            "Rượu vang ngon, bánh quy bơ thơm và hạt điều giòn tan. Làm quà tặng đối tác cực kỳ sang trọng.",
+            "Giao hàng nhanh, đóng gói đẹp đúng không khí Tết. Sẽ tiếp tục ủng hộ shop vào dịp sau.",
+            "Sản phẩm giống hình 100%. Tư vấn nhiệt tình và chu đáo. Đánh giá 5 sao cho chất lượng phục vụ.",
+            "Hộp quà thiết tế tinh tế, sang trọng, các món hạt ăn rất ngon và không bị gắt dầu."
+        };
+
+        for (int i = 0; i < giftBoxes.Count; i++)
+        {
+            reviews.Add(new Review
+            {
+                OrderId = "MockOrderId_" + i,
+                GiftBoxId = giftBoxes[i].Id,
+                UserId = memberUser.Id,
+                Rating = 5 - (i % 2),
+                Comment = sampleComments[i % sampleComments.Length],
+                Status = "APPROVED",
+                CreatedAt = DateTime.UtcNow.AddDays(-i)
+            });
+        }
+
+        await context.Reviews.AddRangeAsync(reviews);
     }
 }
 
