@@ -1,0 +1,24 @@
+{
+  "type": "Compass Connections",
+  "version": {
+    "$numberInt": "1"
+  },
+  "connections": [
+    {
+      "id": "4d88d299-76af-41b7-82b6-f43aa8bf1edf",
+      "lastUsed": {
+        "$date": {
+          "$numberLong": "1774509685312"
+        }
+      },
+      "favorite": {
+        "name": "swd.ewfailu.mongodb.net"
+      },
+      "savedConnectionType": "recent",
+      "connectionOptions": {
+        "connectionString": "mongodb+srv://ShopHangTet@swd.ewfailu.mongodb.net/",
+        "oidc": {}
+      }
+    }
+  ]
+}
