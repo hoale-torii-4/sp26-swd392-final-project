@@ -139,11 +139,22 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Đăng ký AI Service
-var groqApiKey = builder.Configuration["Groq:ApiKey"]
-    ?? throw new InvalidOperationException("Groq ApiKey is required. Please configure Groq:ApiKey in appsettings.json.");
+var llmApiKey = builder.Configuration["Llm:ApiKey"]
+    ?? builder.Configuration["LLM_API_KEY"]
+    ?? builder.Configuration["Groq:ApiKey"]
+    ?? builder.Configuration["GROQ_API_KEY"]
+    ?? "sk-a44a2b72ee610b60513f3e8ca17f413ad5c3708c";
+
+var llmBaseUrl = builder.Configuration["Llm:BaseUrl"]
+    ?? builder.Configuration["LLM_BASE_URL"]
+    ?? "https://api.vilao.ai/v1";
+
+var llmModel = builder.Configuration["Llm:Model"]
+    ?? builder.Configuration["LLM_MODEL"]
+    ?? "ram/gemini-3.5-flash-low";
 
 builder.Services.AddSingleton<AiService>(sp =>
-    new AiService(groqApiKey)); // Đưa Groq Key vào
+    new AiService(llmApiKey, llmBaseUrl, llmModel));
 
 var app = builder.Build();
 

@@ -1,4 +1,4 @@
-﻿using System.Net.Http.Headers;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -7,18 +7,21 @@ namespace ShopHangTet.Services
     public class AiService : IAiService
     {
         private readonly HttpClient _httpClient;
+        private readonly string _model;
 
-        public AiService(string apiKey)
+        public AiService(string apiKey, string baseUrl = "https://api.vilao.ai/v1", string model = "ram/gemini-3.5-flash-low")
         {
+            var normalizedBaseUrl = string.IsNullOrWhiteSpace(baseUrl) ? "https://api.vilao.ai/v1/" : baseUrl.TrimEnd('/') + "/";
+
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri("https://api.groq.com/openai/v1/")
+                BaseAddress = new Uri(normalizedBaseUrl)
             };
 
             _httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", apiKey);
 
-            // Xóa mấy cái Header HTTP-Referer với X-Title đi vì Google không cần cái này
+            _model = string.IsNullOrWhiteSpace(model) ? "ram/gemini-3.5-flash-low" : model;
         }
 
         public async Task<string> AskAsync(string message)
@@ -32,12 +35,12 @@ Quy tắc tối thượng:
 
             var requestBody = new
             {
-                model = "llama-3.3-70b-versatile",
+                model = _model,
                 messages = new[]
                 {
-        new { role = "system", content = systemPrompt },
-        new { role = "user", content = message }
-    },
+                    new { role = "system", content = systemPrompt },
+                    new { role = "user", content = message }
+                },
                 max_tokens = 2000
             };
 
@@ -61,13 +64,13 @@ Quy tắc tối thượng:
                       .GetProperty("content")
                       .GetString() ?? "";
         }
-        // Thêm hàm này vào dưới hàm AskAsync cũ trong file AiService.cs
+
         public async Task<string> AskWithHistoryAsync(List<object> conversationHistory)
         {
             var requestBody = new
             {
-                model = "llama-3.3-70b-versatile", // Hoặc model Groq/Gemini bạn đang dùng
-                messages = conversationHistory, // Đẩy nguyên cục lịch sử vào đây
+                model = _model,
+                messages = conversationHistory,
                 max_tokens = 2000
             };
 
@@ -90,4 +93,4 @@ Quy tắc tối thượng:
                       .GetString() ?? "";
         }
     }
-}
+}

@@ -3,7 +3,7 @@ import axiosRetry from 'axios-retry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // TODO: Replace with your actual API URL or use env config
-const API_BASE_URL = 'https://shophangtet-api.onrender.com/api';
+const API_BASE_URL = 'https://shoplocxuanapi.onrender.com/api';
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
