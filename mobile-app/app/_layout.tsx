@@ -1,12 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '../contexts/AuthContext';
 import { AppColors } from '../constants/theme';
 import Toast, { BaseToast, ErrorToast, ToastConfig } from 'react-native-toast-message';
 import AIChatBox from '../components/AIChatBox';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Global Toast Config
 const toastConfig: ToastConfig = {
@@ -61,6 +64,9 @@ const toastConfig: ToastConfig = {
 };
 
 export default function RootLayout() {
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
