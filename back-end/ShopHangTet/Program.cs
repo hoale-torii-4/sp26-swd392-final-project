@@ -139,19 +139,27 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 
 // Đăng ký AI Service
-var llmApiKey = builder.Configuration["Llm:ApiKey"]
-    ?? builder.Configuration["LLM_API_KEY"]
-    ?? builder.Configuration["Groq:ApiKey"]
-    ?? builder.Configuration["GROQ_API_KEY"]
-    ?? "sk-a44a2b72ee610b60513f3e8ca17f413ad5c3708c";
+// Environment variables take precedence over appsettings so deployments can
+// change the provider without changing the application files.
+static string? FirstConfiguredValue(params string?[] values) =>
+    values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
 
-var llmBaseUrl = builder.Configuration["Llm:BaseUrl"]
-    ?? builder.Configuration["LLM_BASE_URL"]
-    ?? "https://api.vilao.ai/v1";
+var llmApiKey = FirstConfiguredValue(
+    builder.Configuration["LLM_API_KEY"],
+    builder.Configuration["Llm:ApiKey"],
+    builder.Configuration["GROQ_API_KEY"],
+    builder.Configuration["Groq:ApiKey"]
+) ?? string.Empty;
 
-var llmModel = builder.Configuration["Llm:Model"]
-    ?? builder.Configuration["LLM_MODEL"]
-    ?? "ram/gemini-3.5-flash-low";
+var llmBaseUrl = FirstConfiguredValue(
+    builder.Configuration["LLM_BASE_URL"],
+    builder.Configuration["Llm:BaseUrl"]
+) ?? "https://api.vilao.ai/v1";
+
+var llmModel = FirstConfiguredValue(
+    builder.Configuration["LLM_MODEL"],
+    builder.Configuration["Llm:Model"]
+) ?? "ram/gemini-3.5-flash-low";
 
 builder.Services.AddSingleton<AiService>(sp =>
     new AiService(llmApiKey, llmBaseUrl, llmModel));

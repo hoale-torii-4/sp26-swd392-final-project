@@ -11,17 +11,34 @@ export function createAiRouter(aiService) {
     // ========== POST /api/ai/chat ==========
     router.post('/chat', async (req, res) => {
         try {
-            const { Message, Language } = req.body;
+            // Accept the current chat-box payload (`messages`, `language`) and
+            // the legacy single-message payload for backwards compatibility.
+            const { messages, language, Message, Language } = req.body;
+            const history = Array.isArray(messages) ? messages : [];
+            const lastMessage = history
+                .slice()
+                .reverse()
+                .find((item) => item && item.sender?.toUpperCase() !== 'BOT' && item.sender?.toUpperCase() !== 'STAFF')
+                ?.message || Message;
 
-            if (!Message || !Message.trim()) {
+            if (!lastMessage || !String(lastMessage).trim()) {
                 return res.status(400).json(ApiResponse.error('Message is required.'));
             }
 
-            const language = Language?.trim() || 'Vietnamese';
+            const responseLanguage = (language || Language || 'Vietnamese').trim();
+            const promptMessages = history.length
+                ? history.map((item) => ({
+                    role: item.sender?.toUpperCase() === 'BOT' || item.sender?.toUpperCase() === 'STAFF' ? 'assistant' : 'user',
+                    content: item.message,
+                }))
+                : [{ role: 'user', content: String(lastMessage) }];
 
-            const prompt = `Respond in ${language}.\n${Message}`;
+            promptMessages.unshift({
+                role: 'system',
+                content: `Respond in ${responseLanguage}.`,
+            });
 
-            const result = await aiService.ask(prompt);
+            const result = await aiService.ask(promptMessages);
 
             return res.status(200).json({ response: result });
         } catch (error) {

@@ -40,6 +40,15 @@ services:
       - key: MONGODB_CONNECTION_STRING
         sync: false
 
+      # OpenAI-compatible LLM provider configuration
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: ram/gemini-3.5-flash-low
+      - key: LLM_BASE_URL
+        value: https://api.vilao.ai/v1
+
+      # Legacy fallback (kept for older deployments)
       - key: GROQ_API_KEY
         sync: false
 

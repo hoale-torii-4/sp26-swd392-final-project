@@ -112,7 +112,11 @@ async function main() {
   const orderService = new OrderService(deliverySlotRepository);
   const cartService = new CartService();
   const productService = new ProductService();
-  const aiService = new AiService(process.env.OPENROUTER_API_KEY);
+  const aiService = new AiService(
+    process.env.LLM_API_KEY,
+    process.env.LLM_BASE_URL,
+    process.env.LLM_MODEL,
+  );
   const orderExpirationService = new OrderExpirationService();
 
   // ========== Routes (Controllers) ==========

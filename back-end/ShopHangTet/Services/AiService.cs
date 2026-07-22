@@ -26,6 +26,8 @@ namespace ShopHangTet.Services
 
         public async Task<string> AskAsync(string message)
         {
+            EnsureApiKeyConfigured();
+
             // Viết một kịch bản thép cho con AI
             var systemPrompt = @"Bạn là nhân viên tư vấn nhiệt tình, duyên dáng của Shop Hàng Tết.
 Quy tắc tối thượng:
@@ -67,6 +69,8 @@ Quy tắc tối thượng:
 
         public async Task<string> AskWithHistoryAsync(List<object> conversationHistory)
         {
+            EnsureApiKeyConfigured();
+
             var requestBody = new
             {
                 model = _model,
@@ -92,5 +96,14 @@ Quy tắc tối thượng:
                       .GetProperty("content")
                       .GetString() ?? "";
         }
+
+        private void EnsureApiKeyConfigured()
+        {
+            if (string.IsNullOrWhiteSpace(_httpClient.DefaultRequestHeaders.Authorization?.Parameter))
+            {
+                throw new InvalidOperationException(
+                    "LLM API key is not configured. Set the LLM_API_KEY environment variable.");
+            }
+        }
     }
-}
+}

@@ -1,11 +1,13 @@
 /**
  * AI Service - Tương đương AiService.cs
- * Sử dụng OpenRouter API
+ * Sử dụng OpenAI-compatible LLM API
  */
 export class AiService {
-    constructor(apiKey) {
-        this.apiKey = apiKey || process.env.OPENROUTER_API_KEY || '';
-        this.baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    constructor(apiKey, baseUrl, model) {
+        this.apiKey = apiKey || process.env.LLM_API_KEY || process.env.OPENROUTER_API_KEY || '';
+        const configuredBaseUrl = baseUrl || process.env.LLM_BASE_URL || 'https://api.vilao.ai/v1';
+        this.baseUrl = `${configuredBaseUrl.replace(/\/$/, '')}/chat/completions`;
+        this.model = model || process.env.LLM_MODEL || 'ram/gemini-3.5-flash-low';
     }
 
     /**
@@ -15,12 +17,12 @@ export class AiService {
      */
     async ask(message) {
         if (!this.apiKey) {
-            throw new Error('OpenRouter API key not configured');
+            throw new Error('LLM API key not configured. Set LLM_API_KEY.');
         }
 
         const requestBody = {
-            model: 'qwen/qwen3-vl-235b-a22b-thinking',
-            messages: [{ role: 'user', content: message }],
+            model: this.model,
+            messages: Array.isArray(message) ? message : [{ role: 'user', content: message }],
             max_tokens: 1000,
         };
 
