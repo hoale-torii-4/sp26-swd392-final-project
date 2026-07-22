@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useLocation } from "react-router-dom";
-import { chatService, type ChatMessagePayload } from "../services/chatService";
+import { Link, useLocation } from "react-router-dom";
+import { chatService, type ChatMessagePayload, type ChatProduct } from "../services/chatService";
 import { authService } from "../services/authService";
 import { FiMessageSquare, FiChevronDown, FiSend } from "react-icons/fi";
 
@@ -9,6 +9,69 @@ interface Message {
     role: "user" | "assistant";
     content: string;
     timestamp: Date;
+    products?: ChatProduct[];
+}
+
+function renderInlineMarkdown(text: string, keyPrefix: string) {
+    const tokenPattern = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*|\[[^\]]+\]\([^\)]+\))/g;
+    return text.split(tokenPattern).map((token, index) => {
+        if (!token) return null;
+        if (token.startsWith("**") && token.endsWith("**")) {
+            return <strong key={`${keyPrefix}-b-${index}`}>{token.slice(2, -2)}</strong>;
+        }
+        if (token.startsWith("*") && token.endsWith("*")) {
+            return <em key={`${keyPrefix}-i-${index}`}>{token.slice(1, -1)}</em>;
+        }
+        if (token.startsWith("`") && token.endsWith("`")) {
+            return <code key={`${keyPrefix}-c-${index}`} className="px-1 py-0.5 rounded bg-gray-100 text-[#8B1A1A] text-[0.9em]">{token.slice(1, -1)}</code>;
+        }
+        const linkMatch = token.match(/^\[([^\]]+)\]\(([^\)]+)\)$/);
+        if (linkMatch) {
+            const href = linkMatch[2].startsWith("/") ? linkMatch[2] : undefined;
+            return href ? <a key={`${keyPrefix}-a-${index}`} href={href} className="underline text-[#8B1A1A]">{linkMatch[1]}</a> : token;
+        }
+        return token;
+    });
+}
+
+function MarkdownMessage({ content }: { content: string }) {
+    const lines = content.split(/\r?\n/);
+    return (
+        <div className="space-y-1.5">
+            {lines.map((line, index) => {
+                const key = `line-${index}`;
+                if (!line.trim()) return <div key={key} className="h-1" />;
+                const heading = line.match(/^#{1,3}\s+(.+)$/);
+                if (heading) return <p key={key} className="font-bold text-[#8B1A1A]">{renderInlineMarkdown(heading[1], key)}</p>;
+                const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+                if (bullet) return <div key={key} className="flex gap-2"><span>•</span><span>{renderInlineMarkdown(bullet[1], key)}</span></div>;
+                const numbered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+                if (numbered) return <div key={key} className="pl-1">{renderInlineMarkdown(line, key)}</div>;
+                return <p key={key}>{renderInlineMarkdown(line, key)}</p>;
+            })}
+        </div>
+    );
+}
+
+function ProductSuggestions({ products }: { products: ChatProduct[] }) {
+    if (!products.length) return null;
+    return (
+        <div className="mt-2 grid grid-cols-1 gap-2">
+            {products.map((product) => {
+                const href = `/gift-boxes/${product.id}${product.type === "item" ? "?type=item" : ""}`;
+                return (
+                    <Link key={`${product.type}-${product.id}`} to={href} className="flex gap-2 p-2 rounded-xl border border-[#ead9d9] bg-[#fffafa] hover:border-[#8B1A1A] hover:shadow-sm transition-all">
+                        {product.image ? <img src={product.image} alt="" className="w-12 h-12 rounded-lg object-cover shrink-0" /> : <div className="w-12 h-12 rounded-lg bg-[#f4e7e7] shrink-0" />}
+                        <span className="min-w-0">
+                            <span className="block font-semibold text-xs text-gray-800 truncate">{product.name}</span>
+                            <span className="block text-xs text-[#8B1A1A] font-bold mt-1">{product.price.toLocaleString("vi-VN")}₫</span>
+                            <span className="block text-[10px] text-gray-400 mt-0.5">Bấm để xem chi tiết</span>
+                        </span>
+                    </Link>
+                );
+            })}
+        </div>
+    );
 }
 
 const WELCOME_MSG: Message = {
@@ -129,6 +192,7 @@ export default function AIChatBox() {
                 role: "assistant",
                 content: data.response,
                 timestamp: new Date(),
+                products: data.products ?? [],
             };
             setMessages((prev) => [...prev, botMsg]);
         } catch {
@@ -458,8 +522,9 @@ export default function AIChatBox() {
                                         : "bg-white text-gray-800 rounded-bl-md shadow-sm border border-gray-100"
                                         }`}
                                 >
-                                    {msg.content}
+                                    {msg.role === "assistant" ? <MarkdownMessage content={msg.content} /> : msg.content}
                                 </div>
+                                {msg.role === "assistant" && <ProductSuggestions products={msg.products ?? []} />}
                                 <p className={`text-[10px] text-gray-400 mt-1 ${msg.role === "user" ? "text-right" : "text-left"}`}>
                                     {formatTime(msg.timestamp)}
                                 </p>

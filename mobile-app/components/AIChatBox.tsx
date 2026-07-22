@@ -5,9 +5,10 @@ import {
     Platform, Modal, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import Svg, { Line, Circle, Ellipse, G, Path, Defs, RadialGradient, Stop } from 'react-native-svg';
-import { usePathname } from 'expo-router';
-import { chatService, type ChatMessagePayload } from '../services/chatService';
+import { usePathname, useRouter } from 'expo-router';
+import { chatService, type ChatMessagePayload, type ChatProduct } from '../services/chatService';
 import { useAuth } from '../contexts/AuthContext';
 import { AppColors, BorderRadius, Spacing } from '../constants/theme';
 
@@ -95,6 +96,59 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+    products?: ChatProduct[];
+}
+
+function MarkdownText({ content, style }: { content: string; style: any }) {
+    const renderInline = (line: string, lineKey: string) => {
+        const tokens = line.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g);
+        return tokens.map((token, index) => {
+            if (token.startsWith('**') && token.endsWith('**')) {
+                return <Text key={`${lineKey}-${index}`} style={{ fontWeight: '700' }}>{token.slice(2, -2)}</Text>;
+            }
+            if (token.startsWith('*') && token.endsWith('*')) {
+                return <Text key={`${lineKey}-${index}`} style={{ fontStyle: 'italic' }}>{token.slice(1, -1)}</Text>;
+            }
+            if (token.startsWith('`') && token.endsWith('`')) {
+                return <Text key={`${lineKey}-${index}`} style={{ color: '#8B1A1A', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>{token.slice(1, -1)}</Text>;
+            }
+            return token;
+        });
+    };
+
+    return (
+        <View>
+            {content.split(/\r?\n/).map((line, index) => {
+                if (!line.trim()) return <View key={`blank-${index}`} style={{ height: 5 }} />;
+                const heading = line.match(/^#{1,3}\s+(.+)$/);
+                const bullet = line.match(/^\s*[-*]\s+(.+)$/);
+                const text = heading?.[1] || bullet?.[1] || line;
+                return (
+                    <Text key={`line-${index}`} style={[style, heading && { fontWeight: '700', color: '#8B1A1A' }, { marginBottom: 2 }]}>
+                        {bullet ? '•  ' : ''}{renderInline(text, `line-${index}`)}
+                    </Text>
+                );
+            })}
+        </View>
+    );
+}
+
+function ProductSuggestions({ products, onPress }: { products: ChatProduct[]; onPress: (product: ChatProduct) => void }) {
+    if (!products.length) return null;
+    return (
+        <View style={styles.productSuggestions}>
+            {products.map((product) => (
+                <TouchableOpacity key={`${product.type}-${product.id}`} style={styles.productCard} onPress={() => onPress(product)} activeOpacity={0.75}>
+                    {product.image ? <Image source={{ uri: product.image }} style={styles.productImage} contentFit="cover" /> : <View style={[styles.productImage, styles.productImagePlaceholder]} />}
+                    <View style={styles.productInfo}>
+                        <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+                        <Text style={styles.productPrice}>{product.price.toLocaleString('vi-VN')}₫</Text>
+                        <Text style={styles.productLink}>Xem chi tiết ›</Text>
+                    </View>
+                </TouchableOpacity>
+            ))}
+        </View>
+    );
 }
 
 const WELCOME_MSG: Message = {
@@ -106,6 +160,7 @@ const WELCOME_MSG: Message = {
 
 export default function AIChatBox() {
     const pathname = usePathname();
+    const router = useRouter();
     const { user } = useAuth();
 
     const [isOpen, setIsOpen] = useState(false);
@@ -192,6 +247,7 @@ export default function AIChatBox() {
                 role: 'assistant',
                 content: data.response,
                 timestamp: new Date(),
+                products: data.products ?? [],
             };
             setMessages(prev => [...prev, botMsg]);
         } catch (error) {
@@ -290,10 +346,9 @@ export default function AIChatBox() {
                                 return (
                                     <View style={[styles.messageRow, isUser ? styles.messageRowUser : styles.messageRowBot]}>
                                         <View style={[styles.messageBubble, isUser ? styles.messageBubbleUser : styles.messageBubbleBot]}>
-                                            <Text style={isUser ? styles.messageTextUser : styles.messageTextBot}>
-                                                {item.content}
-                                            </Text>
+                                            {isUser ? <Text style={styles.messageTextUser}>{item.content}</Text> : <MarkdownText content={item.content} style={styles.messageTextBot} />}
                                         </View>
+                                        {!isUser && <ProductSuggestions products={item.products ?? []} onPress={(product) => router.push({ pathname: '/product/[id]', params: { id: product.id, ...(product.type === 'item' ? { type: 'item' } : {}) } })} />}
                                         <Text style={[styles.timestamp, isUser ? styles.timestampUser : styles.timestampBot]}>
                                             {formatTime(item.timestamp)}
                                         </Text>
@@ -439,6 +494,48 @@ const styles = StyleSheet.create({
     },
     messageTextBot: {
         fontSize: 14, color: AppColors.text, lineHeight: 22,
+    },
+    productSuggestions: {
+        marginTop: 8,
+        gap: 8,
+    },
+    productCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 8,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#EAD9D9',
+        backgroundColor: '#FFFAFA',
+    },
+    productImage: {
+        width: 52,
+        height: 52,
+        borderRadius: 9,
+        backgroundColor: '#F4E7E7',
+    },
+    productImagePlaceholder: {
+        backgroundColor: '#F4E7E7',
+    },
+    productInfo: {
+        flex: 1,
+        marginLeft: 9,
+    },
+    productName: {
+        color: AppColors.text,
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    productPrice: {
+        color: '#8B1A1A',
+        fontSize: 12,
+        fontWeight: '700',
+        marginTop: 3,
+    },
+    productLink: {
+        color: AppColors.textMuted,
+        fontSize: 10,
+        marginTop: 2,
     },
     timestamp: {
         fontSize: 10, color: AppColors.textMuted, marginTop: 4,

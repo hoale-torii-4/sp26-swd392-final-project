@@ -9,6 +9,17 @@ export interface ChatMessagePayload {
 
 export interface ChatResponse {
     response: string;
+    products?: ChatProduct[];
+}
+
+export interface ChatProduct {
+    type: "giftbox" | "item";
+    id: string;
+    name: string;
+    description?: string;
+    price: number;
+    image?: string | null;
+    stockQuantity?: number;
 }
 
 export const chatService = {
